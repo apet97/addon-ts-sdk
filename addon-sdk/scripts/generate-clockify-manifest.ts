@@ -2,6 +2,36 @@ import * as fs from "fs";
 import * as path from "path";
 import { toMethodName, toClassName } from "./naming";
 
+// Minimal shape of the JSON-schema nodes we traverse. The schemas are untyped JSON; this captures
+// just the fields the generator reads so the pipeline below is typed end-to-end.
+interface SchemaNode {
+  type?: string | string[];
+  enum?: string[];
+  $ref?: string;
+  anyOf?: SchemaNode[];
+  items?: SchemaNode;
+  properties?: Record<string, SchemaNode>;
+  required?: string[];
+  description?: string;
+  version?: string;
+  definitions?: Record<string, SchemaNode>;
+}
+
+interface PropInfo {
+  name: string;
+  isReq: boolean;
+  tsType: string;
+  desc: string;
+  node: SchemaNode;
+}
+
+interface ObjectDef {
+  defName: string | null;
+  className: string;
+  properties: PropInfo[];
+  requiredList: string[];
+}
+
 const DEFINITIONS_MAP: Record<string, string> = {
   lifecycle: "lifecycleEvent",
 };
@@ -43,9 +73,16 @@ function resolveRef(ref: string): string {
   return ref.substring(ref.lastIndexOf("/") + 1);
 }
 
-function getTSType(node: any, definitions: any): string {
+// Enum values for a property node, resolving a `$ref` to its definition first. Returns [] when the
+// node (or the definition it references) has no enum.
+function getEnumValues(node: SchemaNode, definitions: Record<string, SchemaNode>): string[] {
+  const resolved = node.$ref ? definitions[resolveRef(node.$ref)] : node;
+  return resolved && resolved.enum ? resolved.enum : [];
+}
+
+function getTSType(node: SchemaNode, definitions: Record<string, SchemaNode>): string {
   if (node.anyOf) {
-    return node.anyOf.map((n: any) => getTSType(n, definitions)).join(" | ");
+    return node.anyOf.map((n) => getTSType(n, definitions)).join(" | ");
   }
   if (node.$ref) {
     const ref = resolveRef(node.$ref);
@@ -56,7 +93,7 @@ function getTSType(node: any, definitions: any): string {
   }
   const type = node.type;
   if (Array.isArray(type)) {
-    return type.map((t: string) => {
+    return type.map((t) => {
       if (t === "integer") return "number";
       if (t === "array") return "any[]";
       if (t === "object") return "Record<string, any>";
@@ -71,7 +108,7 @@ function getTSType(node: any, definitions: any): string {
   }
   if (type === "string") {
     if (node.enum) {
-      return node.enum.map((e: string) => JSON.stringify(e)).join(" | ");
+      return node.enum.map((e) => JSON.stringify(e)).join(" | ");
     }
     return "string";
   }
@@ -87,237 +124,241 @@ function getTSType(node: any, definitions: any): string {
   return "any";
 }
 
-function generateVersion(schemaPath: string, outDir: string) {
-  const schemaRaw = fs.readFileSync(schemaPath, "utf-8");
-  const schema = JSON.parse(schemaRaw);
-  const version = schema.version;
-  const versionSuffix = version.replace(".", "_");
-  const definitions = schema.definitions;
-
-  const imports = `import { ClockifyResource } from "../clockify-resource";\n\n`;
-  let content = imports;
-
-  // Generate top-level enums (scope, minimalSubscriptionPlan)
-  for (const [defName, defNode] of Object.entries(definitions) as [string, any][]) {
-    if (defNode.type === "string" && defNode.enum) {
-      const className = getDefinitionSimpleClassName(defName);
-      content += `export const ${className} = {\n`;
-      for (const val of defNode.enum) {
-        content += `  ${val}: "${val}",\n`;
-      }
-      content += `} as const;\n\n`;
-      content += `export type ${className} = typeof ${className}[keyof typeof ${className}];\n\n`;
-    }
+function getPropertiesInfo(
+  propertiesNode: Record<string, SchemaNode>,
+  requiredList: string[],
+  definitions: Record<string, SchemaNode>,
+): PropInfo[] {
+  const required = new Set(requiredList);
+  const props: PropInfo[] = [];
+  for (const [propName, propNode] of Object.entries(propertiesNode)) {
+    if (propName === "schemaVersion") continue;
+    props.push({
+      name: propName,
+      isReq: required.has(propName),
+      tsType: getTSType(propNode, definitions),
+      desc: propNode.description || "",
+      node: propNode,
+    });
   }
+  return props;
+}
 
-  // Helper to gather properties of an object
-  function getPropertiesInfo(propertiesNode: any, requiredList: string[]) {
-    const props: any[] = [];
-    const required = new Set(requiredList);
-    for (const [propName, propNode] of Object.entries(propertiesNode) as [string, any][]) {
-      if (propName === "schemaVersion") continue;
-      const isReq = required.has(propName);
-      const tsType = getTSType(propNode, definitions);
-      const desc = propNode.description || "";
-      props.push({
-        name: propName,
-        isReq,
-        tsType,
-        desc,
-        node: propNode,
+// The manifest plus every `object` definition, each carrying its resolved properties and required
+// list. The manifest is appended last with `defName: null` (it has no definition name).
+function collectObjectDefs(schema: SchemaNode, definitions: Record<string, SchemaNode>): ObjectDef[] {
+  const objectDefs: ObjectDef[] = [];
+  for (const [defName, defNode] of Object.entries(definitions)) {
+    if (defNode.type === "object") {
+      objectDefs.push({
+        defName,
+        className: getDefinitionSimpleClassName(defName),
+        properties: getPropertiesInfo(defNode.properties ?? {}, defNode.required ?? [], definitions),
+        requiredList: defNode.required ?? [],
       });
     }
-    return props;
   }
+  objectDefs.push({
+    defName: null,
+    className: "ClockifyManifest",
+    properties: getPropertiesInfo(schema.properties ?? {}, schema.required ?? [], definitions),
+    requiredList: schema.required ?? [],
+  });
+  return objectDefs;
+}
 
-  // Pre-process definitions to generate interfaces first
-  const objectDefs: { defName: string | null; className: string; properties: any[]; requiredList: string[] }[] = [];
-  for (const [defName, defNode] of Object.entries(definitions) as [string, any][]) {
-    if (defNode.type === "object") {
+// Required builder steps follow the schema's `required` array order to match the Java annotation
+// processor (DefinitionProcessor reads `required`, not declaration order). Optionals keep
+// declaration order and collapse into a single trailing step.
+function splitProps(obj: ObjectDef): { requiredProps: PropInfo[]; optionalProps: PropInfo[] } {
+  const requiredProps = obj.requiredList
+    .map((name) => obj.properties.find((p) => p.name === name))
+    .filter((p): p is PropInfo => p != null && p.isReq);
+  const optionalProps = obj.properties.filter((p) => !p.isReq);
+  return { requiredProps, optionalProps };
+}
+
+function firstStepName(obj: ObjectDef, requiredProps: PropInfo[], optionalProps: PropInfo[]): string {
+  if (requiredProps.length > 0) return `${obj.className}Builder_${requiredProps[0].name}`;
+  return optionalProps.length > 0 ? `${obj.className}Builder_Optional` : `${obj.className}Builder_Build`;
+}
+
+// Top-level enum constants (scope, minimalSubscriptionPlan, ...) as `as const` objects.
+function emitEnums(definitions: Record<string, SchemaNode>): string {
+  let out = "";
+  for (const [defName, defNode] of Object.entries(definitions)) {
+    if (defNode.type === "string" && defNode.enum) {
       const className = getDefinitionSimpleClassName(defName);
-      const requiredList = defNode.required || [];
-      const properties = getPropertiesInfo(defNode.properties, requiredList);
-      objectDefs.push({ defName, className, properties, requiredList });
+      out += `export const ${className} = {\n`;
+      for (const val of defNode.enum) {
+        out += `  ${val}: "${val}",\n`;
+      }
+      out += `} as const;\n\n`;
+      out += `export type ${className} = typeof ${className}[keyof typeof ${className}];\n\n`;
     }
   }
+  return out;
+}
 
-  // Add the Manifest itself as an object definition
-  const manifestClassName = "ClockifyManifest";
-  const manifestRequired = schema.required || [];
-  const manifestProperties = getPropertiesInfo(schema.properties, manifestRequired);
-  objectDefs.push({ defName: null, className: manifestClassName, properties: manifestProperties, requiredList: manifestRequired });
+// The readonly data interface for one model (manifest or definition).
+function emitInterface(obj: ObjectDef, version: string): string {
+  const isManifest = obj.defName === null;
+  const isResource = obj.defName !== null && ["lifecycle", "webhook", "component"].includes(obj.defName);
+  const heritage = isResource ? " extends ClockifyResource" : "";
 
-  // Generate Interfaces
-  for (const obj of objectDefs) {
-    const isManifest = obj.defName === null;
-    const isResource = obj.defName !== null && ["lifecycle", "webhook", "component"].includes(obj.defName);
-    const heritage = isResource ? " extends ClockifyResource" : "";
+  let out = `export interface ${obj.className}${heritage} {\n`;
+  if (isManifest) {
+    out += `  readonly schemaVersion: "${version}";\n`;
+  }
+  for (const prop of obj.properties) {
+    const optional = prop.isReq ? "" : "?";
+    out += `  readonly ${prop.name}${optional}: ${prop.tsType};\n`;
+  }
+  out += `}\n\n`;
+  return out;
+}
 
-    content += `export interface ${obj.className}${heritage} {\n`;
-    if (isManifest) {
-      content += `  readonly schemaVersion: "${version}";\n`;
+// The type-state step interfaces: one per required property (each returning the next step), then a
+// single Optional step (every optional setter + build) or a bare Build step when there are none.
+function emitStepInterfaces(
+  obj: ObjectDef,
+  requiredProps: PropInfo[],
+  optionalProps: PropInfo[],
+  definitions: Record<string, SchemaNode>,
+): string {
+  let out = "";
+  for (let i = 0; i < requiredProps.length; i++) {
+    const prop = requiredProps[i];
+    const stepName = `${obj.className}Builder_${prop.name}`;
+    const nextStepName = i === requiredProps.length - 1
+      ? (optionalProps.length > 0 ? `${obj.className}Builder_Optional` : `${obj.className}Builder_Build`)
+      : `${obj.className}Builder_${requiredProps[i + 1].name}`;
+
+    out += `export interface ${stepName} {\n`;
+    out += `  ${prop.name}(value: ${prop.tsType}): ${nextStepName};\n`;
+    for (const enumVal of getEnumValues(prop.node, definitions)) {
+      out += `  ${getEnumSetterMethodName(obj.defName, prop.name, enumVal)}(): ${nextStepName};\n`;
     }
-    for (const prop of obj.properties) {
-      const optional = prop.isReq ? "" : "?";
-      content += `  readonly ${prop.name}${optional}: ${prop.tsType};\n`;
-    }
-    content += `}\n\n`;
+    out += `}\n\n`;
   }
 
-  // Generate Step Builders
-  for (const obj of objectDefs) {
-    const isManifest = obj.defName === null;
-    // Required builder steps must follow the schema's `required` array order to match the
-    // Java annotation processor (DefinitionProcessor reads `required`, not declaration order).
-    const requiredProps = obj.requiredList
-      .map((name: string) => obj.properties.find((p: any) => p.name === name))
-      .filter((p: any): p is any => p != null && p.isReq);
-    const optionalProps = obj.properties.filter(p => !p.isReq);
-
-    // Write step interfaces
-    for (let i = 0; i < requiredProps.length; i++) {
-      const prop = requiredProps[i];
-      const stepName = `${obj.className}Builder_${prop.name}`;
-      const nextStepName = i === requiredProps.length - 1
-        ? (optionalProps.length > 0 ? `${obj.className}Builder_Optional` : `${obj.className}Builder_Build`)
-        : `${obj.className}Builder_${requiredProps[i + 1].name}`;
-
-      content += `export interface ${stepName} {\n`;
-      content += `  ${prop.name}(value: ${prop.tsType}): ${nextStepName};\n`;
-
-      // Enum helpers
-      let enumNode = prop.node;
-      if (enumNode.$ref) {
-        const refName = resolveRef(enumNode.$ref);
-        enumNode = definitions[refName];
-      }
-      if (enumNode && enumNode.enum) {
-        for (const enumVal of enumNode.enum) {
-          const helperName = getEnumSetterMethodName(obj.defName, prop.name, enumVal);
-          content += `  ${helperName}(): ${nextStepName};\n`;
-        }
-      }
-      content += `}\n\n`;
-    }
-
-    // Optional steps or Build step
+  if (optionalProps.length > 0) {
     const optionalStepName = `${obj.className}Builder_Optional`;
-    if (optionalProps.length > 0) {
-      content += `export interface ${optionalStepName} {\n`;
-      for (const prop of optionalProps) {
-        content += `  ${prop.name}(value: ${prop.tsType}): ${optionalStepName};\n`;
-
-        // Enum helpers for optional fields
-        let enumNode = prop.node;
-        if (enumNode.$ref) {
-          const refName = resolveRef(enumNode.$ref);
-          enumNode = definitions[refName];
-        }
-        if (enumNode && enumNode.enum) {
-          for (const enumVal of enumNode.enum) {
-            const helperName = getEnumSetterMethodName(obj.defName, prop.name, enumVal);
-            content += `  ${helperName}(): ${optionalStepName};\n`;
-          }
-        }
-      }
-      content += `  build(): ${obj.className};\n`;
-      content += `}\n\n`;
-    } else {
-      const buildStepName = `${obj.className}Builder_Build`;
-      content += `export interface ${buildStepName} {\n`;
-      content += `  build(): ${obj.className};\n`;
-      content += `}\n\n`;
-    }
-
-    // Implementation class
-    const builderName = `${obj.className}BuilderImpl`;
-    const firstStep = requiredProps.length > 0
-      ? `${obj.className}Builder_${requiredProps[0].name}`
-      : (optionalProps.length > 0 ? `${obj.className}Builder_Optional` : `${obj.className}Builder_Build`);
-
-    content += `class ${builderName} implements `;
-    const interfacesList: string[] = [];
-    for (const prop of requiredProps) {
-      interfacesList.push(`${obj.className}Builder_${prop.name}`);
-    }
-    if (optionalProps.length > 0) {
-      interfacesList.push(`${obj.className}Builder_Optional`);
-    } else {
-      interfacesList.push(`${obj.className}Builder_Build`);
-    }
-    content += interfacesList.join(", ") + " {\n";
-
-    // Fields
-    for (const prop of obj.properties) {
-      content += `  private _${prop.name}: any;\n`;
-    }
-    content += `\n`;
-
-    // Constructor
-    content += `  constructor() {\n`;
-    for (const prop of obj.properties) {
-      // Arrays default to empty list in Java SDK
-      if (prop.node.type === "array") {
-        content += `    this._${prop.name} = [];\n`;
+    out += `export interface ${optionalStepName} {\n`;
+    for (const prop of optionalProps) {
+      out += `  ${prop.name}(value: ${prop.tsType}): ${optionalStepName};\n`;
+      for (const enumVal of getEnumValues(prop.node, definitions)) {
+        out += `  ${getEnumSetterMethodName(obj.defName, prop.name, enumVal)}(): ${optionalStepName};\n`;
       }
     }
-    content += `  }\n\n`;
+    out += `  build(): ${obj.className};\n`;
+    out += `}\n\n`;
+  } else {
+    out += `export interface ${obj.className}Builder_Build {\n`;
+    out += `  build(): ${obj.className};\n`;
+    out += `}\n\n`;
+  }
+  return out;
+}
 
-    // Implement primary setters
-    for (const prop of obj.properties) {
-      content += `  ${prop.name}(value: ${prop.tsType}): any {\n`;
-      content += `    this._${prop.name} = value;\n`;
-      content += `    return this;\n`;
-      content += `  }\n\n`;
+// The builder implementation class: fields, array defaults, primary + enum-helper setters, and the
+// runtime required-field guard in build().
+function emitImplClass(
+  obj: ObjectDef,
+  requiredProps: PropInfo[],
+  optionalProps: PropInfo[],
+  isManifest: boolean,
+  version: string,
+  definitions: Record<string, SchemaNode>,
+): string {
+  const builderName = `${obj.className}BuilderImpl`;
+  const interfaces = [
+    ...requiredProps.map((prop) => `${obj.className}Builder_${prop.name}`),
+    optionalProps.length > 0 ? `${obj.className}Builder_Optional` : `${obj.className}Builder_Build`,
+  ];
 
-      // Enum helpers
-      let enumNode = prop.node;
-      if (enumNode.$ref) {
-        const refName = resolveRef(enumNode.$ref);
-        enumNode = definitions[refName];
-      }
-      if (enumNode && enumNode.enum) {
-        for (const enumVal of enumNode.enum) {
-          const helperName = getEnumSetterMethodName(obj.defName, prop.name, enumVal);
-          content += `  ${helperName}(): any {\n`;
-          content += `    return this.${prop.name}("${enumVal}");\n`;
-          content += `  }\n\n`;
-        }
-      }
+  let out = `class ${builderName} implements ${interfaces.join(", ")} {\n`;
+  for (const prop of obj.properties) {
+    out += `  private _${prop.name}: any;\n`;
+  }
+  out += `\n`;
+
+  out += `  constructor() {\n`;
+  for (const prop of obj.properties) {
+    // Arrays default to an empty list, matching the Java SDK's field initializers.
+    if (prop.node.type === "array") {
+      out += `    this._${prop.name} = [];\n`;
     }
+  }
+  out += `  }\n\n`;
 
-    // Build method
-    content += `  build(): ${obj.className} {\n`;
-    // Required fields non-null assertion
-    for (const prop of requiredProps) {
-      content += `    if (this._${prop.name} === undefined || this._${prop.name} === null) {\n`;
-      content += `      throw new Error("Required field '${prop.name}' is missing.");\n`;
-      content += `    }\n`;
+  for (const prop of obj.properties) {
+    out += `  ${prop.name}(value: ${prop.tsType}): any {\n`;
+    out += `    this._${prop.name} = value;\n`;
+    out += `    return this;\n`;
+    out += `  }\n\n`;
+    for (const enumVal of getEnumValues(prop.node, definitions)) {
+      out += `  ${getEnumSetterMethodName(obj.defName, prop.name, enumVal)}(): any {\n`;
+      out += `    return this.${prop.name}("${enumVal}");\n`;
+      out += `  }\n\n`;
     }
-    content += `    return {\n`;
-    if (isManifest) {
-      content += `      schemaVersion: "${version}",\n`;
-    }
-    for (const prop of obj.properties) {
-      content += `      ${prop.name}: this._${prop.name},\n`;
-    }
-    content += `    } as any;\n`;
-    content += `  }\n`;
-    content += `}\n\n`;
-
-    // Static builder entrypoint
-    content += `export namespace ${obj.className} {\n`;
-    content += `  export function builder(): ${firstStep} {\n`;
-    content += `    return new ${builderName}();\n`;
-    content += `  }\n`;
-    content += `}\n\n`;
-
-    content += `export function ${obj.className}Builder(): ${firstStep} {\n`;
-    content += `  return new ${builderName}();\n`;
-    content += `}\n\n`;
   }
 
-  const outPath = path.join(outDir, `v${versionSuffix}.ts`);
+  out += `  build(): ${obj.className} {\n`;
+  for (const prop of requiredProps) {
+    out += `    if (this._${prop.name} === undefined || this._${prop.name} === null) {\n`;
+    out += `      throw new Error("Required field '${prop.name}' is missing.");\n`;
+    out += `    }\n`;
+  }
+  out += `    return {\n`;
+  if (isManifest) {
+    out += `      schemaVersion: "${version}",\n`;
+  }
+  for (const prop of obj.properties) {
+    out += `      ${prop.name}: this._${prop.name},\n`;
+  }
+  out += `    } as any;\n`;
+  out += `  }\n`;
+  out += `}\n\n`;
+  return out;
+}
+
+// The `Model.builder()` namespace entrypoint plus the standalone `ModelBuilder()` function.
+function emitEntrypoints(obj: ObjectDef, firstStep: string): string {
+  const builderName = `${obj.className}BuilderImpl`;
+  let out = `export namespace ${obj.className} {\n`;
+  out += `  export function builder(): ${firstStep} {\n`;
+  out += `    return new ${builderName}();\n`;
+  out += `  }\n`;
+  out += `}\n\n`;
+  out += `export function ${obj.className}Builder(): ${firstStep} {\n`;
+  out += `  return new ${builderName}();\n`;
+  out += `}\n\n`;
+  return out;
+}
+
+function emitObjectBuilder(obj: ObjectDef, version: string, definitions: Record<string, SchemaNode>): string {
+  const { requiredProps, optionalProps } = splitProps(obj);
+  const firstStep = firstStepName(obj, requiredProps, optionalProps);
+  return (
+    emitStepInterfaces(obj, requiredProps, optionalProps, definitions) +
+    emitImplClass(obj, requiredProps, optionalProps, obj.defName === null, version, definitions) +
+    emitEntrypoints(obj, firstStep)
+  );
+}
+
+function generateVersion(schemaPath: string, outDir: string): void {
+  const schema: SchemaNode = JSON.parse(fs.readFileSync(schemaPath, "utf-8"));
+  const version = schema.version!;
+  const definitions = schema.definitions ?? {};
+  const objectDefs = collectObjectDefs(schema, definitions);
+
+  let content = `import { ClockifyResource } from "../clockify-resource";\n\n`;
+  content += emitEnums(definitions);
+  for (const obj of objectDefs) content += emitInterface(obj, version);
+  for (const obj of objectDefs) content += emitObjectBuilder(obj, version, definitions);
+
+  const outPath = path.join(outDir, `v${version.replace(".", "_")}.ts`);
   fs.writeFileSync(outPath, content, "utf-8");
   console.log(`Generated manifest builder for version ${version} at ${outPath}`);
 }
