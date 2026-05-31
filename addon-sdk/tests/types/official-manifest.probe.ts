@@ -1,0 +1,74 @@
+// Compile-only fidelity probe: the SDK's generated v1.2 types must accept REAL official Clockify
+// manifests. This is the `ui-example` manifest from github.com/clockify/addon-examples verbatim
+// (every component type + fully nested structured settings). If the generated types drift from what
+// Clockify actually ships, `satisfies` fails to compile. Compiled by tsconfig.typecheck.json.
+import { generated } from "../../src";
+
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+const _uiExample = {
+  schemaVersion: "1.2",
+  key: "ui-examples",
+  name: "UI examples",
+  description: "Example of every UI entrypoint for an addon",
+  baseUrl: "https://271a-95-107-169-8.eu.ngrok.io",
+  lifecycle: [
+    { type: "INSTALLED", path: "/lifecycle/installed" },
+    { type: "DELETED", path: "/lifecycle/uninstalled" },
+    { type: "SETTINGS_UPDATED", path: "/lifecycle/settings-updated" },
+  ],
+  webhooks: [],
+  components: [
+    { type: "widget", accessLevel: "EVERYONE", label: "Chat", path: "/chat.html" },
+    { type: "sidebar", accessLevel: "EVERYONE", path: "/", label: "Sidebar", iconPath: "/tab_icon.svg" },
+    { type: "timeoff.tab", accessLevel: "EVERYONE", path: "/chart.html", label: "Monthly Time Offs", iconPath: "/tab_icon.svg" },
+    { type: "schedule.tab", accessLevel: "EVERYONE", path: "/", label: "Schedule Tab", iconPath: "/tab_icon.svg" },
+    { type: "approvals.tab", accessLevel: "EVERYONE", path: "/", label: "Approvals Tab", iconPath: "/tab_icon.svg" },
+    { type: "reports.tab", accessLevel: "EVERYONE", path: "/", label: "Reports Tab", iconPath: "/tab_icon.svg" },
+    { type: "activity.tab", accessLevel: "EVERYONE", path: "/", label: "Activity Tab", iconPath: "/tab_icon.svg" },
+    { type: "team.tab", accessLevel: "EVERYONE", path: "/", label: "Team Tab", iconPath: "/tab_icon.svg" },
+    { type: "projects.tab", accessLevel: "EVERYONE", path: "/", label: "Projects Tab", iconPath: "/tab_icon.svg" },
+  ],
+  settings: {
+    tabs: [
+      {
+        id: "settings",
+        name: "settings",
+        settings: [
+          {
+            id: "addon-dropdown-single-setting-1",
+            name: "Dropdown single setting",
+            accessLevel: "EVERYONE",
+            type: "DROPDOWN_SINGLE",
+            value: "option 1",
+            allowedValues: ["option 1", "option 2", "option 3"],
+          },
+          {
+            id: "addon-dropdown-multiple-setting-1",
+            name: "Dropdown multiple setting",
+            accessLevel: "ADMINS",
+            type: "DROPDOWN_MULTIPLE",
+            value: ["option 1", "option 2"],
+            allowedValues: ["option 1", "option 2", "option 3"],
+          },
+        ],
+        groups: [
+          {
+            id: "addon-settings-group-1",
+            title: "Addon settings group 1",
+            header: { title: "Addon settings" },
+            description: "Addon settings group 1",
+            settings: [
+              { id: "addon-txt-setting", name: "Txt setting", accessLevel: "ADMINS", type: "TXT", value: "Some text" },
+              { id: "addon-link-setting", name: "Link setting", accessLevel: "EVERYONE", type: "LINK", value: "https://clockify.me" },
+              { id: "addon-number-setting", name: "Number setting", accessLevel: "EVERYONE", type: "NUMBER", value: 5 },
+            ],
+          },
+        ],
+      },
+    ],
+  },
+  minimalSubscriptionPlan: "FREE",
+  scopes: [],
+} satisfies generated.v1_2.ClockifyManifest;
+
+void _uiExample;

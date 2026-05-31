@@ -1,0 +1,14 @@
+{
+  "name": "clockify-addon-ts-monorepo",
+  "private": true,
+  "workspaces": [
+    "addon-sdk"
+  ],
+  "scripts": {
+    "type-check": "npm run type-check -w clockify-addon-sdk-ts-115",
+    "build": "npm run build -w clockify-addon-sdk-ts-115",
+    "test": "npm run test -w clockify-addon-sdk-ts-115",
+    "lint": "npm run lint -w clockify-addon-sdk-ts-115",
+    "format:check": "npm run format:check -w clockify-addon-sdk-ts-115"
+  }
+}

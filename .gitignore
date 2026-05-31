@@ -1,0 +1,13 @@
+node_modules/
+dist/
+*.tgz
+.DS_Store
+.remember/
+
+# Local working notes & third-party reference material — kept on disk, out of the repo.
+/GOAL.md
+/GOAL.txt
+/NEW_SESSION_PROMPT.md
+/verification_report.md
+/docs/
+/addon-java-sdk-main/

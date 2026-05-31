@@ -1,0 +1,173 @@
+import { describe, it, expect } from "vitest";
+import { ClockifyAddon, ClockifyManifest } from "../src";
+import { ValidationException, IllegalArgumentException } from "../src/shared/errors";
+
+describe("Router", () => {
+  const mockManifest = ClockifyManifest.v1_4Builder()
+    .key("my-addon")
+    .name("My Addon")
+    .baseUrl("https://example.com/addon")
+    .requireBasicPlan()
+    .build();
+
+  it("should auto-register GET /manifest", async () => {
+    const addon = new ClockifyAddon(mockManifest);
+    const response = await addon.handle({
+      method: "GET",
+      path: "/manifest",
+      headers: {},
+    });
+
+    expect(response.status).toBe(200);
+    expect(response.headers?.["content-type"]).toBe("application/json");
+    expect(response.body).toEqual(mockManifest);
+  });
+
+  it("should trim trailing slash from request path during routing", async () => {
+    const addon = new ClockifyAddon(mockManifest);
+    const response = await addon.handle({
+      method: "GET",
+      path: "/manifest/",
+      headers: {},
+    });
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual(mockManifest);
+  });
+
+  it("should reject path registration with ending slash", () => {
+    const addon = new ClockifyAddon(mockManifest);
+    expect(() => {
+      addon.registerHandler("/endpoint/", "GET", () => ({ status: 200 }));
+    }).toThrow(ValidationException);
+  });
+
+  it("should reject path registration without leading slash", () => {
+    const addon = new ClockifyAddon(mockManifest);
+    expect(() => {
+      addon.registerHandler("endpoint", "GET", () => ({ status: 200 }));
+    }).toThrow(ValidationException);
+  });
+
+  it("should reject duplicate path registration", () => {
+    const addon = new ClockifyAddon(mockManifest);
+    addon.registerHandler("/test", "GET", () => ({ status: 200 }));
+    expect(() => {
+      addon.registerHandler("/test", "GET", () => ({ status: 200 }));
+    }).toThrow(IllegalArgumentException);
+  });
+
+  it("should allow registering same path with different HTTP method", async () => {
+    const addon = new ClockifyAddon(mockManifest);
+    addon.registerHandler("/test", "GET", () => ({ status: 200, body: "get" }));
+    addon.registerHandler("/test", "POST", () => ({ status: 200, body: "post" }));
+
+    const resGet = await addon.handle({ method: "GET", path: "/test", headers: {} });
+    const resPost = await addon.handle({ method: "POST", path: "/test", headers: {} });
+
+    expect(resGet.body).toBe("get");
+    expect(resPost.body).toBe("post");
+  });
+
+  it("should return 405 Method Not Allowed for unregistered route/method", async () => {
+    const addon = new ClockifyAddon(mockManifest);
+    const response = await addon.handle({
+      method: "POST",
+      path: "/manifest",
+      headers: {},
+    });
+
+    expect(response.status).toBe(405);
+    expect(response.body).toBe("Method Not Allowed");
+  });
+
+  it("should return 500 on handler exceptions", async () => {
+    const addon = new ClockifyAddon(mockManifest);
+    addon.registerHandler("/fail", "GET", () => {
+      throw new Error("Simulated failure");
+    });
+
+    const response = await addon.handle({
+      method: "GET",
+      path: "/fail",
+      headers: {},
+    });
+
+    expect(response.status).toBe(500);
+    expect(response.body).toBe("Internal Server Error");
+  });
+
+  it("should execute middleware chain in order", async () => {
+    const addon = new ClockifyAddon(mockManifest);
+    const order: number[] = [];
+
+    addon.use(async (req, next) => {
+      order.push(1);
+      const res = await next(req);
+      order.push(3);
+      return res;
+    });
+
+    addon.use(async (req, next) => {
+      order.push(2);
+      return await next(req);
+    });
+
+    addon.registerHandler("/mid", "GET", () => {
+      order.push(4);
+      return { status: 200 };
+    });
+
+    await addon.handle({ method: "GET", path: "/mid", headers: {} });
+    expect(order).toEqual([1, 2, 4, 3]);
+  });
+
+  it("should handle middleware that throws", async () => {
+    const addon = new ClockifyAddon(mockManifest);
+    addon.use(async () => {
+      throw new Error("Middleware error");
+    });
+
+    addon.registerHandler("/mid-throw", "GET", () => {
+      return { status: 200 };
+    });
+
+    const res = await addon.handle({ method: "GET", path: "/mid-throw", headers: {} });
+    expect(res.status).toBe(500);
+    expect(res.body).toBe("Internal Server Error");
+  });
+
+  it("should support middleware that swallows request and returns custom response", async () => {
+    const addon = new ClockifyAddon(mockManifest);
+    addon.use(async () => {
+      return { status: 403, body: "Forbidden by middleware" };
+    });
+
+    addon.registerHandler("/mid-swallow", "GET", () => {
+      return { status: 200, body: "ok" };
+    });
+
+    const res = await addon.handle({ method: "GET", path: "/mid-swallow", headers: {} });
+    expect(res.status).toBe(403);
+    expect(res.body).toBe("Forbidden by middleware");
+  });
+
+  it("should handle middleware that calls next multiple times gracefully or as expected", async () => {
+    const addon = new ClockifyAddon(mockManifest);
+    let count = 0;
+    addon.use(async (req, next) => {
+      await next(req);
+      const res2 = await next(req);
+      return res2;
+    });
+
+    addon.registerHandler("/mid-double", "GET", () => {
+      count++;
+      return { status: 200, body: `run-${count}` };
+    });
+
+    const res = await addon.handle({ method: "GET", path: "/mid-double", headers: {} });
+    expect(count).toBe(2);
+    expect(res.body).toBe("run-2");
+  });
+});
