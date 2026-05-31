@@ -1,42 +1,10 @@
 import * as fs from "fs";
 import * as path from "path";
+import { toMethodName, toClassName } from "./naming";
 
 const DEFINITIONS_MAP: Record<string, string> = {
   lifecycle: "lifecycleEvent",
 };
-
-function capitalize(s: string): string {
-  if (!s) return "";
-  return s.charAt(0).toUpperCase() + s.slice(1);
-}
-
-function toMethodName(value: string): string {
-  if (value === value.toUpperCase() && !/[.\-_]/.test(value)) {
-    return value.toLowerCase();
-  }
-  const parts = value.split(/[.\-_]/);
-  const words: string[] = [];
-  for (let part of parts) {
-    if (part === part.toUpperCase()) {
-      part = part.toLowerCase();
-    }
-    const subparts = part.split(/(?=[A-Z])/);
-    for (const sp of subparts) {
-      if (sp) words.push(sp.toLowerCase());
-    }
-  }
-  if (words.length === 0) return "";
-  let res = words[0];
-  for (let i = 1; i < words.length; i++) {
-    res += capitalize(words[i]);
-  }
-  return res;
-}
-
-function toClassName(value: string): string {
-  const methodName = toMethodName(value);
-  return capitalize(methodName);
-}
 
 function getDefinitionSimpleClassName(defName: string): string {
   const suffix = DEFINITIONS_MAP[defName] || defName;
