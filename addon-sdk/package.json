@@ -1,8 +1,26 @@
 {
   "name": "clockify-addon-sdk-ts-115",
   "version": "1.0.0",
-  "description": "Clockify Addon SDK in TypeScript",
-  "files": ["dist", "README.md"],
+  "description": "TypeScript SDK for building Clockify add-on servers: manifest builders, request router, runtime adapters, and RS256 webhook-signature verification.",
+  "keywords": [
+    "clockify",
+    "addon",
+    "add-on",
+    "sdk",
+    "typescript",
+    "manifest",
+    "webhook"
+  ],
+  "license": "MIT",
+  "author": "apet97 <petkovic.aleksandar037@gmail.com>",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/apet97/addon-ts-sdk.git",
+    "directory": "addon-sdk"
+  },
+  "homepage": "https://github.com/apet97/addon-ts-sdk#readme",
+  "bugs": "https://github.com/apet97/addon-ts-sdk/issues",
+  "files": ["dist", "LICENSE", "README.md"],
   "main": "./dist/cjs/index.js",
   "module": "./dist/esm/index.js",
   "types": "./dist/esm/index.d.ts",
