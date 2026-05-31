@@ -3,6 +3,6 @@ export interface AddonRequest {
   readonly path: string;
   readonly headers: Record<string, string | string[] | undefined>;
   readonly query?: URLSearchParams;
-  readonly body?: any;
+  readonly body?: unknown;
   readonly rawBody?: Uint8Array;
 }

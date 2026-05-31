@@ -64,7 +64,7 @@ export class ClockifySignatureParser {
       throw new Error("Invalid token type.");
     }
 
-    return payload as any as ClockifyAddonClaims;
+    return payload as ClockifyAddonClaims;
   }
 }
 
