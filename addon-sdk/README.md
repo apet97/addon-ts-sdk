@@ -1,4 +1,4 @@
-# clockify-addon-sdk-ts-115
+# @apet97/clockify-addon-sdk
 
 A TypeScript SDK for the server side of a Clockify add-on: typed manifest builders, a request
 router, runtime adapters, and RSA signature verification for incoming webhooks.
@@ -13,7 +13,7 @@ the Clockify REST API.
 ## Install
 
 ```bash
-npm install clockify-addon-sdk-ts-115
+npm install @apet97/clockify-addon-sdk
 ```
 
 Node 18+. Ships ESM and CommonJS builds with type declarations.
@@ -26,8 +26,8 @@ import {
   ClockifyManifest,
   ClockifyComponent,
   ClockifyScope,
-} from "clockify-addon-sdk-ts-115";
-import { createNodeHttpAddonServer } from "clockify-addon-sdk-ts-115/adapters";
+} from "@apet97/clockify-addon-sdk";
+import { createNodeHttpAddonServer } from "@apet97/clockify-addon-sdk/adapters";
 
 // 1. Build the manifest using the versioned builder
 const manifest = ClockifyManifest.v1_4Builder()

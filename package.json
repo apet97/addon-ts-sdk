@@ -5,10 +5,10 @@
     "addon-sdk"
   ],
   "scripts": {
-    "type-check": "npm run type-check -w clockify-addon-sdk-ts-115",
-    "build": "npm run build -w clockify-addon-sdk-ts-115",
-    "test": "npm run test -w clockify-addon-sdk-ts-115",
-    "lint": "npm run lint -w clockify-addon-sdk-ts-115",
-    "format:check": "npm run format:check -w clockify-addon-sdk-ts-115"
+    "type-check": "npm run type-check -w @apet97/clockify-addon-sdk",
+    "build": "npm run build -w @apet97/clockify-addon-sdk",
+    "test": "npm run test -w @apet97/clockify-addon-sdk",
+    "lint": "npm run lint -w @apet97/clockify-addon-sdk",
+    "format:check": "npm run format:check -w @apet97/clockify-addon-sdk"
   }
 }

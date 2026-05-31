@@ -1,4 +1,4 @@
-# clockify-addon-sdk-ts-115
+# @apet97/clockify-addon-sdk
 
 TypeScript SDK for the server side of a Clockify add-on — typed manifest builders, a request
 router, runtime adapters, and RS256 webhook-signature verification.

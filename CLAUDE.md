@@ -36,4 +36,6 @@ npm pack --dry-run        # tarball is dist + README only
 
 ## Schemas
 
-1.2–1.5 are vendored and byte-identical to the live Clockify schema API; `?version=1.6` → HTTP 400.
+1.2–1.4 are vendored byte-identical to the Clockify add-on Java SDK's bundled resources; 1.5 is taken
+verbatim from the live schema endpoint (modulo a trailing newline). All are structurally identical to
+the live API, which serves the same schemas minified. `?version=1.6` → HTTP 400.

@@ -7,7 +7,7 @@ This document describes how the type-safe builders are structured and generated.
 Builders are generated directly from Clockify's manifest schemas for versions 1.2, 1.3, 1.4, and 1.5. They use a **type-state pattern** to enforce that required fields are set in sequence.
 
 ```typescript
-import { ClockifyManifest } from "clockify-addon-sdk-ts-115";
+import { ClockifyManifest } from "@apet97/clockify-addon-sdk";
 
 // Compile-time checks force you to chain required fields: key -> name -> baseUrl -> minimalSubscriptionPlan
 const manifest = ClockifyManifest.v1_4Builder()

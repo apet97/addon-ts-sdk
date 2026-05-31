@@ -1,6 +1,6 @@
 # Java to TypeScript Migration Guide
 
-This guide maps features, classes, and code patterns directly from the Clockify Java Addon SDK to the `clockify-addon-sdk-ts-115` package.
+This guide maps features, classes, and code patterns directly from the Clockify Java Addon SDK to the `@apet97/clockify-addon-sdk` package.
 
 ## API Comparison
 
@@ -45,7 +45,7 @@ addon.registerComponent(
 
 ### TypeScript
 ```typescript
-import { ClockifyAddon, ClockifyManifest, ClockifyComponent } from "clockify-addon-sdk-ts-115";
+import { ClockifyAddon, ClockifyManifest, ClockifyComponent } from "@apet97/clockify-addon-sdk";
 
 const addon = new ClockifyAddon(
   ClockifyManifest.v1_4Builder()
