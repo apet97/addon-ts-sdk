@@ -4,14 +4,16 @@ Conventions for anyone (human or agent) working in this repository.
 
 ## Layout
 
-- `addon-sdk/` — the published package (`clockify-addon-sdk-ts-115`). All SDK code, schemas,
+- `addon-sdk/` — the published package (`@apet97/clockify-addon-sdk`). All SDK code, schemas,
   examples, and tests live here. Run package commands from this directory.
 
 ## Source of truth
 
 - Behaviour mirrors the upstream Clockify add-on Java SDK; the TypeScript port stays faithful to it.
-- Manifest schemas are vendored under `addon-sdk/schemas/clockify-manifests/*.json` and are
-  byte-identical to the live Clockify schema endpoint. Supported versions: **1.2, 1.3, 1.4, 1.5**.
+- Manifest schemas are vendored under `addon-sdk/schemas/clockify-manifests/*.json`: 1.2–1.4 are
+  byte-identical to the Clockify add-on Java SDK's bundled resources, 1.5 is taken verbatim from the
+  live schema endpoint (modulo a trailing newline), and all are structurally identical to the live
+  API (which serves them minified). Supported versions: **1.2, 1.3, 1.4, 1.5**.
 - `addon-sdk/src/clockify/generated/**` is generated from those schemas. **Never edit it by hand** —
   change the schema or the generator, then `npm run generate`.
 - Builder step order follows each schema's `required` array (matching the upstream processor).

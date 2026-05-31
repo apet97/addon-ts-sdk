@@ -5,7 +5,7 @@ All tokens signed by Clockify are JWT tokens signed with the **RSA256** algorith
 ## Example
 
 ```typescript
-import { ClockifySignatureParser } from "clockify-addon-sdk-ts-115";
+import { ClockifySignatureParser } from "@apet97/clockify-addon-sdk";
 
 // Clockify public key in PEM format
 const publicKeyPem = `-----BEGIN PUBLIC KEY-----

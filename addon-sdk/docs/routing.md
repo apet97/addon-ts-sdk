@@ -1,6 +1,6 @@
 # Routing and Middleware
 
-This document describes how request routing, trailing slashes, duplicate checks, and middleware execution work in `clockify-addon-sdk-ts-115`.
+This document describes how request routing, trailing slashes, duplicate checks, and middleware execution work in `@apet97/clockify-addon-sdk`.
 
 ## Path Constraints
 
