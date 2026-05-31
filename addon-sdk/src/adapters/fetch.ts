@@ -1,6 +1,6 @@
 import { Addon } from "../shared/addon";
 import { AddonRequest } from "../shared/request";
-import { AddonResponse } from "../shared/response";
+import { AddonResponse, isJsonBody } from "../shared/response";
 
 export async function handleFetchRequest(
   addon: Addon<unknown>,
@@ -9,7 +9,7 @@ export async function handleFetchRequest(
   const url = new URL(request.url);
 
   let rawBody: Uint8Array | undefined = undefined;
-  let body: any = undefined;
+  let body: unknown = undefined;
 
   // Clone or check request body presence
   if (request.body && request.method !== "GET" && request.method !== "HEAD") {
@@ -54,7 +54,7 @@ export async function handleFetchRequest(
 
   let responseBody: any = null;
   if (response.body !== undefined && response.body !== null) {
-    if (typeof response.body === "object" && !(response.body instanceof Uint8Array)) {
+    if (isJsonBody(response.body)) {
       if (!responseHeaders.has("content-type")) {
         responseHeaders.set("content-type", "application/json");
       }

@@ -1,7 +1,7 @@
 import { createServer, IncomingMessage, ServerResponse } from "node:http";
 import { Addon } from "../shared/addon";
 import { AddonRequest } from "../shared/request";
-import { AddonResponse } from "../shared/response";
+import { AddonResponse, isJsonBody } from "../shared/response";
 
 async function readBody(req: IncomingMessage): Promise<Uint8Array> {
   return new Promise((resolve, reject) => {
@@ -15,7 +15,7 @@ async function readBody(req: IncomingMessage): Promise<Uint8Array> {
 export async function fromNodeRequest(req: IncomingMessage): Promise<AddonRequest> {
   const url = new URL(req.url || "", `http://${req.headers.host || "localhost"}`);
   const rawBody = await readBody(req);
-  let body: any = undefined;
+  let body: unknown = undefined;
   if (rawBody.length > 0) {
     try {
       body = JSON.parse(rawBody.toString());
@@ -43,7 +43,7 @@ export function writeNodeResponse(res: ServerResponse, addonResponse: AddonRespo
   }
 
   if (addonResponse.body !== undefined && addonResponse.body !== null) {
-    if (typeof addonResponse.body === "object" && !(addonResponse.body instanceof Uint8Array)) {
+    if (isJsonBody(addonResponse.body)) {
       if (!res.getHeader("content-type")) {
         res.setHeader("content-type", "application/json");
       }

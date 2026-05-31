@@ -1,7 +1,7 @@
 import type { Request, Response, NextFunction } from "express";
 import { Addon } from "../shared/addon";
 import { AddonRequest } from "../shared/request";
-import { AddonResponse } from "../shared/response";
+import { AddonResponse, isJsonBody } from "../shared/response";
 
 export function createExpressAddonHandler(addon: Addon<unknown>) {
   return async function clockifyAddonExpressHandler(
@@ -27,7 +27,7 @@ export function createExpressAddonHandler(addon: Addon<unknown>) {
         headers: req.headers as Record<string, string | string[] | undefined> || {},
         query: queryParams,
         body: req.body,
-        rawBody: (req as any).rawBody,
+        rawBody: (req as Request & { rawBody?: Uint8Array }).rawBody,
       };
 
       const response: AddonResponse = await addon.handle(addonRequest);
@@ -38,7 +38,7 @@ export function createExpressAddonHandler(addon: Addon<unknown>) {
       }
 
       if (response.body !== undefined && response.body !== null) {
-        if (typeof response.body === "object" && !(response.body instanceof Uint8Array)) {
+        if (isJsonBody(response.body)) {
           res.json(response.body);
         } else {
           res.send(response.body);
