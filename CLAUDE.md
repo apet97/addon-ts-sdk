@@ -16,6 +16,18 @@ router, runtime adapters, and RS256 webhook-signature verification. The package 
   `addon-sdk/schemas/clockify-manifests/*.json`. Change the schema or the generator, then
   `npm run generate`.
 - Builder step order follows each schema's `required` array (matching the upstream Java SDK).
+- Keep Marketplace docs coverage lean. The SDK has request verification helpers, lifecycle payload
+  types, documented header/query constants, and environment claim extraction; it should not grow a
+  REST client, token exchange client, UI/window-event framework, persistence layer, or custom
+  manifest validator without an explicit ask.
+- Token/auth rules: `ClockifySignatureParser` accepts `RS256` only, with `iss=clockify`,
+  `type=addon`, and `sub=<manifest key>`. Webhook handlers should verify
+  `clockify-signature`, assert `clockify-webhook-event-type`, and compare workspace/add-on claims
+  when the expected context is known. Lifecycle handlers use `X-Addon-Lifecycle-Token`; Clockify API
+  requests use `X-Addon-Token`.
+- Environment/region rules: never hardcode Clockify hosts. Read API/report/location/screenshot URLs
+  from verified claims (`backendUrl`, `reportsUrl`, `locationsUrl`, `screenshotsUrl`) or
+  `getClockifyEnvironmentContext()`.
 
 ## Before claiming done — all gates green (from `addon-sdk/`)
 
@@ -33,6 +45,9 @@ npm pack --dry-run        # tarball is dist + README only
   live in `tests/types/*.probe.ts`; `tests/typecheck-gate.test.ts` guards that they are compiled.
 - A green `build` does not mean the published package works. `verify:dist` imports the **built** ESM
   and CJS and boots the README quick-start; it is wired into `prepack`.
+- Webhook signature verification alone is incomplete for Marketplace parity. Tests should also cover
+  event-header mismatches, lifecycle-token headers, workspace/add-on claim mismatches, and
+  no-hardcoded-fallback environment URL behavior.
 
 ## Schemas
 

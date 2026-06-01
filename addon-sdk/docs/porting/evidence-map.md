@@ -1,13 +1,44 @@
 # Evidence Map: Java to TypeScript
 
-This file documents the exact mapping from the source Java SDK classes to the TypeScript SDK port.
+This file documents the mapping from the official Clockify Java add-on SDK to the TypeScript SDK
+port. Last verified against `clockify/addon-java-sdk` main commit
+`1b3a60d17a12adf28ae37ede687558fd50e0a33c` (2025-08-22) and the local
+`addon-java-sdk-main/` snapshot.
 
 | Java Source File | TypeScript Target File | Notes / Parity Level |
 |---|---|---|
 | `shared/Addon.java` | `addon-sdk/src/shared/addon.ts` | Routing core: default `/manifest`, trailing-slash trim at dispatch, 405 on unmatched, 500 on handler throw, middleware (= Java `Filter`) chain. The servlet/server pieces (`AddonServlet`, `EmbeddedServer`) are ported separately under `src/adapters/`. |
+| `shared/AddonServlet.java` | `addon-sdk/src/adapters/express.ts`, `addon-sdk/src/adapters/fetch.ts`, `addon-sdk/src/adapters/node-http.ts` | Servlet bridge is adapted to framework-specific request/response adapters instead of exposing Jakarta servlet types. |
+| `shared/EmbeddedServer.java` | `addon-sdk/src/adapters/node-http.ts` | Jetty embedded server maps to `createNodeHttpAddonServer`; tests boot a real HTTP server and serve `/manifest`. |
+| `shared/RequestHandler.java` | `addon-sdk/src/shared/handler.ts` | Handler contract is translated from servlet mutation to returned `AddonResponse` values, with async support. |
+| `shared/ValidationException.java` | `addon-sdk/src/shared/errors.ts` | Preserves the validation exception type and route-registration error behavior. |
+| `shared/response/HttpResponse.java` | `addon-sdk/src/shared/response.ts` | Response DTO translated to a small structural interface; JSON serialization is centralized in adapters. |
 | `shared/utils/ValidationUtils.java` | `addon-sdk/src/shared/addon.ts` (`isValidManifestPath`) | Manifest path validation (absolute, no trailing slash). Implemented inline in `addon.ts`, not in `errors.ts`. |
 | `shared/utils/Utils.java` | `addon-sdk/src/shared/addon.ts` (`trimTrailingSlash`) | Trims one trailing slash during dispatch. |
 | `clockify/ClockifyAddon.java` | `addon-sdk/src/clockify/clockify-addon.ts` | Extends `Addon`; registers hooks (component/lifecycle/webhook/settings) then mutates the manifest (register-then-mutate order preserved). |
-| `clockify/ClockifySignatureParser.java` | `addon-sdk/src/clockify/clockify-signature-parser.ts` | RSA (RS256) JWT verification with `jose`. Enforces `iss=clockify`, `sub=addonKey`, `type=addon`. Adds doc-confirmed claim constants (`locationsUrl`, `screenshotsUrl`, `language`, `theme`) beyond the Java set — a forward extension. |
+| `clockify/ClockifySignatureParser.java` | `addon-sdk/src/clockify/clockify-signature-parser.ts` | JWT verification with `jose`. Enforces `alg=RS256`, `iss=clockify`, `sub=addonKey`, and `type=addon`. Adds doc-confirmed claim constants (`locationsUrl`, `screenshotsUrl`, `language`, `theme`) beyond the Java set. |
+| Marketplace auth/webhook/lifecycle docs | `addon-sdk/src/clockify/clockify-request-verification.ts` | Small TS-only helper layer for documented request wire names: case-insensitive headers, webhook event-header checks, lifecycle token header support, workspace/addon claim matching, and region/environment claim extraction. No REST client or token exchange client is included. |
+| Marketplace lifecycle docs | `addon-sdk/src/clockify/clockify-lifecycle.ts` | Lightweight payload types for `INSTALLED`, `STATUS_CHANGED`, `SETTINGS_UPDATED`, and `DELETED` lifecycle requests. These mirror documented payload shapes without adding persistence or delivery logic. |
 | `clockify/model/ClockifyManifest.java` | `addon-sdk/src/clockify/clockify-manifest.ts` | Versioned builders (`v1_2`–`v1_5`). 1.2–1.4 from the Java reference; 1.5 from the live Clockify schema API. |
 | `clockify/model/ClockifyResource.java` | `addon-sdk/src/clockify/clockify-resource.ts` | Resource interface enforcing the `path` property. |
+| `annotation-processor/.../ClockifyManifestProcessor.java` | `addon-sdk/scripts/generate-clockify-manifest.ts` | Walks manifest object definitions and enum definitions for each schema version. |
+| `annotation-processor/.../DefinitionProcessor.java` | `addon-sdk/scripts/generate-clockify-manifest.ts` | Generates model interfaces and type-state builders. Required builder step order follows each schema's `required` array, matching the Java processor. |
+| `annotation-processor/.../EnumConstantsProcessor.java` | `addon-sdk/scripts/generate-clockify-manifest.ts` | Emits enum constants as `as const` objects plus literal-union types. |
+| `annotation-processor/.../Utils.java` | `addon-sdk/scripts/naming.ts` | Java method/class-name derivation is ported, including Unicode uppercase splitting behavior guarded by tests. |
+
+## Schema Provenance
+
+- `schemas/clockify-manifests/1.2.json`, `1.3.json`, and `1.4.json` are byte-identical to the Java SDK resources under `annotation-processor/src/main/resources/clockify-manifests/`.
+- `schemas/clockify-manifests/1.5.json` is byte-identical to `GET https://api.clockify.me/api/addons/manifest-schema?version=1.5` after trimming trailing whitespace.
+- Generated files under `src/clockify/generated/**` are reproducible with `npm run generate` and guarded by `npm run verify:generated`.
+
+## Marketplace Docs Coverage
+
+- Token validation follows the Marketplace guidance: `RS256`, issuer `clockify`, type `addon`,
+  manifest key as JWT subject, and expiry enforcement.
+- Webhook helpers cover `clockify-signature`, `clockify-webhook-event-type`, event matching, and
+  workspace/add-on claim matching.
+- Lifecycle helpers cover `X-Addon-Lifecycle-Token` through the same verifier plus payload types for
+  the documented lifecycle events.
+- Environment/region handling stays claim-driven (`backendUrl`, `reportsUrl`, `locationsUrl`,
+  `screenshotsUrl`) with no hardcoded production fallback.

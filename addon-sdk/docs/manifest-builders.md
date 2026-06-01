@@ -45,3 +45,22 @@ The builders generate idiomatic helper methods from the schema enums:
   - `activityTab()`
   - `scheduleTab()`
   // and so on.
+
+## Schema 1.5 Coverage
+
+The v1.5 builders are generated from the live Clockify manifest schema endpoint and include the
+latest Marketplace surface, including:
+
+- webhook events such as `TIME_ENTRY_SPLIT`
+- lifecycle `STATUS_CHANGED`
+- component `invoices.action`
+- both self-hosted settings paths (`settings("/iframe/settings")`) and structured settings objects
+
+Use `generated.v1_5.*` for version-specific enum constants and model types when you need to prove a
+value is present only in v1.5.
+
+## Runtime Marketplace Helpers
+
+Manifest builders cover the schema surface only. Runtime Marketplace rules such as webhook event
+headers, lifecycle token headers, `X-Addon-Token`, and region-specific URL claims are covered by the
+request verification helpers documented in `docs/token-validation.md`.

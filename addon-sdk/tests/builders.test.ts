@@ -1,5 +1,15 @@
 import { describe, it, expect } from "vitest";
-import { ClockifyManifest, ClockifyComponent, ClockifySetting, ClockifyWebhook } from "../src";
+import {
+  ClockifyManifest,
+  ClockifyComponent,
+  ClockifyLifecycleEvent,
+  ClockifySetting,
+  ClockifySettings,
+  ClockifySettingsGroup,
+  ClockifySettingsHeader,
+  ClockifySettingsTab,
+  ClockifyWebhook,
+} from "../src";
 
 describe("Builders", () => {
   it("should build v1.2 manifest with scopes required", () => {
@@ -78,6 +88,79 @@ describe("Builders", () => {
 
     expect(webhook.event).toBe("APPROVAL_REQUEST_STATUS_UPDATED");
     expect(webhook.path).toBe("/webhooks/approval");
+  });
+
+  it("should build v1.5 latest marketplace entrypoints", () => {
+    const webhook = ClockifyWebhook.v1_5Builder()
+      .onTimeEntrySplit()
+      .path("/webhooks/time-entry-split")
+      .build();
+    const lifecycle = ClockifyLifecycleEvent.v1_5Builder()
+      .path("/lifecycle/status-changed")
+      .onStatusChanged()
+      .build();
+    const invoiceAction = ClockifyComponent.v1_5Builder()
+      .invoicesAction()
+      .allowAdmins()
+      .path("/invoice/send")
+      .label("Send invoice")
+      .build();
+
+    expect(webhook).toEqual({
+      event: "TIME_ENTRY_SPLIT",
+      path: "/webhooks/time-entry-split",
+    });
+    expect(lifecycle).toEqual({
+      path: "/lifecycle/status-changed",
+      type: "STATUS_CHANGED",
+    });
+    expect(invoiceAction.type).toBe("invoices.action");
+  });
+
+  it("should build v1.5 structured and self-hosted settings manifests", () => {
+    const header = ClockifySettingsHeader.v1_5Builder()
+      .title("Mileage settings")
+      .build();
+    const rate = ClockifySetting.v1_5Builder()
+      .id("rate")
+      .name("Mileage rate")
+      .allowAdmins()
+      .asNumber()
+      .value(0)
+      .required(true)
+      .build();
+    const group = ClockifySettingsGroup.v1_5Builder()
+      .id("reimbursement")
+      .title("Reimbursement")
+      .settings([rate])
+      .header(header)
+      .build();
+    const tab = ClockifySettingsTab.v1_5Builder()
+      .id("general")
+      .name("General")
+      .groups([group])
+      .build();
+    const settings = ClockifySettings.v1_5Builder()
+      .tabs([tab])
+      .build();
+
+    const structured = ClockifyManifest.v1_5Builder()
+      .key("structured-settings")
+      .name("Structured Settings")
+      .baseUrl("https://example.com/addon")
+      .requireProPlan()
+      .settings(settings)
+      .build();
+    const selfHosted = ClockifyManifest.v1_5Builder()
+      .key("self-hosted-settings")
+      .name("Self Hosted Settings")
+      .baseUrl("https://example.com/addon")
+      .requireProPlan()
+      .settings("/iframe/settings")
+      .build();
+
+    expect(structured.settings).toEqual(settings);
+    expect(selfHosted.settings).toBe("/iframe/settings");
   });
 
   it("should build setting drop-down multiple with asDropdownMultiple", () => {

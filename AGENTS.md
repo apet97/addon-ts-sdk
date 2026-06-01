@@ -17,6 +17,15 @@ Conventions for anyone (human or agent) working in this repository.
 - `addon-sdk/src/clockify/generated/**` is generated from those schemas. **Never edit it by hand** —
   change the schema or the generator, then `npm run generate`.
 - Builder step order follows each schema's `required` array (matching the upstream processor).
+- Marketplace docs coverage is intentionally small and runtime-focused: request verification helpers,
+  lifecycle payload types, token/header constants, and environment/region claim extraction. Do not add
+  a REST client, token exchange client, UI/window-event framework, persistence layer, or custom
+  manifest validator unless explicitly requested.
+- Clockify-signed tokens are verified as `RS256` JWTs with `iss=clockify`, `type=addon`, and
+  `sub=<manifest key>`. Webhooks should assert `clockify-webhook-event-type`; lifecycle routes should
+  use `X-Addon-Lifecycle-Token`; Clockify API calls use `X-Addon-Token`.
+- Do not hardcode Clockify API/report/location/screenshot hosts. Use verified token claims such as
+  `backendUrl`, `reportsUrl`, `locationsUrl`, and `screenshotsUrl`.
 
 ## Gates (from `addon-sdk/`)
 

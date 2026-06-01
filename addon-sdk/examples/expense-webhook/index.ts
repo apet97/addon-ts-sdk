@@ -14,9 +14,8 @@ import {
   ClockifyManifest,
   ClockifySignatureParser,
   ClockifyAddonClaims,
-  AddonRequest,
-  AddonResponse,
-  RequestHandler,
+  ClockifyHeaders,
+  withClockifyVerifiedRequest,
   generated,
 } from "../../src";
 
@@ -48,46 +47,6 @@ export type ConvertFn = (
   source: ConversionSource,
   eventType: string,
 ) => void | Promise<void>;
-
-function getHeader(headers: AddonRequest["headers"], name: string): string | undefined {
-  const lower = name.toLowerCase();
-  for (const key of Object.keys(headers)) {
-    if (key.toLowerCase() === lower) {
-      const value = headers[key];
-      return Array.isArray(value) ? value[0] : value;
-    }
-  }
-  return undefined;
-}
-
-type AuthedHandler = (
-  req: AddonRequest,
-  claims: ClockifyAddonClaims,
-) => AddonResponse | Promise<AddonResponse>;
-
-/**
- * Wraps a handler with Clockify webhook signature verification (the TS analogue of
- * ClockifyWebhookAuthFilter): verifies the `Clockify-Signature` JWT and passes the claims through,
- * or short-circuits with 401.
- */
-export function withClockifySignature(
-  parser: ClockifySignatureParser,
-  handler: AuthedHandler,
-): RequestHandler {
-  return async (req) => {
-    const token = getHeader(req.headers, "clockify-signature");
-    if (!token) {
-      return { status: 401, body: "Missing Clockify-Signature" };
-    }
-    let claims: ClockifyAddonClaims;
-    try {
-      claims = await parser.parseClaims(token);
-    } catch {
-      return { status: 401, body: "Invalid Clockify-Signature" };
-    }
-    return handler(req, claims);
-  };
-}
 
 export interface ExpenseWebhookAddonOptions {
   key: string;
@@ -126,15 +85,22 @@ export function createExpenseWebhookAddon(opts: ExpenseWebhookAddonOptions): Clo
 
   addon.registerWebhook(
     webhook,
-    withClockifySignature(parser, async (req, claims) => {
-      const expenseId = resolveExpenseId(req.body as ExpenseWebhookPayload | undefined);
-      if (!expenseId) {
-        // Java handler returns void → 200 with no conversion.
+    withClockifyVerifiedRequest(
+      parser,
+      {
+        expectedEventType: "EXPENSE_CREATED",
+        eventHeader: ClockifyHeaders.WEBHOOK_EVENT_TYPE,
+      },
+      async (req, claims) => {
+        const expenseId = resolveExpenseId(req.body as ExpenseWebhookPayload | undefined);
+        if (!expenseId) {
+          // Java handler returns void → 200 with no conversion.
+          return { status: 200 };
+        }
+        await opts.onConvert(claims, expenseId, "WEBHOOK_CREATED", "EXPENSE_CREATED");
         return { status: 200 };
-      }
-      await opts.onConvert(claims, expenseId, "WEBHOOK_CREATED", "EXPENSE_CREATED");
-      return { status: 200 };
-    }),
+      },
+    ),
   );
 
   return addon;

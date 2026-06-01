@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { ClockifySignatureParser, ClockifySignatureClaims } from "../src";
 import { generateTestKeys, signTestToken } from "../src/testing";
-import { jwtVerify } from "jose";
+import { generateKeyPair, SignJWT } from "jose";
 
 describe("ClockifySignatureParser", () => {
   const addonKey = "my-test-addon";
@@ -80,6 +80,19 @@ describe("ClockifySignatureParser", () => {
     await expect(parser.parseClaims(token)).rejects.toThrow();
   });
 
+  it("should reject valid RSA JWTs that are not signed with RS256", async () => {
+    const { publicKey, privateKey } = await generateKeyPair("PS256");
+    const token = await new SignJWT({ type: "addon" })
+      .setProtectedHeader({ alg: "PS256" })
+      .setIssuer("clockify")
+      .setSubject(addonKey)
+      .setExpirationTime("30m")
+      .sign(privateKey);
+
+    const parser = new ClockifySignatureParser(addonKey, publicKey);
+    await expect(parser.parseClaims(token)).rejects.toThrow();
+  });
+
   it("should parse new claims (locationsUrl, screenshotsUrl, language, theme) if present in token", async () => {
     const { publicKey, privateKey } = await generateTestKeys();
     const token = await signTestToken(privateKey, addonKey, {
@@ -130,7 +143,6 @@ describe("ClockifySignatureParser", () => {
 });
 
 // Minimal helper to test wrong issuer claim since our helper signs standard issuer
-import { SignJWT } from "jose";
 class joseSignJWTWrapper {
   private payload: any;
   private issuer: string = "clockify";

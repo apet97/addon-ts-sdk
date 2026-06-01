@@ -56,6 +56,7 @@ export class ClockifySignatureParser {
     }
 
     const { payload } = await jwtVerify(token, this.resolvedKey, {
+      algorithms: ["RS256"],
       issuer: CLOCKIFY_JWT_ISSUER,
       subject: this.addonKey,
     });
@@ -67,4 +68,3 @@ export class ClockifySignatureParser {
     return payload as ClockifyAddonClaims;
   }
 }
-
