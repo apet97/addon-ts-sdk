@@ -7,7 +7,6 @@
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import * as path from "node:path";
-import * as net from "node:net";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const dist = path.join(here, "..", "dist");
@@ -89,8 +88,5 @@ try {
 } finally {
   await new Promise((resolve) => server.close(resolve));
 }
-
-// guard against the port helper being unused on some platforms
-void net;
 
 console.log("verify:dist OK — ESM + CJS exports resolve and the README quick-start serves /manifest.");

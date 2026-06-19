@@ -7,7 +7,7 @@
 **Decision**: In TypeScript, the step builder pattern is represented via type-state interfaces. At compile time, the user is forced to chain required setters in order. At runtime, the builder validates missing inputs on `.build()`.
 
 ## 3. JWT Signature Parsing Library
-**Decision**: We use `jose` for signature parsing. It is lightweight, native to Node.js/Web environments, and does not require complex cryptographic configurations. It verified RSA256 tokens in complete alignment with Java's JJWT configuration.
+**Decision**: We use `jose` for signature parsing. It is lightweight, native to Node.js/Web environments, and does not require complex cryptographic configurations. It verifies RS256 tokens in complete alignment with Java's JJWT configuration.
 
 ## 4. Default Routing 405 vs 404
 **Decision**: We return 405 Method Not Allowed for unmatched paths or methods. This strictly preserves the Java Addon router behavior.

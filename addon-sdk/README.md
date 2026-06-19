@@ -1,7 +1,7 @@
 # @apet97/clockify-addon-sdk
 
 A TypeScript SDK for the server side of a Clockify add-on: typed manifest builders, a request
-router, runtime adapters, and RSA signature verification for incoming webhooks.
+router, runtime adapters, and RS256 webhook-signature verification.
 
 > Independent, unofficial project. Not affiliated with, endorsed by, or supported by Clockify or
 > CAKE.com. "Clockify" is referenced only to describe what this library is compatible with.
@@ -49,7 +49,7 @@ addon.registerComponent(
     .path("/component")
     .label("Activity Tab")
     .build(),
-  async (request) => {
+  async () => {
     return {
       status: 200,
       headers: { "content-type": "text/html" },
@@ -71,8 +71,9 @@ server.listen(8080, () => {
   level: the chain will not expose `.build()` until every required step is set.
 - **Router** that serves `/manifest`, trims a trailing slash before matching, returns 405 for an
   unmatched route, and 500 when a handler throws.
-- **`ClockifySignatureParser`** — verifies the RS256 `Clockify-Signature` JWT (issuer, subject,
-  type, signature, expiry).
+- **Clockify token helpers** — built-in platform public key, parser factory, RS256 JWT
+  verification, component `auth_token` and lifecycle-header helpers, admin-role checks, and
+  environment URL normalization.
 - **Adapters** for Node `http`, Express, and the Fetch API (Hono, Cloudflare Workers, Bun, Deno).
 
 ## Schema versions

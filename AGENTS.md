@@ -13,7 +13,8 @@ Conventions for anyone (human or agent) working in this repository.
 - Manifest schemas are vendored under `addon-sdk/schemas/clockify-manifests/*.json`: 1.2–1.4 are
   byte-identical to the Clockify add-on Java SDK's bundled resources, 1.5 is taken verbatim from the
   live schema endpoint (modulo a trailing newline), and all are structurally identical to the live
-  API (which serves them minified). Supported versions: **1.2, 1.3, 1.4, 1.5**.
+  API (which serves them minified). Supported versions: **1.2, 1.3, 1.4, 1.5** (`?version=1.6`
+  returns HTTP 400).
 - `addon-sdk/src/clockify/generated/**` is generated from those schemas. **Never edit it by hand** —
   change the schema or the generator, then `npm run generate`.
 - Builder step order follows each schema's `required` array (matching the upstream processor).
@@ -36,7 +37,7 @@ Conventions for anyone (human or agent) working in this repository.
 | `npm run test` | vitest suite. |
 | `npm run build` | ESM + CJS output. |
 | `npm run verify:dist` | Imports the **built** ESM and CJS and boots the quick-start. A green `build` alone does not prove the package imports. |
-| `npm pack --dry-run` | Tarball contents (`dist` + README only). |
+| `npm pack --dry-run` | Tarball contents (`dist` + `LICENSE` + `README`). |
 
 ## Notes
 

@@ -11,7 +11,7 @@ const manifest = ClockifyManifest.v1_4Builder()
 const addon = new ClockifyAddon(manifest);
 
 // Register a custom settings endpoint
-addon.registerCustomSettings("/settings/custom", async (req) => {
+addon.registerCustomSettings("/settings/custom", async () => {
   return {
     status: 200,
     headers: { "content-type": "application/json" },

@@ -8,7 +8,7 @@ export type ClockifyLifecycleStatus = "ACTIVE" | "INACTIVE";
 
 export interface ClockifyLifecycleWebhookToken {
   path: string;
-  webhookType: string;
+  webhookType: "ADDON";
   authToken: string;
 }
 

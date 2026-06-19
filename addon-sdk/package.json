@@ -23,6 +23,9 @@
   },
   "homepage": "https://github.com/apet97/addon-ts-sdk#readme",
   "bugs": "https://github.com/apet97/addon-ts-sdk/issues",
+  "engines": {
+    "node": ">=18"
+  },
   "files": ["dist", "LICENSE", "README.md"],
   "main": "./dist/cjs/index.js",
   "module": "./dist/esm/index.js",

@@ -7,7 +7,14 @@ import {
   ClockifySignatureParser,
   getClockifyEnvironmentContext,
   getClockifyHeader,
+  getClockifyQueryParam,
+  isClockifyAdminRole,
+  resolveClockifyApiBaseUrl,
+  resolveClockifyReportsBaseUrl,
+  verifyClockifyComponentRequest,
+  verifyClockifyLifecycleRequest,
   verifyClockifyRequest,
+  verifyClockifyToken,
   withClockifyVerifiedRequest,
 } from "../src";
 import { generateTestKeys, signTestToken } from "../src/testing";
@@ -28,6 +35,10 @@ function parser() {
 
 function request(headers: AddonRequest["headers"]): AddonRequest {
   return { method: "POST", path: "/webhook", headers };
+}
+
+function componentRequest(query: URLSearchParams): AddonRequest {
+  return { method: "GET", path: "/component", headers: {}, query };
 }
 
 async function validToken(extraClaims: Record<string, unknown> = {}) {
@@ -53,6 +64,13 @@ describe("Marketplace request verification helpers", () => {
     expect(getClockifyHeader(headers, ClockifyHeaders.SIGNATURE)).toBe("jwt-1");
     expect(getClockifyHeader(headers, ClockifyHeaders.ADDON_TOKEN)).toBe("installation-token");
     expect(getClockifyHeader(headers, "missing")).toBeUndefined();
+
+    const query = new URLSearchParams([
+      [ClockifyQueryParams.AUTH_TOKEN, "token-1"],
+      [ClockifyQueryParams.AUTH_TOKEN, "token-2"],
+    ]);
+    expect(getClockifyQueryParam(query, ClockifyQueryParams.AUTH_TOKEN)).toBe("token-1");
+    expect(getClockifyQueryParam(undefined, ClockifyQueryParams.AUTH_TOKEN)).toBeUndefined();
   });
 
   it("verifies a webhook signature, event header, workspace, and add-on id", async () => {
@@ -158,6 +176,93 @@ describe("Marketplace request verification helpers", () => {
     );
 
     expect(result).toMatchObject({ ok: true, claims: { workspaceId: WORKSPACE_ID, addonId: ADDON_ID } });
+  });
+
+  it("verifies raw tokens without throwing for missing or invalid input", async () => {
+    const token = await validToken();
+
+    await expect(verifyClockifyToken(parser(), token)).resolves.toMatchObject({
+      ok: true,
+      claims: { workspaceId: WORKSPACE_ID, addonId: ADDON_ID },
+    });
+    await expect(verifyClockifyToken(parser(), undefined)).resolves.toEqual({
+      ok: false,
+      reason: "missing-token",
+    });
+    await expect(verifyClockifyToken(parser(), "not-a-jwt")).resolves.toEqual({
+      ok: false,
+      reason: "invalid-token",
+    });
+  });
+
+  it("verifies component requests using the auth_token query parameter", async () => {
+    const token = await validToken({ user: "admin-user", workspaceRole: "OWNER" });
+    const result = await verifyClockifyComponentRequest(
+      parser(),
+      componentRequest(new URLSearchParams({ [ClockifyQueryParams.AUTH_TOKEN]: token })),
+      {
+        expectedWorkspaceId: WORKSPACE_ID,
+        expectedAddonId: ADDON_ID,
+      },
+    );
+
+    expect(result).toMatchObject({
+      ok: true,
+      claims: { workspaceId: WORKSPACE_ID, addonId: ADDON_ID, user: "admin-user" },
+    });
+  });
+
+  it("reports missing component tokens and verifies lifecycle tokens through narrow helpers", async () => {
+    await expect(
+      verifyClockifyComponentRequest(parser(), componentRequest(new URLSearchParams())),
+    ).resolves.toEqual({
+      ok: false,
+      reason: "missing-token",
+    });
+
+    await expect(
+      verifyClockifyComponentRequest(
+        parser(),
+        componentRequest(new URLSearchParams({ [ClockifyQueryParams.AUTH_TOKEN]: "not-a-jwt" })),
+      ),
+    ).resolves.toEqual({
+      ok: false,
+      reason: "invalid-token",
+    });
+
+    const token = await validToken();
+    await expect(
+      verifyClockifyLifecycleRequest(parser(), request({ "X-Addon-Lifecycle-Token": token })),
+    ).resolves.toMatchObject({
+      ok: true,
+      claims: { workspaceId: WORKSPACE_ID, addonId: ADDON_ID },
+    });
+  });
+
+  it("identifies Clockify admin roles case-insensitively", () => {
+    expect(isClockifyAdminRole("OWNER")).toBe(true);
+    expect(isClockifyAdminRole(" admin ")).toBe(true);
+    expect(isClockifyAdminRole("USER")).toBe(false);
+    expect(isClockifyAdminRole(undefined)).toBe(false);
+  });
+
+  it("normalizes Clockify environment URLs without adding production fallbacks", () => {
+    expect(resolveClockifyApiBaseUrl({ apiUrl: "https://developer.clockify.me/api" })).toBe(
+      "https://developer.clockify.me/api/v1",
+    );
+    expect(resolveClockifyApiBaseUrl({ apiUrl: "https://x.clockify.me/api/v1" })).toBe(
+      "https://x.clockify.me/api/v1",
+    );
+    expect(
+      resolveClockifyApiBaseUrl({
+        apiUrl: "https://developer.clockify.me/api",
+        backendUrl: "https://api.clockify.me/api",
+      }),
+    ).toBe("https://developer.clockify.me/api/v1");
+    expect(resolveClockifyApiBaseUrl({})).toBeUndefined();
+    expect(resolveClockifyReportsBaseUrl({ reportsUrl: "https://developer.clockify.me/report" })).toBe(
+      "https://developer.clockify.me/report/v1",
+    );
   });
 
   it("wraps handlers and returns 401 for failed verification", async () => {

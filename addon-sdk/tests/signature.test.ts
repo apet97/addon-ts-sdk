@@ -40,11 +40,35 @@ describe("ClockifySignatureParser", () => {
 
   it("should fail validation if issuer is incorrect", async () => {
     const { publicKey, privateKey } = await generateTestKeys();
-    // Sign with wrong issuer
-    const token = await new joseSignJWTWrapper({ type: "addon" })
+    const token = await new SignJWT({ type: "addon" })
       .setProtectedHeader({ alg: "RS256" })
       .setIssuer("wrong-issuer")
       .setSubject(addonKey)
+      .setExpirationTime("30m")
+      .sign(privateKey);
+
+    const parser = new ClockifySignatureParser(addonKey, publicKey);
+    await expect(parser.parseClaims(token)).rejects.toThrow();
+  });
+
+  it("should fail validation if the issuer claim is missing", async () => {
+    const { publicKey, privateKey } = await generateTestKeys();
+    const token = await new SignJWT({ type: "addon" })
+      .setProtectedHeader({ alg: "RS256" })
+      .setSubject(addonKey)
+      .setExpirationTime("30m")
+      .sign(privateKey);
+
+    const parser = new ClockifySignatureParser(addonKey, publicKey);
+    await expect(parser.parseClaims(token)).rejects.toThrow();
+  });
+
+  it("should fail validation if the subject claim is missing", async () => {
+    const { publicKey, privateKey } = await generateTestKeys();
+    const token = await new SignJWT({ type: "addon" })
+      .setProtectedHeader({ alg: "RS256" })
+      .setIssuer("clockify")
+      .setExpirationTime("30m")
       .sign(privateKey);
 
     const parser = new ClockifySignatureParser(addonKey, publicKey);
@@ -141,23 +165,3 @@ describe("ClockifySignatureParser", () => {
     expect(ClockifySignatureClaims.THEME).toBe("theme");
   });
 });
-
-// Minimal helper to test wrong issuer claim since our helper signs standard issuer
-class joseSignJWTWrapper {
-  private payload: any;
-  private issuer: string = "clockify";
-  private subject: string = "";
-  constructor(payload: any) {
-    this.payload = payload;
-  }
-  setProtectedHeader(h: any) { return this; }
-  setIssuer(iss: string) { this.issuer = iss; return this; }
-  setSubject(sub: string) { this.subject = sub; return this; }
-  async sign(key: any) {
-    return await new SignJWT(this.payload)
-      .setProtectedHeader({ alg: "RS256" })
-      .setIssuer(this.issuer)
-      .setSubject(this.subject)
-      .sign(key);
-  }
-}

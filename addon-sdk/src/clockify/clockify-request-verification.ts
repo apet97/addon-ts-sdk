@@ -36,11 +36,22 @@ export interface ClockifyRequestVerificationOptions {
   expectedAddonId?: string;
 }
 
+export interface ClockifyTokenVerificationOptions {
+  expectedWorkspaceId?: string;
+  expectedAddonId?: string;
+}
+
 export type ClockifyRequestVerificationFailureReason =
   | "missing-signature"
   | "invalid-signature"
   | "missing-event-type"
   | "event-type-mismatch"
+  | "workspace-id-mismatch"
+  | "addon-id-mismatch";
+
+export type ClockifyTokenVerificationFailureReason =
+  | "missing-token"
+  | "invalid-token"
   | "workspace-id-mismatch"
   | "addon-id-mismatch";
 
@@ -53,6 +64,16 @@ export type ClockifyRequestVerificationResult =
   | {
       ok: false;
       reason: ClockifyRequestVerificationFailureReason;
+    };
+
+export type ClockifyTokenVerificationResult =
+  | {
+      ok: true;
+      claims: ClockifyAddonClaims;
+    }
+  | {
+      ok: false;
+      reason: ClockifyTokenVerificationFailureReason;
     };
 
 export interface ClockifyVerifiedRequestContext {
@@ -80,6 +101,41 @@ export function getClockifyHeader(
   return undefined;
 }
 
+export function getClockifyQueryParam(
+  query: AddonRequest["query"],
+  name: string,
+): string | undefined {
+  return query?.get(name) ?? undefined;
+}
+
+export function isClockifyAdminRole(role: unknown): boolean {
+  const normalized = String(role ?? "").trim().toLowerCase();
+  return normalized === "owner" || normalized === "admin";
+}
+
+function normalizeClockifyVersionedBaseUrl(value: string | undefined): string | undefined {
+  const root = value?.trim().replace(/\/+$/, "");
+  if (!root) return undefined;
+  return root.endsWith("/v1") ? root : `${root}/v1`;
+}
+
+function firstNonEmpty(...values: Array<string | undefined>): string | undefined {
+  return values.find((value) => value !== undefined && value.trim() !== "");
+}
+
+export function resolveClockifyApiBaseUrl(input: {
+  apiUrl?: string;
+  backendUrl?: string;
+}): string | undefined {
+  return normalizeClockifyVersionedBaseUrl(firstNonEmpty(input.apiUrl, input.backendUrl));
+}
+
+export function resolveClockifyReportsBaseUrl(input: {
+  reportsUrl?: string;
+}): string | undefined {
+  return normalizeClockifyVersionedBaseUrl(input.reportsUrl);
+}
+
 export function getClockifyEnvironmentContext(
   claims: ClockifyAddonClaims,
 ): ClockifyEnvironmentContext {
@@ -96,6 +152,19 @@ export function getClockifyEnvironmentContext(
     language: claims.language,
     theme: claims.theme,
   };
+}
+
+function checkClockifyClaimContext(
+  claims: ClockifyAddonClaims,
+  options: ClockifyTokenVerificationOptions,
+): "workspace-id-mismatch" | "addon-id-mismatch" | undefined {
+  if (options.expectedWorkspaceId !== undefined && claims.workspaceId !== options.expectedWorkspaceId) {
+    return "workspace-id-mismatch";
+  }
+  if (options.expectedAddonId !== undefined && claims.addonId !== options.expectedAddonId) {
+    return "addon-id-mismatch";
+  }
+  return undefined;
 }
 
 export async function verifyClockifyRequest(
@@ -117,12 +186,9 @@ export async function verifyClockifyRequest(
     return { ok: false, reason: "invalid-signature" };
   }
 
-  if (options.expectedWorkspaceId !== undefined && claims.workspaceId !== options.expectedWorkspaceId) {
-    return { ok: false, reason: "workspace-id-mismatch" };
-  }
-
-  if (options.expectedAddonId !== undefined && claims.addonId !== options.expectedAddonId) {
-    return { ok: false, reason: "addon-id-mismatch" };
+  const contextMismatch = checkClockifyClaimContext(claims, options);
+  if (contextMismatch) {
+    return { ok: false, reason: contextMismatch };
   }
 
   const eventHeader = options.eventHeader ?? ClockifyHeaders.WEBHOOK_EVENT_TYPE;
@@ -138,6 +204,54 @@ export async function verifyClockifyRequest(
   }
 
   return eventType === undefined ? { ok: true, claims } : { ok: true, claims, eventType };
+}
+
+export async function verifyClockifyToken(
+  parser: ClockifySignatureParser,
+  token: string | undefined | null,
+  options: ClockifyTokenVerificationOptions = {},
+): Promise<ClockifyTokenVerificationResult> {
+  if (!token || token.trim() === "") {
+    return { ok: false, reason: "missing-token" };
+  }
+
+  let claims: ClockifyAddonClaims;
+  try {
+    claims = await parser.parseClaims(token);
+  } catch {
+    return { ok: false, reason: "invalid-token" };
+  }
+
+  const contextMismatch = checkClockifyClaimContext(claims, options);
+  if (contextMismatch) {
+    return { ok: false, reason: contextMismatch };
+  }
+
+  return { ok: true, claims };
+}
+
+export function verifyClockifyComponentRequest(
+  parser: ClockifySignatureParser,
+  request: AddonRequest,
+  options: ClockifyTokenVerificationOptions = {},
+): Promise<ClockifyTokenVerificationResult> {
+  return verifyClockifyToken(
+    parser,
+    getClockifyQueryParam(request.query, ClockifyQueryParams.AUTH_TOKEN),
+    options,
+  );
+}
+
+export function verifyClockifyLifecycleRequest(
+  parser: ClockifySignatureParser,
+  request: AddonRequest,
+  options: ClockifyTokenVerificationOptions = {},
+): Promise<ClockifyTokenVerificationResult> {
+  return verifyClockifyToken(
+    parser,
+    getClockifyHeader(request.headers, ClockifyHeaders.LIFECYCLE_TOKEN),
+    options,
+  );
 }
 
 export function withClockifyVerifiedRequest(
