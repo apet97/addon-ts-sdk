@@ -1,46 +1,46 @@
 import { ClockifyResource } from "../clockify-resource";
 
 export const ClockifyScope = {
-  CLIENT_READ: "CLIENT_READ",
-  CLIENT_WRITE: "CLIENT_WRITE",
-  PROJECT_READ: "PROJECT_READ",
-  PROJECT_WRITE: "PROJECT_WRITE",
-  TAG_READ: "TAG_READ",
-  TAG_WRITE: "TAG_WRITE",
-  TASK_READ: "TASK_READ",
-  TASK_WRITE: "TASK_WRITE",
-  TIME_ENTRY_READ: "TIME_ENTRY_READ",
-  TIME_ENTRY_WRITE: "TIME_ENTRY_WRITE",
-  EXPENSE_READ: "EXPENSE_READ",
-  EXPENSE_WRITE: "EXPENSE_WRITE",
-  INVOICE_READ: "INVOICE_READ",
-  INVOICE_WRITE: "INVOICE_WRITE",
-  USER_READ: "USER_READ",
-  USER_WRITE: "USER_WRITE",
-  GROUP_READ: "GROUP_READ",
-  GROUP_WRITE: "GROUP_WRITE",
-  WORKSPACE_READ: "WORKSPACE_READ",
-  WORKSPACE_WRITE: "WORKSPACE_WRITE",
-  CUSTOM_FIELDS_READ: "CUSTOM_FIELDS_READ",
-  CUSTOM_FIELDS_WRITE: "CUSTOM_FIELDS_WRITE",
-  APPROVAL_READ: "APPROVAL_READ",
-  APPROVAL_WRITE: "APPROVAL_WRITE",
-  SCHEDULING_READ: "SCHEDULING_READ",
-  SCHEDULING_WRITE: "SCHEDULING_WRITE",
-  REPORTS_READ: "REPORTS_READ",
-  REPORTS_WRITE: "REPORTS_WRITE",
-  TIME_OFF_READ: "TIME_OFF_READ",
-  TIME_OFF_WRITE: "TIME_OFF_WRITE",
+  "CLIENT_READ": "CLIENT_READ",
+  "CLIENT_WRITE": "CLIENT_WRITE",
+  "PROJECT_READ": "PROJECT_READ",
+  "PROJECT_WRITE": "PROJECT_WRITE",
+  "TAG_READ": "TAG_READ",
+  "TAG_WRITE": "TAG_WRITE",
+  "TASK_READ": "TASK_READ",
+  "TASK_WRITE": "TASK_WRITE",
+  "TIME_ENTRY_READ": "TIME_ENTRY_READ",
+  "TIME_ENTRY_WRITE": "TIME_ENTRY_WRITE",
+  "EXPENSE_READ": "EXPENSE_READ",
+  "EXPENSE_WRITE": "EXPENSE_WRITE",
+  "INVOICE_READ": "INVOICE_READ",
+  "INVOICE_WRITE": "INVOICE_WRITE",
+  "USER_READ": "USER_READ",
+  "USER_WRITE": "USER_WRITE",
+  "GROUP_READ": "GROUP_READ",
+  "GROUP_WRITE": "GROUP_WRITE",
+  "WORKSPACE_READ": "WORKSPACE_READ",
+  "WORKSPACE_WRITE": "WORKSPACE_WRITE",
+  "CUSTOM_FIELDS_READ": "CUSTOM_FIELDS_READ",
+  "CUSTOM_FIELDS_WRITE": "CUSTOM_FIELDS_WRITE",
+  "APPROVAL_READ": "APPROVAL_READ",
+  "APPROVAL_WRITE": "APPROVAL_WRITE",
+  "SCHEDULING_READ": "SCHEDULING_READ",
+  "SCHEDULING_WRITE": "SCHEDULING_WRITE",
+  "REPORTS_READ": "REPORTS_READ",
+  "REPORTS_WRITE": "REPORTS_WRITE",
+  "TIME_OFF_READ": "TIME_OFF_READ",
+  "TIME_OFF_WRITE": "TIME_OFF_WRITE",
 } as const;
 
 export type ClockifyScope = typeof ClockifyScope[keyof typeof ClockifyScope];
 
 export const ClockifyMinimalSubscriptionPlan = {
-  FREE: "FREE",
-  BASIC: "BASIC",
-  STANDARD: "STANDARD",
-  PRO: "PRO",
-  ENTERPRISE: "ENTERPRISE",
+  "FREE": "FREE",
+  "BASIC": "BASIC",
+  "STANDARD": "STANDARD",
+  "PRO": "PRO",
+  "ENTERPRISE": "ENTERPRISE",
 } as const;
 
 export type ClockifyMinimalSubscriptionPlan = typeof ClockifyMinimalSubscriptionPlan[keyof typeof ClockifyMinimalSubscriptionPlan];
@@ -75,7 +75,7 @@ export interface ClockifySetting {
   readonly type: "TXT" | "NUMBER" | "DROPDOWN_SINGLE" | "DROPDOWN_MULTIPLE" | "CHECKBOX" | "LINK" | "USER_DROPDOWN_SINGLE" | "USER_DROPDOWN_MULTIPLE";
   readonly key?: string;
   readonly value: string | number | any[] | boolean;
-  readonly allowedValues?: any[];
+  readonly allowedValues?: string[];
   readonly required?: boolean;
   readonly copyable?: boolean;
   readonly readOnly?: boolean;
@@ -652,7 +652,7 @@ export interface ClockifySettingBuilder_Optional {
   description(value: string): ClockifySettingBuilder_Optional;
   placeholder(value: string): ClockifySettingBuilder_Optional;
   key(value: string): ClockifySettingBuilder_Optional;
-  allowedValues(value: any[]): ClockifySettingBuilder_Optional;
+  allowedValues(value: string[]): ClockifySettingBuilder_Optional;
   required(value: boolean): ClockifySettingBuilder_Optional;
   copyable(value: boolean): ClockifySettingBuilder_Optional;
   readOnly(value: boolean): ClockifySettingBuilder_Optional;
@@ -757,7 +757,7 @@ class ClockifySettingBuilderImpl implements ClockifySettingBuilder_id, ClockifyS
     return this;
   }
 
-  allowedValues(value: any[]): any {
+  allowedValues(value: string[]): any {
     this._allowedValues = value;
     return this;
   }

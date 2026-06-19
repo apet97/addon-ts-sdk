@@ -1,4 +1,4 @@
-import { generateKeyPair, SignJWT, exportSPKI } from "jose";
+import { generateKeyPair, SignJWT, exportSPKI, type KeyLike } from "jose";
 
 export async function generateTestKeys() {
   const { publicKey, privateKey } = await generateKeyPair("RS256");
@@ -7,9 +7,9 @@ export async function generateTestKeys() {
 }
 
 export async function signTestToken(
-  privateKey: any,
+  privateKey: KeyLike | Uint8Array,
   addonKey: string,
-  claims: Record<string, any> = {},
+  claims: Record<string, unknown> = {},
   expiresIn = "30m"
 ) {
   return await new SignJWT({

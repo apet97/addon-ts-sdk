@@ -40,6 +40,9 @@ export function createExpressAddonHandler(addon: Addon<unknown>) {
       if (response.body !== undefined && response.body !== null) {
         if (isJsonBody(response.body)) {
           res.json(response.body);
+        } else if (response.body instanceof Uint8Array) {
+          // express's res.send JSON-encodes a plain Uint8Array; wrap it so it ships as raw bytes.
+          res.send(Buffer.from(response.body));
         } else {
           res.send(response.body);
         }

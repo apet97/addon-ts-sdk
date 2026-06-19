@@ -116,7 +116,8 @@ function getTSType(node: SchemaNode, definitions: Record<string, SchemaNode>): s
     if (node.items) {
       return `${getTSType(node.items, definitions)}[]`;
     }
-    return "any[]";
+    // Items-less arrays default to string[], matching the Java processor's List<String>.
+    return "string[]";
   }
   if (type === "object") {
     return "Record<string, any>";
@@ -191,7 +192,8 @@ function emitEnums(definitions: Record<string, SchemaNode>): string {
       const className = getDefinitionSimpleClassName(defName);
       out += `export const ${className} = {\n`;
       for (const val of defNode.enum) {
-        out += `  ${val}: "${val}",\n`;
+        // Quote keys so enum values that aren't valid JS identifiers still emit valid TypeScript.
+        out += `  "${val}": "${val}",\n`;
       }
       out += `} as const;\n\n`;
       out += `export type ${className} = typeof ${className}[keyof typeof ${className}];\n\n`;

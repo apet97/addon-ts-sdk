@@ -76,6 +76,22 @@ server.listen(8080, () => {
   environment URL normalization.
 - **Adapters** for Node `http`, Express, and the Fetch API (Hono, Cloudflare Workers, Bun, Deno).
 
+## Testing helpers
+
+The `@apet97/clockify-addon-sdk/testing` subpath exports `generateTestKeys()` and `signTestToken()`
+for signing RS256 add-on JWTs in your own tests, so you can exercise the verification helpers without
+a live Clockify environment:
+
+```typescript
+import { ClockifySignatureParser } from "@apet97/clockify-addon-sdk";
+import { generateTestKeys, signTestToken } from "@apet97/clockify-addon-sdk/testing";
+
+const { privateKey, publicKey } = await generateTestKeys();
+const token = await signTestToken(privateKey, "my-addon-key", { workspaceId: "w-1" });
+
+const claims = await new ClockifySignatureParser("my-addon-key", publicKey).parseClaims(token);
+```
+
 ## Schema versions
 
 1.2–1.4 are ported from the Clockify add-on Java SDK; 1.5 is taken from the live schema endpoint

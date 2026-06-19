@@ -180,4 +180,51 @@ describe("Adapters", () => {
     expect(statusSpy).toHaveBeenCalledWith(500);
     expect(sendSpy).toHaveBeenCalledWith("Internal Server Error");
   });
+
+  it("writes Uint8Array response bodies as raw bytes via writeNodeResponse", () => {
+    const mockRes = new ServerResponse(new IncomingMessage(new Socket()));
+    const endSpy = vi.spyOn(mockRes, "end").mockImplementation(() => mockRes);
+    const headerSpy = vi.spyOn(mockRes, "setHeader").mockImplementation(() => mockRes);
+
+    writeNodeResponse(mockRes, { status: 200, body: new Uint8Array([1, 2, 3]) });
+
+    expect(endSpy).toHaveBeenCalledWith(new Uint8Array([1, 2, 3]));
+    expect(headerSpy).not.toHaveBeenCalledWith("content-type", "application/json");
+  });
+
+  it("preserves Uint8Array response bodies as raw bytes via the Fetch adapter", async () => {
+    const addon = new ClockifyAddon(mockManifest);
+    addon.registerHandler("/binary", "POST", () => ({ status: 200, body: new Uint8Array([1, 2, 3]) }));
+
+    const response = await handleFetchRequest(
+      addon,
+      new Request("https://example.com/binary", { method: "POST" }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-type")).not.toBe("application/json");
+    expect(Array.from(new Uint8Array(await response.arrayBuffer()))).toEqual([1, 2, 3]);
+  });
+
+  it("sends Uint8Array response bodies as raw bytes via the Express adapter", async () => {
+    const addon = new ClockifyAddon(mockManifest);
+    addon.registerHandler("/binary", "POST", () => ({ status: 200, body: new Uint8Array([1, 2, 3]) }));
+    const handler = createExpressAddonHandler(addon);
+
+    const mockReq = { method: "POST", url: "/binary", path: "/binary", headers: {}, query: {}, body: {} };
+    const sendSpy = vi.fn().mockReturnThis();
+    const jsonSpy = vi.fn().mockReturnThis();
+    const mockRes = {
+      status: vi.fn().mockReturnThis(),
+      set: vi.fn().mockReturnThis(),
+      json: jsonSpy,
+      send: sendSpy,
+      end: vi.fn().mockReturnThis(),
+    };
+
+    await handler(mockReq as any, mockRes as any);
+
+    expect(jsonSpy).not.toHaveBeenCalled();
+    expect(sendSpy).toHaveBeenCalledWith(Buffer.from([1, 2, 3]));
+  });
 });
