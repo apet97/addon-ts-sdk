@@ -28,6 +28,7 @@ interface PropInfo {
 interface ObjectDef {
   defName: string | null;
   className: string;
+  desc: string;
   properties: PropInfo[];
   requiredList: string[];
 }
@@ -131,6 +132,12 @@ function getTSType(node: SchemaNode, definitions: Record<string, SchemaNode>): s
   return "any";
 }
 
+function jsDoc(desc: string, indent = ""): string {
+  const cleaned = desc.replace(/\*\//g, "* /").replace(/\s+/g, " ").trim();
+  if (!cleaned) return "";
+  return `${indent}/** ${cleaned} */\n`;
+}
+
 function getPropertiesInfo(
   propertiesNode: Record<string, SchemaNode>,
   requiredList: string[],
@@ -163,6 +170,7 @@ function collectObjectDefs(
       objectDefs.push({
         defName,
         className: getDefinitionSimpleClassName(defName),
+        desc: defNode.description ?? "",
         properties: getPropertiesInfo(
           defNode.properties ?? {},
           defNode.required ?? [],
@@ -175,6 +183,7 @@ function collectObjectDefs(
   objectDefs.push({
     defName: null,
     className: "ClockifyManifest",
+    desc: schema.description ?? "",
     properties: getPropertiesInfo(schema.properties ?? {}, schema.required ?? [], definitions),
     requiredList: schema.required ?? [],
   });
@@ -228,12 +237,14 @@ function emitInterface(obj: ObjectDef, version: string): string {
     obj.defName !== null && ["lifecycle", "webhook", "component"].includes(obj.defName);
   const heritage = isResource ? " extends ClockifyResource" : "";
 
-  let out = `export interface ${obj.className}${heritage} {\n`;
+  let out = jsDoc(obj.desc);
+  out += `export interface ${obj.className}${heritage} {\n`;
   if (isManifest) {
     out += `  readonly schemaVersion: "${version}";\n`;
   }
   for (const prop of obj.properties) {
     const optional = prop.isReq ? "" : "?";
+    out += jsDoc(prop.desc, "  ");
     out += `  readonly ${prop.name}${optional}: ${prop.tsType};\n`;
   }
   out += `}\n\n`;
@@ -260,8 +271,10 @@ function emitStepInterfaces(
         : `${obj.className}Builder_${requiredProps[i + 1].name}`;
 
     out += `export interface ${stepName} {\n`;
+    out += jsDoc(prop.desc, "  ");
     out += `  ${prop.name}(value: ${prop.tsType}): ${nextStepName};\n`;
     for (const enumVal of getEnumValues(prop.node, definitions)) {
+      out += jsDoc(prop.desc, "  ");
       out += `  ${getEnumSetterMethodName(obj.defName, prop.name, enumVal)}(): ${nextStepName};\n`;
     }
     out += `}\n\n`;
@@ -271,8 +284,10 @@ function emitStepInterfaces(
     const optionalStepName = `${obj.className}Builder_Optional`;
     out += `export interface ${optionalStepName} {\n`;
     for (const prop of optionalProps) {
+      out += jsDoc(prop.desc, "  ");
       out += `  ${prop.name}(value: ${prop.tsType}): ${optionalStepName};\n`;
       for (const enumVal of getEnumValues(prop.node, definitions)) {
+        out += jsDoc(prop.desc, "  ");
         out += `  ${getEnumSetterMethodName(obj.defName, prop.name, enumVal)}(): ${optionalStepName};\n`;
       }
     }

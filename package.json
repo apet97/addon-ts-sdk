@@ -9,12 +9,13 @@
     "verify:generated": "npm run verify:generated -w @apet97/clockify-addon-sdk",
     "build": "npm run build -w @apet97/clockify-addon-sdk",
     "verify:dist": "npm run verify:dist -w @apet97/clockify-addon-sdk",
+    "verify:package-consumer": "npm run verify:package-consumer -w @apet97/clockify-addon-sdk",
     "test": "npm run test -w @apet97/clockify-addon-sdk",
     "lint": "npm run lint -w @apet97/clockify-addon-sdk",
     "format:check": "npm run format:check -w @apet97/clockify-addon-sdk",
     "pack:dry-run": "npm pack --dry-run -w @apet97/clockify-addon-sdk",
     "audit:prod": "npm audit --omit=dev --json",
     "audit:all": "npm audit --json",
-    "ci:verify": "npm run type-check && npm run verify:generated && npm run test && npm run lint && npm run format:check && npm run build && npm run verify:dist && npm run pack:dry-run && npm run audit:prod && npm run audit:all"
+    "ci:verify": "npm run type-check && npm run verify:generated && npm run test && npm run lint && npm run format:check && npm run build && npm run verify:dist && npm run pack:dry-run && npm run verify:package-consumer && npm run audit:prod && npm run audit:all"
   }
 }

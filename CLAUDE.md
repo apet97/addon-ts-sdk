@@ -15,16 +15,21 @@ starts at Node 22. Independent, unofficial project, not affiliated with Clockify
 
 - **Generated output:** never hand-edit `addon-sdk/src/clockify/generated/**`. It is generated from
   `addon-sdk/schemas/clockify-manifests/*.json`; change the schema or generator, then
-  `npm run generate`. Builder step order follows each schema's `required` array; required array
-  setters must be called at runtime even when Java-parity defaults initialize arrays to `[]`.
+  `npm run generate`. Public generated interfaces carry schema descriptions as JSDoc; private
+  builder implementations should not duplicate those comments. Builder step order follows each
+  schema's `required` array; required array setters must be called at runtime even when Java-parity
+  defaults initialize arrays to `[]`.
 - **Schema provenance is part of the source of truth.** `verify:generated` enforces exactly schema
   versions 1.2, 1.3, 1.4, and 1.5, source labels, schema file presence, raw SHA-256 hashes, and a
   check-only fresh generation that must match committed output without rewriting tracked files.
 - **Keep it lean.** No REST client, token-exchange client, UI/window-event framework, persistence
   layer, or custom manifest validator without an explicit ask.
 - **Tokens:** verify `RS256` only, with `iss=clockify`, `type=addon`, `sub=<manifest key>`. Webhooks
-  should use `verifyClockifyWebhookRequest()` with an explicit `expectedEventType`; lifecycle uses `X-Addon-Lifecycle-Token`;
-  Clockify API calls use `X-Addon-Token`.
+  should use `verifyClockifyWebhookRequest()` with an explicit `expectedEventType`; lifecycle uses
+  `X-Addon-Lifecycle-Token`; Clockify API calls use `X-Addon-Token`.
+- **Lifecycle bodies:** use the exported payload guards plus
+  `clockifyLifecyclePayloadMatchesClaims()`. The matcher narrows claims to required
+  `workspaceId`/`addonId`, so examples should not need installation-claim casts.
 - **Hosts:** never hardcode them. Read `backendUrl`/`reportsUrl`/`locationsUrl`/`screenshotsUrl` from
   verified claims, or `getClockifyEnvironmentContext()`.
 - **Adapters:** Node `http` and Fetch bodies default to `DEFAULT_MAX_BODY_BYTES` (`1_048_576`) and
@@ -42,7 +47,8 @@ npm run ci:verify
 ```
 
 This runs type-check, generated drift, tests, lint, format check, build, `verify:dist`, pack dry-run,
-production audit, and full audit. GitHub Actions runs the same gate on Node 22.x and 24.x.
+installed-package consumer smoke, production audit, and full audit. GitHub Actions runs the same
+gate on Node 22.x and 24.x.
 
 ## Gotchas (learned the hard way)
 
@@ -55,6 +61,9 @@ production audit, and full audit. GitHub Actions runs the same gate on Node 22.x
   no-hardcoded-fallback environment URL behavior.
 - `npm pack --dry-run` invokes `prepack`, so it re-runs the heavy gate chain. Use
   `find addon-sdk -maxdepth 1 -name '*.tgz' -print` afterward when checking for accidental artifacts.
+- `verify:package-consumer` stays outside `prepack`: it packs the already-built package with scripts
+  ignored, installs that tarball into temporary ESM and CJS consumers, and imports public subpaths
+  from the installed dependency.
 - `npm run lint` and `npm run format:check` are real check-only gates. The package configs ignore
   vendored Marketplace docs, schema/provenance files, generated Clockify models, `dist`, `coverage`,
   `node_modules`, and dry-run tarballs.

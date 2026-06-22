@@ -22,13 +22,14 @@ Conventions for anyone (human or agent) working in this repository.
   missing, changed without updating provenance, if the supported version set drifts, or if a fresh
   temporary generation differs from committed generated output.
 - `addon-sdk/src/clockify/generated/**` is generated from those schemas. **Never edit it by hand** —
-  change the schema or the generator, then `npm run generate`.
+  change the schema or the generator, then `npm run generate`. Public generated interfaces include
+  schema descriptions as JSDoc; keep that documentation in the generator, not in generated files.
 - Builder step order follows each schema's `required` array (matching the upstream processor).
   Required array fields keep Java-parity empty-array defaults but must still throw at runtime when
   their setter was never called.
 - Marketplace docs coverage is intentionally small and runtime-focused: request verification helpers,
-  lifecycle payload types, token/header constants, and environment/region claim extraction. Do not add
-  a REST client, token exchange client, UI/window-event framework, persistence layer, or custom
+  lifecycle payload guards, token/header constants, and environment/region claim extraction. Do not
+  add a REST client, token exchange client, UI/window-event framework, persistence layer, or custom
   manifest validator unless explicitly requested.
 - Clockify-signed tokens are verified as `RS256` JWTs with `iss=clockify`, `type=addon`, and
   `sub=<manifest key>`. Webhooks should use `verifyClockifyWebhookRequest()` with
@@ -47,7 +48,7 @@ Conventions for anyone (human or agent) working in this repository.
 
 | Command                                    | Checks                                                                                                                                        |
 | ------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------- |
-| `npm run ci:verify`                        | Canonical root gate: type-check, generated drift, tests, lint, format check, build, dist import smoke, pack dry-run, and audits.              |
+| `npm run ci:verify`                        | Canonical root gate: type-check, generated drift, tests, lint, format check, build, dist import smoke, pack dry-run, installed-consumer smoke, and audits. |
 | `npm run type-check`                       | `src`, generator, examples, and the type-state probes. A weakened builder must fail this.                                                     |
 | `npm run verify:generated`                 | Checks schema provenance, generates to a temporary directory, compares against committed generated files, and leaves tracked files untouched. |
 | `npm run test`                             | vitest suite.                                                                                                                                 |
@@ -56,6 +57,7 @@ Conventions for anyone (human or agent) working in this repository.
 | `npm run build`                            | ESM + CJS output.                                                                                                                             |
 | `npm run verify:dist`                      | Imports the **built** ESM and CJS and boots the quick-start. A green `build` alone does not prove the package imports.                        |
 | `npm run pack:dry-run`                     | Tarball contents (`dist` + `docs` + `schemas/clockify-manifests` + `LICENSE` + `README`).                                                     |
+| `npm run verify:package-consumer`          | Packs the already-built package with scripts ignored, installs it into temporary ESM/CJS consumers, imports public subpaths, and serves `/manifest`. |
 | `npm run audit:prod` / `npm run audit:all` | Production and full dependency audits; both should report 0 vulnerabilities.                                                                  |
 
 GitHub Actions runs `npm run ci:verify` on Node 22.x and 24.x for pushes to `main`, pull requests,

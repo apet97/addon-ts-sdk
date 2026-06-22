@@ -5,6 +5,8 @@ This document describes how the type-safe builders are structured and generated.
 ## Versioned Manifest Builders
 
 Builders are generated directly from Clockify's manifest schemas for versions 1.2, 1.3, 1.4, and 1.5. They use a **type-state pattern** to enforce that required fields are set in sequence.
+Schema descriptions are emitted as JSDoc on public generated interfaces and builder steps, so editor
+help stays tied to the vendored schema source of truth.
 
 ```typescript
 import { ClockifyManifest } from "@apet97/clockify-addon-sdk";

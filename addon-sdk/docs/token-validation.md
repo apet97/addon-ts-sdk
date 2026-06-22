@@ -96,7 +96,9 @@ signed add-on JWT:
 
 ```typescript
 import {
+  clockifyLifecyclePayloadMatchesClaims,
   createClockifySignatureParser,
+  isClockifyInstalledLifecyclePayload,
   isClockifyAdminRole,
   resolveClockifyApiBaseUrl,
   resolveClockifyReportsBaseUrl,
@@ -127,6 +129,13 @@ const lifecycleResult = await verifyClockifyLifecycleRequest(parser, request);
 if (!lifecycleResult.ok) {
   return { status: 401, body: "Unauthorized" };
 }
+
+if (
+  !isClockifyInstalledLifecyclePayload(request.body) ||
+  !clockifyLifecyclePayloadMatchesClaims(request.body, lifecycleResult.claims)
+) {
+  return { status: 401, body: "Unauthorized" };
+}
 ```
 
 These request helpers expect an `AddonRequest` whose `query` is a `URLSearchParams` — the shape the
@@ -134,6 +143,12 @@ SDK's Node, Express, and Fetch adapters produce. If you already hold the raw tok
 example, an Express route reading `req.query.auth_token` or `req.headers['x-addon-lifecycle-token']`
 itself), call `verifyClockifyToken(parser, token, options)` directly; it returns the same typed
 result without an `AddonRequest`.
+
+Lifecycle body helpers are intentionally small runtime guards. They verify the documented payload
+shape and let you bind a lifecycle body to already verified `workspaceId` and `addonId` claims before
+persisting installation data or webhook `authToken` values. After
+`clockifyLifecyclePayloadMatchesClaims()` returns true, TypeScript treats the claims as carrying
+required `workspaceId` and `addonId` strings.
 
 ## Environments and Regions
 

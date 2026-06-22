@@ -66,4 +66,16 @@ describe("secure server example", () => {
       ),
     ).resolves.toBe("webhook-token");
   }, 15_000);
+
+  it("uses the SDK lifecycle helpers instead of local payload guards", async () => {
+    const source = await import("node:fs/promises").then((fs) =>
+      fs.readFile(new URL("../examples/secure-server/index.ts", import.meta.url), "utf8"),
+    );
+
+    expect(source).toContain("isClockifyInstalledLifecyclePayload");
+    expect(source).toContain("clockifyLifecyclePayloadMatchesClaims");
+    expect(source).not.toContain("function isInstalledPayload");
+    expect(source).not.toContain("function installationPayloadMatchesClaims");
+    expect(source).not.toContain("as VerifiedInstallationClaims");
+  });
 });

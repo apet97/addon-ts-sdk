@@ -15,6 +15,8 @@ This package provides a server runtime SDK for CAKE.com marketplace add-ons targ
 - Clockify Addon lifecycle, component, settings, and webhook registrations.
 - RS256 JWT signature verification (`jose`) plus component, lifecycle, and strict webhook request
   helpers.
+- Narrow lifecycle payload guards that bind documented lifecycle bodies to verified workspace/add-on
+  claims and narrow those claims before persistence.
 - Adapters for Node.js `http`, Express, and Fetch API. Node and Fetch enforce a default 1 MiB body
   limit before dispatch; Express remains an optional peer with body limits owned by the host app.
 - Optional `onError(error, context)` reporting for handled router, Fetch, and Node adapter errors.

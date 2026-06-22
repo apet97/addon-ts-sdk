@@ -18,9 +18,12 @@ built and verified from a green tree.
 6. **`npm run build`** — emits the ESM and CJS outputs with type declarations.
 7. **`npm run verify:dist`** — imports the **built** ESM and CJS and boots the README quick-start; a
    green `build` alone does not prove the package imports.
-8. **`npm pack --dry-run`** — confirms the tarball contents (`dist` + `docs` + vendored
+8. **`npm run pack:dry-run`** — confirms the tarball contents (`dist` + `docs` + vendored
    `schemas/clockify-manifests` + `LICENSE` + `README`).
-9. **`npm audit --omit=dev --json` and `npm audit --json`** — production and full dependency audit;
+9. **`npm run verify:package-consumer`** — packs the already-built package with `--ignore-scripts`,
+   installs that tarball into temporary ESM and CJS consumers, imports the root and subpath entry
+   points, checks `generated.v1_5`, and boots a `/manifest` server smoke from the installed package.
+10. **`npm audit --omit=dev --json` and `npm audit --json`** — production and full dependency audit;
    both should report 0 vulnerabilities.
 
 GitHub Actions runs the same root gate on Node 22.x and 24.x for pushes to `main`, pull requests,
@@ -28,3 +31,5 @@ and manual dispatches. Node 22 is the minimum supported runtime.
 
 The package `prepack` chain includes type-check, generated drift, tests, lint, format check, build,
 and `verify:dist`; `npm pack --dry-run` is therefore both a contents check and a final package smoke.
+`verify:package-consumer` stays outside `prepack` to avoid recursive package creation while still
+proving the tarball works exactly as an installed dependency.

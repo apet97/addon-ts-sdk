@@ -6,10 +6,13 @@ import {
   ClockifyComponent,
   ClockifyInstalledLifecyclePayload,
   ClockifyLifecycleEvent,
+  ClockifyLifecycleMatchedClaims,
   ClockifyManifest,
   ClockifyWebhook,
+  clockifyLifecyclePayloadMatchesClaims,
   createClockifySignatureParser,
   isClockifyAdminRole,
+  isClockifyInstalledLifecyclePayload,
   verifyClockifyComponentRequest,
   verifyClockifyLifecycleRequest,
   verifyClockifyWebhookRequest,
@@ -25,15 +28,10 @@ interface StoredWebhookTokenLookup {
   eventType: string;
 }
 
-type VerifiedInstallationClaims = ClockifyAddonClaims & {
-  workspaceId: string;
-  addonId: string;
-};
-
 interface SecureServerStore {
   saveInstallation(
     payload: ClockifyInstalledLifecyclePayload,
-    claims: VerifiedInstallationClaims,
+    claims: ClockifyLifecycleMatchedClaims,
   ): void | Promise<void>;
   findWebhookAuthToken(
     input: StoredWebhookTokenLookup,
@@ -74,22 +72,6 @@ function normalizeWebhookPath(path: string, baseUrl?: string): string {
   }
 
   return normalizePath(pathname.startsWith("/") ? pathname : `/${pathname}`);
-}
-
-function isInstalledPayload(value: unknown): value is ClockifyInstalledLifecyclePayload {
-  return (
-    typeof value === "object" &&
-    value !== null &&
-    typeof (value as ClockifyInstalledLifecyclePayload).workspaceId === "string" &&
-    typeof (value as ClockifyInstalledLifecyclePayload).addonId === "string"
-  );
-}
-
-function installationPayloadMatchesClaims(
-  payload: ClockifyInstalledLifecyclePayload,
-  claims: ClockifyAddonClaims,
-): claims is VerifiedInstallationClaims {
-  return payload.workspaceId === claims.workspaceId && payload.addonId === claims.addonId;
 }
 
 export function createSecureServerAddon(
@@ -135,8 +117,8 @@ export function createSecureServerAddon(
       if (!result.ok) return { status: 401, body: "Unauthorized" };
 
       if (
-        !isInstalledPayload(request.body) ||
-        !installationPayloadMatchesClaims(request.body, result.claims)
+        !isClockifyInstalledLifecyclePayload(request.body) ||
+        !clockifyLifecyclePayloadMatchesClaims(request.body, result.claims)
       ) {
         return { status: 401, body: "Unauthorized" };
       }

@@ -84,6 +84,8 @@ server.listen(8080, () => {
 - **Clockify token helpers** — built-in platform public key, parser factory, RS256 JWT
   verification, component `auth_token` and lifecycle-header helpers, admin-role checks, and
   environment URL normalization.
+- **Lifecycle payload guards** that validate documented lifecycle bodies and narrow verified claims
+  before persisting installation or webhook-token data.
 - **Adapters** for Node `http`, Express, and the Fetch API (Hono, Cloudflare Workers, Bun, Deno).
 
 ## Testing helpers
@@ -112,6 +114,7 @@ reproducible from them.
 ## Documentation
 
 - [Java Migration Guide](./docs/java-migration.md)
+- [API Reference](./docs/api-reference.md)
 - [Manifest Builders](./docs/manifest-builders.md)
 - [Routing and Middleware](./docs/routing.md)
 - [Token Signature Validation](./docs/token-validation.md)
