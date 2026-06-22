@@ -50,6 +50,8 @@ import { ClockifyAddon, ClockifyComponent, ClockifyManifest, createClockifyNumbe
 import * as clockify from "@apet97/clockify-addon-sdk/clockify";
 import { createNodeHttpAddonServer } from "@apet97/clockify-addon-sdk/adapters";
 import { generateTestKeys } from "@apet97/clockify-addon-sdk/testing";
+import schema15 from "@apet97/clockify-addon-sdk/schemas/clockify-manifests/1.5.json" with { type: "json" };
+import schemaProvenance from "@apet97/clockify-addon-sdk/schemas/clockify-manifests/provenance.json" with { type: "json" };
 
 assert.equal(typeof ClockifyAddon, "function");
 assert.equal(typeof ClockifyManifest.v1_5Builder, "function");
@@ -60,6 +62,8 @@ assert.equal(typeof createClockifyNumberSetting, "function");
 assert.equal(typeof withClockifyVerifiedComponentRequest, "function");
 assert.equal(typeof testing.signTestToken, "function");
 assert.equal(typeof generateTestKeys, "function");
+assert.equal(schema15.version, "1.5");
+assert.equal(schemaProvenance.schemas["1.5"].file, "1.5.json");
 
 const manifest = ClockifyManifest.v1_5Builder()
   .key("packed-consumer-addon")
@@ -97,6 +101,8 @@ const sdk = require("@apet97/clockify-addon-sdk");
 const clockify = require("@apet97/clockify-addon-sdk/clockify");
 const adapters = require("@apet97/clockify-addon-sdk/adapters");
 const testing = require("@apet97/clockify-addon-sdk/testing");
+const schema15 = require("@apet97/clockify-addon-sdk/schemas/clockify-manifests/1.5.json");
+const schemaProvenance = require("@apet97/clockify-addon-sdk/schemas/clockify-manifests/provenance.json");
 
 assert.equal(typeof sdk.ClockifyAddon, "function");
 assert.equal(typeof sdk.ClockifyManifest.v1_5Builder, "function");
@@ -107,6 +113,8 @@ assert.equal(typeof sdk.createClockifyNumberSetting, "function");
 assert.equal(typeof sdk.withClockifyVerifiedComponentRequest, "function");
 assert.equal(typeof adapters.createNodeHttpAddonServer, "function");
 assert.equal(typeof testing.signTestToken, "function");
+assert.equal(schema15.version, "1.5");
+assert.equal(schemaProvenance.schemas["1.5"].file, "1.5.json");
 `,
     "utf8",
   );

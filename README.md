@@ -18,11 +18,14 @@ Primary repo gate from the root:
 npm run ci:verify
 ```
 
-Manual live schema freshness check:
+Release readiness check from the root:
 
 ```bash
-npm run verify:schema-live
+npm run release:verify
 ```
+
+This runs the canonical `ci:verify` gate, the manual live schema freshness check, and the dry-run
+publish check.
 
 The package is not published to the npm registry yet; use this repository as the source of truth and
 pack a local tarball when you need to install it into another project.

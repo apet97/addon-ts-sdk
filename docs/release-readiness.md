@@ -12,14 +12,20 @@ Run these commands from the repository root:
 
 ```bash
 npm ci
-npm run ci:verify
-npm run verify:schema-live
-npm publish --dry-run -w @apet97/clockify-addon-sdk --access public
+npm run release:verify
 ```
 
-`npm run ci:verify` remains the canonical local and CI gate. `npm run verify:schema-live` is manual
-because it depends on Clockify's live manifest schema endpoint. The final command is a dry run only:
-it should print the package contents and registry publish checks without uploading anything.
+`npm run release:verify` runs the canonical `npm run ci:verify` gate, the manual
+`npm run verify:schema-live` freshness check, and the dry-run publish check. `verify:schema-live`
+depends on Clockify's live manifest schema endpoint, so keep it out of deterministic CI. The final
+publish step is a dry run only: it should print the package contents and registry checks without
+uploading anything.
+
+The final dry-run publish command remains:
+
+```bash
+npm publish --dry-run -w @apet97/clockify-addon-sdk --access public
+```
 
 ## Expected package shape
 

@@ -14,6 +14,10 @@ describe("source-only distribution docs", () => {
       resolve(repoRoot, "docs", "release-readiness.md"),
       "utf8",
     );
+    const evidenceMap = readFileSync(
+      resolve(packageRoot, "docs", "porting", "evidence-map.md"),
+      "utf8",
+    );
     const rootPackageJson = JSON.parse(readFileSync(resolve(repoRoot, "package.json"), "utf8"));
     const packageJson = JSON.parse(readFileSync(resolve(packageRoot, "package.json"), "utf8"));
 
@@ -26,7 +30,11 @@ describe("source-only distribution docs", () => {
     expect(packageReadme).toContain(
       "npm install /absolute/path/to/apet97-clockify-addon-sdk-1.0.0.tgz",
     );
+    expect(packageReadme).toContain("## Fetch and edge runtimes");
+    expect(packageReadme).toContain("Hono");
+    expect(packageReadme).toContain("handleFetchRequest(addon, request)");
     expect(productSurface).toContain("not published to the npm registry");
+    expect(rootReadme).toContain("npm run release:verify");
     expect(releaseReadiness).toContain(
       "npm publish --dry-run -w @apet97/clockify-addon-sdk --access public",
     );
@@ -34,6 +42,13 @@ describe("source-only distribution docs", () => {
     expect(rootPackageJson.scripts["release:dry-run"]).toBe(
       "npm publish --dry-run -w @apet97/clockify-addon-sdk --access public",
     );
+    expect(rootPackageJson.scripts["release:verify"]).toBe(
+      "npm run ci:verify && npm run verify:schema-live && npm run release:dry-run",
+    );
+    expect(packageJson.devDependencies["@types/node"]).toMatch(/^\^22\./);
     expect(packageJson.sideEffects).toBe(false);
+    expect(evidenceMap).toContain("clockify-request-verifiers.ts");
+    expect(evidenceMap).toContain("clockify-request-handlers.ts");
+    expect(evidenceMap).toContain("clockify-request-wire.ts");
   });
 });

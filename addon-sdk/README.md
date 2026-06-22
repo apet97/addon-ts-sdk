@@ -113,6 +113,32 @@ server.listen(8080, () => {
   `TXT`, `NUMBER`, `CHECKBOX`, `LINK`, dropdown, and user dropdown settings.
 - **Adapters** for Node `http`, Express, and the Fetch API (Hono, Cloudflare Workers, Bun, Deno).
 
+## Fetch and edge runtimes
+
+`handleFetchRequest()` adapts the framework-free router to standard Fetch `Request` and `Response`
+objects. In Hono, Cloudflare Workers, Bun, Deno, or another Fetch-compatible runtime, keep the addon
+instance outside the request callback and pass each incoming request through the adapter:
+
+```typescript
+import { Hono } from "hono";
+import { ClockifyAddon, ClockifyManifest } from "@apet97/clockify-addon-sdk";
+import { handleFetchRequest } from "@apet97/clockify-addon-sdk/adapters";
+
+const manifest = ClockifyManifest.v1_5Builder()
+  .key("edge-addon")
+  .name("Edge Add-on")
+  .baseUrl("https://example.com/addon")
+  .requireBasicPlan()
+  .build();
+
+const addon = new ClockifyAddon(manifest);
+const app = new Hono();
+
+app.all("*", (c) => handleFetchRequest(addon, c.req.raw));
+```
+
+For a plain Fetch handler, return `handleFetchRequest(addon, request)` from `fetch(request)`.
+
 ## Testing helpers
 
 The `@apet97/clockify-addon-sdk/testing` subpath exports `generateTestKeys()` and `signTestToken()`
@@ -136,6 +162,17 @@ const claims = await new ClockifySignatureParser("my-addon-key", publicKey).pars
 `schemas/clockify-manifests/` are structurally identical to those sources, and the generated builders
 are reproducible from them. Run `npm run verify:schema-live` manually when you want to compare the
 vendored schemas against Clockify's live endpoint.
+
+The packaged tarball intentionally exposes the vendored schema JSON files. ESM consumers can
+import a schema or the provenance file directly:
+
+```typescript
+import manifestSchema15 from "@apet97/clockify-addon-sdk/schemas/clockify-manifests/1.5.json" with { type: "json" };
+import schemaProvenance from "@apet97/clockify-addon-sdk/schemas/clockify-manifests/provenance.json" with { type: "json" };
+
+console.log(manifestSchema15.version);
+console.log(schemaProvenance.supportedVersions);
+```
 
 ## Documentation
 
