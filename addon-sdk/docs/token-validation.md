@@ -10,16 +10,17 @@ required claims.
 import {
   createClockifySignatureParser,
   getClockifyEnvironmentContext,
-  verifyClockifyRequest,
+  verifyClockifyWebhookRequest,
 } from "@apet97/clockify-addon-sdk";
 
 const parser = createClockifySignatureParser("my-addon-key");
 
 // In your webhook route handler:
-const result = await verifyClockifyRequest(parser, request, {
+const result = await verifyClockifyWebhookRequest(parser, request, {
   expectedEventType: "NEW_TIME_ENTRY",
   expectedWorkspaceId: "workspace-id-from-your-route-or-storage",
   expectedAddonId: "addon-id-from-installation",
+  expectedWebhookAuthToken: "stored-token-for-this-webhook",
 });
 
 if (!result.ok) {
@@ -67,12 +68,19 @@ Use `getClockifyHeader(headers, name)` for case-insensitive request header looku
 
 ## Webhook and Lifecycle Requests
 
-`verifyClockifyRequest()` validates the JWT and can additionally assert the Marketplace invariants
-that are easy to miss:
+`verifyClockifyWebhookRequest()` validates the JWT and asserts the Marketplace invariants that are
+easy to miss:
 
 - webhook event header matches the expected event
 - token `workspaceId` matches the request/installation context
 - token `addonId` matches the stored add-on installation
+- optional stored webhook `authToken` matches the `clockify-signature` header
+
+Use `verifyClockifyWebhookRequest()` for webhook routes because it requires `expectedEventType`.
+`verifyClockifyRequest()` remains available as a lower-level helper for advanced cases that need a
+custom policy.
+Plain JavaScript callers that omit `expectedEventType` receive `{ ok: false, reason:
+"missing-expected-event-type" }` rather than an accidentally permissive verification result.
 
 Lifecycle and component routes are served by `verifyClockifyLifecycleRequest()` and
 `verifyClockifyComponentRequest()`, which read the `x-addon-lifecycle-token` header and the

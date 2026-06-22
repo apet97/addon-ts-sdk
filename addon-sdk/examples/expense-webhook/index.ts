@@ -15,7 +15,7 @@ import {
   ClockifySignatureParser,
   ClockifyAddonClaims,
   ClockifyHeaders,
-  withClockifyVerifiedRequest,
+  verifyClockifyWebhookRequest,
   generated,
 } from "../../src";
 
@@ -85,22 +85,28 @@ export function createExpenseWebhookAddon(opts: ExpenseWebhookAddonOptions): Clo
 
   addon.registerWebhook(
     webhook,
-    withClockifyVerifiedRequest(
-      parser,
-      {
+    async (req) => {
+      const verification = await verifyClockifyWebhookRequest(parser, req, {
         expectedEventType: "EXPENSE_CREATED",
         eventHeader: ClockifyHeaders.WEBHOOK_EVENT_TYPE,
-      },
-      async (req, claims) => {
-        const expenseId = resolveExpenseId(req.body as ExpenseWebhookPayload | undefined);
-        if (!expenseId) {
-          // Java handler returns void → 200 with no conversion.
-          return { status: 200 };
-        }
-        await opts.onConvert(claims, expenseId, "WEBHOOK_CREATED", "EXPENSE_CREATED");
+      });
+      if (!verification.ok) {
+        return { status: 401, body: "Unauthorized" };
+      }
+
+      const expenseId = resolveExpenseId(req.body as ExpenseWebhookPayload | undefined);
+      if (!expenseId) {
+        // Java handler returns void -> 200 with no conversion.
         return { status: 200 };
-      },
-    ),
+      }
+      await opts.onConvert(
+        verification.claims,
+        expenseId,
+        "WEBHOOK_CREATED",
+        verification.eventType,
+      );
+      return { status: 200 };
+    },
   );
 
   return addon;

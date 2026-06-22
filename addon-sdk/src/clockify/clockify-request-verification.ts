@@ -36,6 +36,15 @@ export interface ClockifyRequestVerificationOptions {
   expectedAddonId?: string;
 }
 
+export interface ClockifyWebhookVerificationOptions {
+  signatureHeader?: string;
+  eventHeader?: string;
+  expectedEventType: string;
+  expectedWorkspaceId?: string;
+  expectedAddonId?: string;
+  expectedWebhookAuthToken?: string;
+}
+
 export interface ClockifyTokenVerificationOptions {
   expectedWorkspaceId?: string;
   expectedAddonId?: string;
@@ -48,6 +57,11 @@ export type ClockifyRequestVerificationFailureReason =
   | "event-type-mismatch"
   | "workspace-id-mismatch"
   | "addon-id-mismatch";
+
+export type ClockifyWebhookVerificationFailureReason =
+  | ClockifyRequestVerificationFailureReason
+  | "missing-expected-event-type"
+  | "webhook-token-mismatch";
 
 export type ClockifyTokenVerificationFailureReason =
   | "missing-token"
@@ -64,6 +78,17 @@ export type ClockifyRequestVerificationResult =
   | {
       ok: false;
       reason: ClockifyRequestVerificationFailureReason;
+    };
+
+export type ClockifyWebhookVerificationResult =
+  | {
+      ok: true;
+      claims: ClockifyAddonClaims;
+      eventType: string;
+    }
+  | {
+      ok: false;
+      reason: ClockifyWebhookVerificationFailureReason;
     };
 
 export type ClockifyTokenVerificationResult =
@@ -204,6 +229,45 @@ export async function verifyClockifyRequest(
   }
 
   return eventType === undefined ? { ok: true, claims } : { ok: true, claims, eventType };
+}
+
+export async function verifyClockifyWebhookRequest(
+  parser: ClockifySignatureParser,
+  request: AddonRequest,
+  options: ClockifyWebhookVerificationOptions,
+): Promise<ClockifyWebhookVerificationResult> {
+  if (
+    options == null ||
+    typeof options.expectedEventType !== "string" ||
+    options.expectedEventType.trim() === ""
+  ) {
+    return { ok: false, reason: "missing-expected-event-type" };
+  }
+
+  const signatureHeader = options.signatureHeader ?? ClockifyHeaders.SIGNATURE;
+  const token = getClockifyHeader(request.headers, signatureHeader);
+
+  if (!token) {
+    return { ok: false, reason: "missing-signature" };
+  }
+
+  if (
+    options.expectedWebhookAuthToken !== undefined &&
+    token !== options.expectedWebhookAuthToken
+  ) {
+    return { ok: false, reason: "webhook-token-mismatch" };
+  }
+
+  const result = await verifyClockifyRequest(parser, request, {
+    signatureHeader,
+    eventHeader: options.eventHeader,
+    expectedEventType: options.expectedEventType,
+    expectedWorkspaceId: options.expectedWorkspaceId,
+    expectedAddonId: options.expectedAddonId,
+  });
+
+  if (!result.ok) return result;
+  return { ok: true, claims: result.claims, eventType: result.eventType! };
 }
 
 export async function verifyClockifyToken(

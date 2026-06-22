@@ -14,6 +14,7 @@ import {
   verifyClockifyComponentRequest,
   verifyClockifyLifecycleRequest,
   verifyClockifyRequest,
+  verifyClockifyWebhookRequest,
   verifyClockifyToken,
   withClockifyVerifiedRequest,
 } from "../src";
@@ -148,6 +149,74 @@ describe("Marketplace request verification helpers", () => {
         { expectedEventType: "EXPENSE_CREATED" },
       ),
     ).resolves.toEqual({ ok: false, reason: "event-type-mismatch" });
+  });
+
+  it("verifies webhook requests with event, workspace, add-on, and stored webhook token checks", async () => {
+    const token = await validToken();
+
+    await expect(
+      verifyClockifyWebhookRequest(
+        parser(),
+        request({
+          [ClockifyHeaders.SIGNATURE]: token,
+          [ClockifyHeaders.WEBHOOK_EVENT_TYPE]: "EXPENSE_CREATED",
+        }),
+        {} as any,
+      ),
+    ).resolves.toEqual({ ok: false, reason: "missing-expected-event-type" });
+
+    await expect(
+      verifyClockifyWebhookRequest(
+        parser(),
+        request({ [ClockifyHeaders.SIGNATURE]: token }),
+        { expectedEventType: "EXPENSE_CREATED" },
+      ),
+    ).resolves.toEqual({ ok: false, reason: "missing-event-type" });
+
+    await expect(
+      verifyClockifyWebhookRequest(
+        parser(),
+        request({
+          [ClockifyHeaders.SIGNATURE]: token,
+          [ClockifyHeaders.WEBHOOK_EVENT_TYPE]: "EXPENSE_DELETED",
+        }),
+        { expectedEventType: "EXPENSE_CREATED" },
+      ),
+    ).resolves.toEqual({ ok: false, reason: "event-type-mismatch" });
+
+    await expect(
+      verifyClockifyWebhookRequest(
+        parser(),
+        request({
+          [ClockifyHeaders.SIGNATURE]: token,
+          [ClockifyHeaders.WEBHOOK_EVENT_TYPE]: "EXPENSE_CREATED",
+        }),
+        {
+          expectedEventType: "EXPENSE_CREATED",
+          expectedWebhookAuthToken: "different-token",
+        },
+      ),
+    ).resolves.toEqual({ ok: false, reason: "webhook-token-mismatch" });
+
+    await expect(
+      verifyClockifyWebhookRequest(
+        parser(),
+        request({
+          [ClockifyHeaders.SIGNATURE]: token,
+          [ClockifyHeaders.WEBHOOK_EVENT_TYPE]: "EXPENSE_CREATED",
+        }),
+        {
+          expectedEventType: "EXPENSE_CREATED",
+          expectedWebhookAuthToken: token,
+          expectedWorkspaceId: WORKSPACE_ID,
+          expectedAddonId: ADDON_ID,
+        },
+      ),
+    ).resolves.toMatchObject({
+      ok: true,
+      eventType: "EXPENSE_CREATED",
+      claims: { workspaceId: WORKSPACE_ID, addonId: ADDON_ID },
+    });
   });
 
   it("rejects verified tokens that target a different workspace or add-on id", async () => {

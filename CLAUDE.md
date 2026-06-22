@@ -15,14 +15,22 @@ CAKE.com.
 
 - **Never hand-edit `addon-sdk/src/clockify/generated/**`.** It is generated from
   `addon-sdk/schemas/clockify-manifests/*.json`; change the schema or generator, then
-  `npm run generate`. Builder step order follows each schema's `required` array.
+  `npm run generate`. Builder step order follows each schema's `required` array; required array
+  setters must be called at runtime even when Java-parity defaults initialize arrays to `[]`.
+- **Schema provenance is part of the source of truth.** `verify:generated` first runs
+  `scripts/verify-schema-provenance.cjs`, which enforces exactly schema versions 1.2, 1.3, 1.4, and
+  1.5, source labels, schema file presence, and raw SHA-256 hashes.
 - **Keep it lean.** No REST client, token-exchange client, UI/window-event framework, persistence
   layer, or custom manifest validator without an explicit ask.
 - **Tokens:** verify `RS256` only, with `iss=clockify`, `type=addon`, `sub=<manifest key>`. Webhooks
-  assert `clockify-signature` + `clockify-webhook-event-type`; lifecycle uses `X-Addon-Lifecycle-Token`;
+  should use `verifyClockifyWebhookRequest()` with an explicit `expectedEventType`; lifecycle uses `X-Addon-Lifecycle-Token`;
   Clockify API calls use `X-Addon-Token`.
 - **Hosts:** never hardcode them. Read `backendUrl`/`reportsUrl`/`locationsUrl`/`screenshotsUrl` from
   verified claims, or `getClockifyEnvironmentContext()`.
+- **Adapters:** Node `http` and Fetch bodies default to `DEFAULT_MAX_BODY_BYTES` (`1_048_576`) and
+  return 413 before dispatch when exceeded. Express body limits belong to the host app
+  (`express.json({ limit: "1mb" })`). Express is an optional peer; do not leak Express-specific types
+  into root exports or shared adapter contracts.
 
 ## Before claiming done — all gates green (from `addon-sdk/`)
 
@@ -31,7 +39,8 @@ npm run type-check        # compiles the type-state probes; a weakened builder m
 npm run verify:generated  # regenerates from schemas, fails on drift
 npm run test
 npm run build && npm run verify:dist   # build alone does NOT prove the package imports — verify:dist does
-npm pack --dry-run        # tarball is dist + LICENSE + README
+npm pack --dry-run        # tarball is dist + docs + schemas/clockify-manifests + LICENSE + README
+npm audit --omit=dev --json
 ```
 
 ## Gotchas (learned the hard way)
@@ -43,3 +52,8 @@ npm pack --dry-run        # tarball is dist + LICENSE + README
 - Webhook signature verification alone is incomplete for Marketplace parity. Tests also cover
   event-header mismatches, lifecycle-token headers, workspace/add-on claim mismatches, and
   no-hardcoded-fallback environment URL behavior.
+- `npm pack --dry-run` invokes `prepack`, so it re-runs the heavy gate chain. Use
+  `find addon-sdk -maxdepth 1 -name '*.tgz' -print` afterward when checking for accidental artifacts.
+- If asked to push directly to `main`, commit on the work branch, `git fetch origin`, confirm
+  `main` can fast-forward to the branch, then fast-forward `main` and push `origin main`. Do not open
+  a PR when the user explicitly says to push to main.

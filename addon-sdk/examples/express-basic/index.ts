@@ -29,7 +29,7 @@ addon.registerComponent(
 );
 
 const app = express();
-app.use(express.json());
+app.use(express.json({ limit: "1mb" }));
 
 // Bind the addon handler
 app.use(createExpressAddonHandler(addon));

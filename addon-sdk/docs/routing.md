@@ -35,3 +35,24 @@ addon.use(async (request, next) => {
   return response;
 });
 ```
+
+## Request Body Limits
+
+The built-in Node `http` and Fetch adapters buffer request bodies before routing so handlers receive
+both `body` and `rawBody`. They default to `DEFAULT_MAX_BODY_BYTES` (`1_048_576`, 1 MiB) and return
+`413 Payload Too Large` before dispatch when a request exceeds the limit.
+Custom `maxBodyBytes` values must be positive integers; invalid adapter configuration throws instead
+of dispatching requests with an ambiguous limit.
+
+```typescript
+import { createNodeHttpAddonServer } from "@apet97/clockify-addon-sdk/adapters";
+
+const server = createNodeHttpAddonServer(addon, { maxBodyBytes: 2_097_152 });
+```
+
+For Express, configure the host app's body parser directly:
+
+```typescript
+app.use(express.json({ limit: "1mb" }));
+app.use(createExpressAddonHandler(addon));
+```

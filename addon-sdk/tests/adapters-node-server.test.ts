@@ -22,8 +22,11 @@ describe("Node HTTP server boot (integration)", () => {
       .requireBasicPlan()
       .build();
 
-  function listen(addon: ClockifyAddon): Promise<number> {
-    server = createNodeHttpAddonServer(addon);
+  function listen(
+    addon: ClockifyAddon,
+    options?: Parameters<typeof createNodeHttpAddonServer>[1],
+  ): Promise<number> {
+    server = createNodeHttpAddonServer(addon, options);
     return new Promise((resolve) => {
       server!.listen(0, () => resolve((server!.address() as AddressInfo).port));
     });
@@ -66,5 +69,32 @@ describe("Node HTTP server boot (integration)", () => {
     });
     expect(res.status).toBe(204);
     expect(received).toEqual({ ok: true });
+  });
+
+  it("returns 413 for oversized request bodies before dispatching", async () => {
+    const addon = new ClockifyAddon(base());
+    let dispatched = false;
+    addon.registerHandler("/hooks/np", "POST", () => {
+      dispatched = true;
+      return { status: 204 };
+    });
+
+    const port = await listen(addon, { maxBodyBytes: 4 });
+    const res = await fetch(`http://127.0.0.1:${port}/hooks/np`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ ok: true }),
+    });
+
+    expect(res.status).toBe(413);
+    expect(res.headers.get("connection")).toBe("close");
+    expect(await res.text()).toBe("Payload Too Large");
+    expect(dispatched).toBe(false);
+  });
+
+  it("throws configuration errors before creating a server with an invalid body limit", () => {
+    const addon = new ClockifyAddon(base());
+
+    expect(() => createNodeHttpAddonServer(addon, { maxBodyBytes: 0 })).toThrow(/positive integer/);
   });
 });

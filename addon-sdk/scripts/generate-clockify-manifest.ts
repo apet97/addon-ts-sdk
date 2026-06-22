@@ -282,6 +282,9 @@ function emitImplClass(
   let out = `class ${builderName} implements ${interfaces.join(", ")} {\n`;
   for (const prop of obj.properties) {
     out += `  private _${prop.name}: any;\n`;
+    if (prop.isReq && prop.node.type === "array") {
+      out += `  private _${prop.name}Set = false;\n`;
+    }
   }
   out += `\n`;
 
@@ -297,6 +300,9 @@ function emitImplClass(
   for (const prop of obj.properties) {
     out += `  ${prop.name}(value: ${prop.tsType}): any {\n`;
     out += `    this._${prop.name} = value;\n`;
+    if (prop.isReq && prop.node.type === "array") {
+      out += `    this._${prop.name}Set = true;\n`;
+    }
     out += `    return this;\n`;
     out += `  }\n\n`;
     for (const enumVal of getEnumValues(prop.node, definitions)) {
@@ -308,7 +314,10 @@ function emitImplClass(
 
   out += `  build(): ${obj.className} {\n`;
   for (const prop of requiredProps) {
-    out += `    if (this._${prop.name} === undefined || this._${prop.name} === null) {\n`;
+    const missingCheck = prop.node.type === "array"
+      ? `!this._${prop.name}Set || this._${prop.name} === undefined || this._${prop.name} === null`
+      : `this._${prop.name} === undefined || this._${prop.name} === null`;
+    out += `    if (${missingCheck}) {\n`;
     out += `      throw new Error("Required field '${prop.name}' is missing.");\n`;
     out += `    }\n`;
   }

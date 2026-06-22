@@ -1,13 +1,32 @@
-import type { Request, Response, NextFunction } from "express";
 import { Addon } from "../shared/addon";
 import { AddonRequest } from "../shared/request";
 import { AddonResponse, isJsonBody } from "../shared/response";
 
+export interface ExpressLikeRequest {
+  method?: string;
+  path?: string;
+  url?: string;
+  headers?: Record<string, string | string[] | undefined>;
+  query?: Record<string, unknown>;
+  body?: unknown;
+  rawBody?: Uint8Array;
+}
+
+export interface ExpressLikeResponse {
+  status(code: number): this;
+  set(headers: Record<string, string>): this;
+  json(body: unknown): unknown;
+  send(body?: unknown): unknown;
+  end(): unknown;
+}
+
+export type ExpressLikeNextFunction = (error?: unknown) => void;
+
 export function createExpressAddonHandler(addon: Addon<unknown>) {
   return async function clockifyAddonExpressHandler(
-    req: Request,
-    res: Response,
-    next?: NextFunction,
+    req: ExpressLikeRequest,
+    res: ExpressLikeResponse,
+    next?: ExpressLikeNextFunction,
   ) {
     try {
       const queryParams = new URLSearchParams();
@@ -24,10 +43,10 @@ export function createExpressAddonHandler(addon: Addon<unknown>) {
       const addonRequest: AddonRequest = {
         method: req.method || "GET",
         path: req.path || new URL(req.url || "", "http://localhost").pathname,
-        headers: req.headers as Record<string, string | string[] | undefined> || {},
+        headers: req.headers ?? {},
         query: queryParams,
         body: req.body,
-        rawBody: (req as Request & { rawBody?: Uint8Array }).rawBody,
+        rawBody: req.rawBody,
       };
 
       const response: AddonResponse = await addon.handle(addonRequest);
@@ -58,4 +77,3 @@ export function createExpressAddonHandler(addon: Addon<unknown>) {
     }
   };
 }
-

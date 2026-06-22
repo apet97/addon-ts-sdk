@@ -1,6 +1,13 @@
 import { describe, it, expect, vi } from "vitest";
 import { ClockifyAddon, ClockifyManifest } from "../src";
-import { handleFetchRequest, createExpressAddonHandler, fromNodeRequest, writeNodeResponse } from "../src/adapters";
+import {
+  DEFAULT_MAX_BODY_BYTES,
+  createExpressAddonHandler,
+  fromNodeRequest,
+  handleFetchRequest,
+  resolveMaxBodyBytes,
+  writeNodeResponse,
+} from "../src/adapters";
 import { IncomingMessage, ServerResponse } from "node:http";
 import { Socket } from "node:net";
 
@@ -11,6 +18,35 @@ describe("Adapters", () => {
     .baseUrl("https://example.com/addon")
     .requireBasicPlan()
     .build();
+
+  it("exposes and validates adapter body-limit options", () => {
+    expect(DEFAULT_MAX_BODY_BYTES).toBe(1_048_576);
+    expect(resolveMaxBodyBytes()).toBe(DEFAULT_MAX_BODY_BYTES);
+    expect(resolveMaxBodyBytes({ maxBodyBytes: 2 })).toBe(2);
+    expect(() => resolveMaxBodyBytes({ maxBodyBytes: 0 })).toThrow(/positive integer/);
+    expect(() => resolveMaxBodyBytes({ maxBodyBytes: Number.POSITIVE_INFINITY })).toThrow(/positive integer/);
+  });
+
+  it("throws configuration errors instead of dispatching with an invalid Fetch body limit", async () => {
+    const addon = new ClockifyAddon(mockManifest);
+    let dispatched = false;
+    addon.registerHandler("/webhook", "POST", () => {
+      dispatched = true;
+      return { status: 204 };
+    });
+
+    await expect(
+      handleFetchRequest(
+        addon,
+        new Request("https://example.com/webhook", {
+          method: "POST",
+          body: JSON.stringify({ event: "NEW_PROJECT" }),
+        }),
+        { maxBodyBytes: 0 },
+      ),
+    ).rejects.toThrow(/positive integer/);
+    expect(dispatched).toBe(false);
+  });
 
   it("should serve /manifest via Fetch adapter", async () => {
     const addon = new ClockifyAddon(mockManifest);
@@ -43,6 +79,51 @@ describe("Adapters", () => {
     const response = await handleFetchRequest(addon, request);
     expect(response.status).toBe(204);
     expect(receivedBody).toEqual({ event: "NEW_PROJECT" });
+  });
+
+  it("returns 400 and does not dispatch when a Fetch request body cannot be read", async () => {
+    const addon = new ClockifyAddon(mockManifest);
+    let dispatched = false;
+    addon.registerHandler("/webhook", "POST", () => {
+      dispatched = true;
+      return { status: 204 };
+    });
+
+    const request = new Request("https://example.com/webhook", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ event: "NEW_PROJECT" }),
+    });
+    await request.text();
+
+    const response = await handleFetchRequest(addon, request);
+
+    expect(response.status).toBe(400);
+    expect(await response.text()).toBe("Bad Request");
+    expect(dispatched).toBe(false);
+  });
+
+  it("returns 413 when a Fetch request body exceeds maxBodyBytes", async () => {
+    const addon = new ClockifyAddon(mockManifest);
+    let dispatched = false;
+    addon.registerHandler("/webhook", "POST", () => {
+      dispatched = true;
+      return { status: 204 };
+    });
+
+    const response = await handleFetchRequest(
+      addon,
+      new Request("https://example.com/webhook", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ event: "NEW_PROJECT" }),
+      }),
+      { maxBodyBytes: 4 },
+    );
+
+    expect(response.status).toBe(413);
+    expect(await response.text()).toBe("Payload Too Large");
+    expect(dispatched).toBe(false);
   });
 
   it("should handle Express handler flow", async () => {

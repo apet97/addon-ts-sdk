@@ -2,19 +2,40 @@ import { createServer, IncomingMessage, ServerResponse } from "node:http";
 import { Addon } from "../shared/addon";
 import { AddonRequest } from "../shared/request";
 import { AddonResponse, isJsonBody } from "../shared/response";
+import {
+  BodyLimitOptions,
+  PayloadTooLargeError,
+  isPayloadTooLargeError,
+  resolveMaxBodyBytes,
+} from "./body-limit";
 
-async function readBody(req: IncomingMessage): Promise<Uint8Array> {
+async function readBody(req: IncomingMessage, maxBodyBytes: number): Promise<Uint8Array> {
   return new Promise((resolve, reject) => {
     const chunks: Uint8Array[] = [];
-    req.on("data", (chunk) => chunks.push(chunk));
+    let total = 0;
+    let tooLarge = false;
+    req.on("data", (chunk) => {
+      if (tooLarge) return;
+      const bytes = typeof chunk === "string" ? Buffer.from(chunk) : chunk;
+      total += bytes.byteLength;
+      if (total > maxBodyBytes) {
+        tooLarge = true;
+        reject(new PayloadTooLargeError(maxBodyBytes));
+        return;
+      }
+      chunks.push(bytes);
+    });
     req.on("end", () => resolve(Buffer.concat(chunks)));
     req.on("error", (err) => reject(err));
   });
 }
 
-export async function fromNodeRequest(req: IncomingMessage): Promise<AddonRequest> {
+export async function fromNodeRequest(
+  req: IncomingMessage,
+  options: BodyLimitOptions = {},
+): Promise<AddonRequest> {
   const url = new URL(req.url || "", `http://${req.headers.host || "localhost"}`);
-  const rawBody = await readBody(req);
+  const rawBody = await readBody(req, resolveMaxBodyBytes(options));
   let body: unknown = undefined;
   if (rawBody.length > 0) {
     try {
@@ -56,13 +77,26 @@ export function writeNodeResponse(res: ServerResponse, addonResponse: AddonRespo
   }
 }
 
-export function createNodeHttpAddonServer(addon: Addon<unknown>) {
+export function createNodeHttpAddonServer(
+  addon: Addon<unknown>,
+  options: BodyLimitOptions = {},
+) {
+  const maxBodyBytes = resolveMaxBodyBytes(options);
+
   return createServer(async (req, res) => {
     try {
-      const addonRequest = await fromNodeRequest(req);
+      const addonRequest = await fromNodeRequest(req, { maxBodyBytes });
       const addonResponse = await addon.handle(addonRequest);
       writeNodeResponse(res, addonResponse);
     } catch (e) {
+      if (isPayloadTooLargeError(e)) {
+        res.statusCode = 413;
+        res.setHeader("connection", "close");
+        res.end("Payload Too Large", () => {
+          req.destroy();
+        });
+        return;
+      }
       console.error(e);
       res.statusCode = 500;
       res.end("Internal Server Error");

@@ -883,6 +883,7 @@ class ClockifySettingsGroupBuilderImpl implements ClockifySettingsGroupBuilder_i
   private _description: any;
   private _header: any;
   private _settings: any;
+  private _settingsSet = false;
 
   constructor() {
     this._settings = [];
@@ -910,6 +911,7 @@ class ClockifySettingsGroupBuilderImpl implements ClockifySettingsGroupBuilder_i
 
   settings(value: ClockifySetting[]): any {
     this._settings = value;
+    this._settingsSet = true;
     return this;
   }
 
@@ -920,7 +922,7 @@ class ClockifySettingsGroupBuilderImpl implements ClockifySettingsGroupBuilder_i
     if (this._title === undefined || this._title === null) {
       throw new Error("Required field 'title' is missing.");
     }
-    if (this._settings === undefined || this._settings === null) {
+    if (!this._settingsSet || this._settings === undefined || this._settings === null) {
       throw new Error("Required field 'settings' is missing.");
     }
     return {
@@ -1032,6 +1034,7 @@ export interface ClockifySettingsBuilder_Build {
 
 class ClockifySettingsBuilderImpl implements ClockifySettingsBuilder_tabs, ClockifySettingsBuilder_Build {
   private _tabs: any;
+  private _tabsSet = false;
 
   constructor() {
     this._tabs = [];
@@ -1039,11 +1042,12 @@ class ClockifySettingsBuilderImpl implements ClockifySettingsBuilder_tabs, Clock
 
   tabs(value: ClockifySettingsTab[]): any {
     this._tabs = value;
+    this._tabsSet = true;
     return this;
   }
 
   build(): ClockifySettings {
-    if (this._tabs === undefined || this._tabs === null) {
+    if (!this._tabsSet || this._tabs === undefined || this._tabs === null) {
       throw new Error("Required field 'tabs' is missing.");
     }
     return {
@@ -1103,6 +1107,7 @@ class ClockifyManifestBuilderImpl implements ClockifyManifestBuilder_key, Clocki
   private _baseUrl: any;
   private _minimalSubscriptionPlan: any;
   private _scopes: any;
+  private _scopesSet = false;
   private _description: any;
   private _iconPath: any;
   private _lifecycle: any;
@@ -1159,6 +1164,7 @@ class ClockifyManifestBuilderImpl implements ClockifyManifestBuilder_key, Clocki
 
   scopes(value: ClockifyScope[]): any {
     this._scopes = value;
+    this._scopesSet = true;
     return this;
   }
 
@@ -1205,7 +1211,7 @@ class ClockifyManifestBuilderImpl implements ClockifyManifestBuilder_key, Clocki
     if (this._minimalSubscriptionPlan === undefined || this._minimalSubscriptionPlan === null) {
       throw new Error("Required field 'minimalSubscriptionPlan' is missing.");
     }
-    if (this._scopes === undefined || this._scopes === null) {
+    if (!this._scopesSet || this._scopes === undefined || this._scopes === null) {
       throw new Error("Required field 'scopes' is missing.");
     }
     return {

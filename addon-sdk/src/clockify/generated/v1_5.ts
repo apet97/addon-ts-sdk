@@ -934,6 +934,7 @@ class ClockifySettingsGroupBuilderImpl implements ClockifySettingsGroupBuilder_i
   private _description: any;
   private _header: any;
   private _settings: any;
+  private _settingsSet = false;
 
   constructor() {
     this._settings = [];
@@ -961,6 +962,7 @@ class ClockifySettingsGroupBuilderImpl implements ClockifySettingsGroupBuilder_i
 
   settings(value: ClockifySetting[]): any {
     this._settings = value;
+    this._settingsSet = true;
     return this;
   }
 
@@ -971,7 +973,7 @@ class ClockifySettingsGroupBuilderImpl implements ClockifySettingsGroupBuilder_i
     if (this._title === undefined || this._title === null) {
       throw new Error("Required field 'title' is missing.");
     }
-    if (this._settings === undefined || this._settings === null) {
+    if (!this._settingsSet || this._settings === undefined || this._settings === null) {
       throw new Error("Required field 'settings' is missing.");
     }
     return {
@@ -1083,6 +1085,7 @@ export interface ClockifySettingsBuilder_Build {
 
 class ClockifySettingsBuilderImpl implements ClockifySettingsBuilder_tabs, ClockifySettingsBuilder_Build {
   private _tabs: any;
+  private _tabsSet = false;
 
   constructor() {
     this._tabs = [];
@@ -1090,11 +1093,12 @@ class ClockifySettingsBuilderImpl implements ClockifySettingsBuilder_tabs, Clock
 
   tabs(value: ClockifySettingsTab[]): any {
     this._tabs = value;
+    this._tabsSet = true;
     return this;
   }
 
   build(): ClockifySettings {
-    if (this._tabs === undefined || this._tabs === null) {
+    if (!this._tabsSet || this._tabs === undefined || this._tabs === null) {
       throw new Error("Required field 'tabs' is missing.");
     }
     return {

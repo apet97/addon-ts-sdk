@@ -189,6 +189,33 @@ describe("Builders", () => {
     expect(() => (builder as any).build()).toThrow("Required field 'minimalSubscriptionPlan' is missing.");
   });
 
+  it("should throw when required array setters are skipped through any escape hatches", () => {
+    const v12Manifest = ClockifyManifest.v1_2Builder()
+      .key("test")
+      .name("test")
+      .baseUrl("https://example.com")
+      .requireBasicPlan();
+    expect(() => (v12Manifest as any).build()).toThrow("Required field 'scopes' is missing.");
+
+    const settingsGroup = ClockifySettingsGroup.v1_5Builder()
+      .id("group")
+      .title("Group");
+    expect(() => (settingsGroup as any).build()).toThrow("Required field 'settings' is missing.");
+
+    const settings = ClockifySettings.v1_5Builder();
+    expect(() => (settings as any).build()).toThrow("Required field 'tabs' is missing.");
+  });
+
+  it("should keep optional arrays defaulting to empty lists", () => {
+    const tab = ClockifySettingsTab.v1_5Builder()
+      .id("general")
+      .name("General")
+      .build();
+
+    expect(tab.groups).toEqual([]);
+    expect(tab.settings).toEqual([]);
+  });
+
   it("should allow falsy setting values like false and 0 without throwing", () => {
     const settingBool = ClockifySetting.v1_4Builder()
       .id("bool-setting")

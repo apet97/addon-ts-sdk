@@ -1,0 +1,25 @@
+{
+  "supportedVersions": ["1.2", "1.3", "1.4", "1.5"],
+  "schemas": {
+    "1.2": {
+      "file": "1.2.json",
+      "source": "Clockify add-on Java SDK bundled resource",
+      "sha256": "3162349adfe47fc3952c140cf378b22aa7a1dbe713d16cae54a1c047d60a0262"
+    },
+    "1.3": {
+      "file": "1.3.json",
+      "source": "Clockify add-on Java SDK bundled resource",
+      "sha256": "8a9aa695163c096c2401f59014575992008a4b5c21be2caebc506bb6a4a3fbaa"
+    },
+    "1.4": {
+      "file": "1.4.json",
+      "source": "Clockify add-on Java SDK bundled resource",
+      "sha256": "a4d3c0a4c4fb4b32766615d979243db9ef512eb90cc67325c24c46c87bee1734"
+    },
+    "1.5": {
+      "file": "1.5.json",
+      "source": "Clockify live schema endpoint, https://api.clockify.me/api/addons/manifest-schema?version=1.5",
+      "sha256": "c2a246500ffcfc1b4fc4460178a6742ed2a396a96ee5755491c80d09ad56d948"
+    }
+  }
+}

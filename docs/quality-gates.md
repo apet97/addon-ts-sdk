@@ -12,7 +12,8 @@ tarball is always built and verified from a green tree.
 4. **`npm run build`** — emits the ESM and CJS outputs with type declarations.
 5. **`npm run verify:dist`** — imports the **built** ESM and CJS and boots the README quick-start; a
    green `build` alone does not prove the package imports.
-6. **`npm pack --dry-run`** — confirms the tarball contents (`dist` + `LICENSE` + `README`).
+6. **`npm pack --dry-run`** — confirms the tarball contents (`dist` + `docs` + vendored
+   `schemas/clockify-manifests` + `LICENSE` + `README`).
 
 Linting and formatting are intentionally not configured for this lightweight build: `npm run lint`
 and `npm run format:check` are no-op stubs.

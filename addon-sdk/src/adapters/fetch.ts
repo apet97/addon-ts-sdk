@@ -1,11 +1,49 @@
 import { Addon } from "../shared/addon";
 import { AddonRequest } from "../shared/request";
 import { AddonResponse, isJsonBody } from "../shared/response";
+import { BodyLimitOptions, PayloadTooLargeError, resolveMaxBodyBytes } from "./body-limit";
+
+async function readFetchBody(request: Request, maxBodyBytes: number): Promise<Uint8Array> {
+  const contentLength = request.headers.get("content-length");
+  if (contentLength !== null && Number(contentLength) > maxBodyBytes) {
+    throw new PayloadTooLargeError(maxBodyBytes);
+  }
+
+  const clone = request.clone();
+  if (!clone.body) return new Uint8Array();
+
+  const reader = clone.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    if (!value) continue;
+    total += value.byteLength;
+    if (total > maxBodyBytes) {
+      reader.cancel().catch(() => undefined);
+      throw new PayloadTooLargeError(maxBodyBytes);
+    }
+    chunks.push(value);
+  }
+
+  const body = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) {
+    body.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return body;
+}
 
 export async function handleFetchRequest(
   addon: Addon<unknown>,
-  request: Request
+  request: Request,
+  options: BodyLimitOptions = {},
 ): Promise<Response> {
+  const maxBodyBytes = resolveMaxBodyBytes(options);
+
   try {
     const url = new URL(request.url);
 
@@ -15,8 +53,7 @@ export async function handleFetchRequest(
     // Clone or check request body presence
     if (request.body && request.method !== "GET" && request.method !== "HEAD") {
       try {
-        const arrayBuffer = await request.clone().arrayBuffer();
-        rawBody = new Uint8Array(arrayBuffer);
+        rawBody = await readFetchBody(request, maxBodyBytes);
         if (rawBody.length > 0) {
           const text = new TextDecoder().decode(rawBody);
           try {
@@ -26,7 +63,10 @@ export async function handleFetchRequest(
           }
         }
       } catch (e) {
-        console.warn("Failed to read fetch request body:", e);
+        if (e instanceof PayloadTooLargeError) {
+          return new Response("Payload Too Large", { status: 413 });
+        }
+        return new Response("Bad Request", { status: 400 });
       }
     }
 

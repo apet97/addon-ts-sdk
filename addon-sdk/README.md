@@ -25,7 +25,9 @@ import {
   ClockifyAddon,
   ClockifyManifest,
   ClockifyComponent,
-  ClockifyScope,
+  createClockifySignatureParser,
+  isClockifyAdminRole,
+  verifyClockifyComponentRequest,
 } from "@apet97/clockify-addon-sdk";
 import { createNodeHttpAddonServer } from "@apet97/clockify-addon-sdk/adapters";
 
@@ -35,13 +37,13 @@ const manifest = ClockifyManifest.v1_4Builder()
   .name("My Add-on")
   .baseUrl("https://example.com/addon")
   .requireBasicPlan()
-  .scopes([ClockifyScope.PROJECT_READ, ClockifyScope.PROJECT_WRITE])
   .build();
 
 // 2. Initialize the addon
 const addon = new ClockifyAddon(manifest);
+const parser = createClockifySignatureParser("my-clockify-addon");
 
-// 3. Register a component
+// 3. Register a component and verify Clockify's signed auth_token on every request
 addon.registerComponent(
   ClockifyComponent.v1_4Builder()
     .activityTab()
@@ -49,7 +51,15 @@ addon.registerComponent(
     .path("/component")
     .label("Activity Tab")
     .build(),
-  async () => {
+  async (request) => {
+    const verification = await verifyClockifyComponentRequest(parser, request);
+    if (!verification.ok) {
+      return { status: 401, body: "Unauthorized" };
+    }
+    if (!isClockifyAdminRole(verification.claims.workspaceRole)) {
+      return { status: 403, body: "Admins only" };
+    }
+
     return {
       status: 200,
       headers: { "content-type": "text/html" },
@@ -105,3 +115,4 @@ reproducible from them.
 - [Manifest Builders](./docs/manifest-builders.md)
 - [Routing and Middleware](./docs/routing.md)
 - [Token Signature Validation](./docs/token-validation.md)
+- [Dependency Strategy](./docs/dependency-strategy.md)
