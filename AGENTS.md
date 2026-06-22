@@ -6,6 +6,8 @@ Conventions for anyone (human or agent) working in this repository.
 
 - `addon-sdk/` — the published package (`@apet97/clockify-addon-sdk`). All SDK code, schemas,
   examples, and tests live here. Run package commands from this directory.
+- Root npm scripts proxy the package gates through npm workspaces; use `npm run ci:verify` from the
+  repo root for the full local/CI verification chain.
 
 ## Source of truth
 
@@ -38,22 +40,30 @@ Conventions for anyone (human or agent) working in this repository.
   Express body limits are configured by the host app, not the SDK.
 - Express remains an optional peer. Keep the adapter structurally typed so root imports and non-Express
   consumers do not need Express types installed.
+- Runtime support starts at Node 22. CI verifies Node 22.x and 24.x.
 
-## Gates (from `addon-sdk/`)
+## Gates
 
 | Command | Checks |
 |---|---|
+| `npm run ci:verify` | Canonical root gate: type-check, generated drift, tests, build, dist import smoke, pack dry-run, and audits. |
 | `npm run type-check` | `src`, generator, examples, and the type-state probes. A weakened builder must fail this. |
 | `npm run verify:generated` | Regenerates from the schemas; fails on drift. |
 | `npm run test` | vitest suite. |
 | `npm run build` | ESM + CJS output. |
 | `npm run verify:dist` | Imports the **built** ESM and CJS and boots the quick-start. A green `build` alone does not prove the package imports. |
-| `npm pack --dry-run` | Tarball contents (`dist` + `docs` + `schemas/clockify-manifests` + `LICENSE` + `README`). |
-| `npm audit --omit=dev --json` | Production dependency audit; should report 0 vulnerabilities. |
+| `npm run pack:dry-run` | Tarball contents (`dist` + `docs` + `schemas/clockify-manifests` + `LICENSE` + `README`). |
+| `npm run audit:prod` / `npm run audit:all` | Production and full dependency audits; both should report 0 vulnerabilities. |
+
+GitHub Actions runs `npm run ci:verify` on Node 22.x and 24.x for pushes to `main`, pull requests,
+and manual dispatches.
+
+Linting and formatting are intentionally deferred. `npm run lint` and `npm run format:check` remain
+no-op stubs until a focused tooling pass adds check-only ESLint/Prettier without mass churn.
 
 ## Git / publish workflow
 
-- For direct `main` publishes, first run the package gates, then `git fetch origin`, confirm ancestry,
+- For direct `main` publishes, first run `npm run ci:verify`, then `git fetch origin`, confirm ancestry,
   commit the branch, fast-forward `main`, and push `origin main`.
 - Do not open a PR when the user explicitly asks to push to `main`.
 - Do not push generated drift, a stale `dist/`, or a dry-run `.tgz` artifact.

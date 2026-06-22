@@ -9,12 +9,12 @@ router, runtime adapters, and RS256 webhook-signature verification.
   manifest schemas 1.2–1.5 plus provenance hashes used by `npm run verify:generated`.
 - [`MARKETPLACE_DOCS/`](./MARKETPLACE_DOCS) — Clockify's published add-on documentation, kept for reference.
 
-Primary package gate from `addon-sdk/`:
+Runtime support starts at Node 22. The GitHub Actions matrix verifies Node 22.x and 24.x.
+
+Primary repo gate from the root:
 
 ```bash
-npm run type-check && npm run verify:generated && npm run test && npm run build && npm run verify:dist
-npm pack --dry-run
-npm audit --omit=dev --json
+npm run ci:verify
 ```
 
 Independent, unofficial project — not affiliated with, endorsed by, or supported by Clockify or CAKE.com.

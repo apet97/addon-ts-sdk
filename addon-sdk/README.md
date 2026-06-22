@@ -16,7 +16,7 @@ the Clockify REST API.
 npm install @apet97/clockify-addon-sdk
 ```
 
-Node 18+. Ships ESM and CommonJS builds with type declarations.
+Node 22+. Ships ESM and CommonJS builds with type declarations.
 
 ## Quick start
 

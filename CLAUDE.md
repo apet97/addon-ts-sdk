@@ -7,9 +7,9 @@ and the gotchas worth re-reading before you touch anything.
 ## What this is
 
 A TypeScript SDK for the server side of a Clockify add-on: typed manifest builders, a request
-router, runtime adapters, and RS256 webhook-signature verification. The package lives in `addon-sdk/`
-— run all commands from there. Independent, unofficial project, not affiliated with Clockify or
-CAKE.com.
+router, runtime adapters, and RS256 webhook-signature verification. The package lives in
+`addon-sdk/`, with root npm scripts proxying the package gates through workspaces. Runtime support
+starts at Node 22. Independent, unofficial project, not affiliated with Clockify or CAKE.com.
 
 ## Non-negotiables
 
@@ -32,16 +32,14 @@ CAKE.com.
   (`express.json({ limit: "1mb" })`). Express is an optional peer; do not leak Express-specific types
   into root exports or shared adapter contracts.
 
-## Before claiming done — all gates green (from `addon-sdk/`)
+## Before claiming done — root gate green
 
 ```bash
-npm run type-check        # compiles the type-state probes; a weakened builder must fail this
-npm run verify:generated  # regenerates from schemas, fails on drift
-npm run test
-npm run build && npm run verify:dist   # build alone does NOT prove the package imports — verify:dist does
-npm pack --dry-run        # tarball is dist + docs + schemas/clockify-manifests + LICENSE + README
-npm audit --omit=dev --json
+npm run ci:verify
 ```
+
+This runs type-check, generated drift, tests, build, `verify:dist`, pack dry-run, production audit,
+and full audit. GitHub Actions runs the same gate on Node 22.x and 24.x.
 
 ## Gotchas (learned the hard way)
 
@@ -54,6 +52,9 @@ npm audit --omit=dev --json
   no-hardcoded-fallback environment URL behavior.
 - `npm pack --dry-run` invokes `prepack`, so it re-runs the heavy gate chain. Use
   `find addon-sdk -maxdepth 1 -name '*.tgz' -print` afterward when checking for accidental artifacts.
+- Linting and formatting are intentionally deferred. `npm run lint` and `npm run format:check` are
+  no-op stubs until a focused check-only tooling pass is worth the dependency churn.
 - If asked to push directly to `main`, commit on the work branch, `git fetch origin`, confirm
   `main` can fast-forward to the branch, then fast-forward `main` and push `origin main`. Do not open
-  a PR when the user explicitly says to push to main.
+  a PR when the user explicitly says to push to main. If the GitHub CLI is authenticated, watch the
+  resulting main CI run before reporting completion.
