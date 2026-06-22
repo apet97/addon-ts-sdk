@@ -12,9 +12,30 @@ the Clockify REST API.
 
 ## Install
 
+This SDK is source-only for now and is not published to the npm registry. Use the repository as the
+source of truth until a release is intentionally published.
+
+Supported source workflows:
+
 ```bash
-npm install @apet97/clockify-addon-sdk
+# Clone the source repository.
+git clone https://github.com/apet97/addon-ts-sdk.git
+cd addon-ts-sdk
+npm ci
+
+# Verify and inspect the package contents without leaving a tarball.
+npm run ci:verify
+npm pack --dry-run -w @apet97/clockify-addon-sdk
+
+# When another local project needs the package, create and install a tarball intentionally.
+cd addon-sdk
+npm pack
+npm install /absolute/path/to/apet97-clockify-addon-sdk-1.0.0.tgz
 ```
+
+Do not use the repo-root Git URL as an npm package dependency: npm installs the private workspace
+root rather than this SDK package. Pack a tarball from `addon-sdk/` when another project needs to
+consume it.
 
 Node 22+. Ships ESM and CommonJS builds with type declarations.
 
@@ -108,8 +129,9 @@ const claims = await new ClockifySignatureParser("my-addon-key", publicKey).pars
 
 1.2–1.4 are ported from the Clockify add-on Java SDK; 1.5 is taken from the live schema endpoint
 (`GET https://api.clockify.me/api/addons/manifest-schema?version=1.5`). The copies vendored under
-`schemas/clockify-manifests/` are byte-identical to those sources, and the generated builders are
-reproducible from them.
+`schemas/clockify-manifests/` are structurally identical to those sources, and the generated builders
+are reproducible from them. Run `npm run verify:schema-live` manually when you want to compare the
+vendored schemas against Clockify's live endpoint.
 
 ## Documentation
 

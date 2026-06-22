@@ -26,6 +26,13 @@ built and verified from a green tree.
 10. **`npm audit --omit=dev --json` and `npm audit --json`** — production and full dependency audit;
    both should report 0 vulnerabilities.
 
+Manual freshness check:
+
+- **`npm run verify:schema-live`** — fetches the live Clockify manifest schema endpoint, verifies
+  versions 1.2–1.5 are structurally identical to the vendored schemas, and confirms version 1.6 still
+  returns HTTP 400. This is intentionally outside `ci:verify` so CI remains deterministic and does not
+  depend on Clockify network availability.
+
 GitHub Actions runs the same root gate on Node 22.x and 24.x for pushes to `main`, pull requests,
 and manual dispatches. Node 22 is the minimum supported runtime.
 

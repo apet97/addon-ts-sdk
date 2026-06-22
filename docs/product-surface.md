@@ -1,6 +1,7 @@
 # Product Surface: @apet97/clockify-addon-sdk
 
-This package provides a server runtime SDK for CAKE.com marketplace add-ons targeting Clockify.
+This package provides a server runtime SDK for CAKE.com marketplace add-ons targeting Clockify. It is
+source-only for now and is not published to the npm registry.
 
 ## Scope
 
@@ -20,7 +21,7 @@ This package provides a server runtime SDK for CAKE.com marketplace add-ons targ
 - Adapters for Node.js `http`, Express, and Fetch API. Node and Fetch enforce a default 1 MiB body
   limit before dispatch; Express remains an optional peer with body limits owned by the host app.
 - Optional `onError(error, context)` reporting for handled router, Fetch, and Node adapter errors.
-- Published package documentation and vendored manifest schemas.
+- Source package documentation and vendored manifest schemas.
 
 ### Exclusions
 
