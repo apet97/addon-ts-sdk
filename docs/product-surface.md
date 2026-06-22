@@ -16,8 +16,11 @@ source-only for now and is not published to the npm registry.
 - Clockify Addon lifecycle, component, settings, and webhook registrations.
 - RS256 JWT signature verification (`jose`) plus component, lifecycle, and strict webhook request
   helpers.
+- Verified handler wrappers for component, lifecycle, installed lifecycle, and webhook routes.
 - Narrow lifecycle payload guards that bind documented lifecycle bodies to verified workspace/add-on
   claims and narrow those claims before persistence.
+- Typed structured-setting helper creators that encode setting type/value pairing without replacing
+  the generated schema builders.
 - Adapters for Node.js `http`, Express, and Fetch API. Node and Fetch enforce a default 1 MiB body
   limit before dispatch; Express remains an optional peer with body limits owned by the host app.
 - Optional `onError(error, context)` reporting for handled router, Fetch, and Node adapter errors.
@@ -29,3 +32,4 @@ source-only for now and is not published to the npm registry.
   it does not call Clockify APIs on your behalf.
 - Token exchange, persistence, custom manifest validation, or UI/window-event framework primitives.
 - Pumble and Plaky add-on implementations.
+- Real npm publishing; release readiness is dry-run-only until explicitly decided otherwise.

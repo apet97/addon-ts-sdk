@@ -5,6 +5,7 @@ router, runtime adapters, and RS256 webhook-signature verification.
 
 - [`addon-sdk/`](./addon-sdk) — the source-only package. See its [README](./addon-sdk/README.md) for local installation and usage.
 - [`docs/`](./docs) — product surface and quality gates for the package.
+- [`docs/release-readiness.md`](./docs/release-readiness.md) — dry-run-only release readiness checklist.
 - [`addon-sdk/schemas/clockify-manifests/`](./addon-sdk/schemas/clockify-manifests) — vendored
   manifest schemas 1.2–1.5 plus provenance hashes used by `npm run verify:generated`.
 - [`MARKETPLACE_DOCS/`](./MARKETPLACE_DOCS) — Clockify's published add-on documentation, kept for reference.

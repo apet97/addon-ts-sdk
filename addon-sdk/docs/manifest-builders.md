@@ -66,3 +66,8 @@ value is present only in v1.5.
 Manifest builders cover the schema surface only. Runtime Marketplace rules such as webhook event
 headers, lifecycle token headers, `X-Addon-Token`, and region-specific URL claims are covered by the
 request verification helpers documented in `docs/token-validation.md`.
+
+For structured settings, the generated builders stay faithful to the schema. The SDK also exports
+small helper creators such as `createClockifyNumberSetting()` and
+`createClockifyDropdownSingleSetting()` when you want plain schema-compatible setting objects with
+the setting type paired to the right TypeScript value type.

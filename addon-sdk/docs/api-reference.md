@@ -41,6 +41,9 @@ client, persistence layer, UI event framework, or custom manifest validator.
 - `verifyClockifyWebhookRequest()`, `verifyClockifyComponentRequest()`,
   `verifyClockifyLifecycleRequest()`, and `verifyClockifyToken()` return typed result objects instead
   of throwing for normal authentication failures.
+- `withClockifyVerifiedComponentRequest()`, `withClockifyVerifiedLifecycleRequest()`,
+  `withClockifyInstalledLifecycleRequest()`, and `withClockifyVerifiedWebhookRequest()` wrap route
+  handlers and return `401 Unauthorized` before application code runs when verification fails.
 - `ClockifyHeaders`, `ClockifyQueryParams`, `getClockifyHeader()`, and `getClockifyQueryParam()`
   centralize Marketplace wire names.
 - `getClockifyEnvironmentContext()`, `resolveClockifyApiBaseUrl()`, and
@@ -58,6 +61,16 @@ client, persistence layer, UI event framework, or custom manifest validator.
   runtime guards for those body shapes.
 - `clockifyLifecyclePayloadMatchesClaims(payload, claims)` verifies that a lifecycle body matches the
   already verified token `workspaceId` and `addonId`, and narrows `claims` for safe persistence.
+
+## Structured Setting Helpers
+
+- `createClockifyTextSetting()`, `createClockifyNumberSetting()`,
+  `createClockifyCheckboxSetting()`, and `createClockifyLinkSetting()` create plain
+  schema-compatible setting objects with matching value types.
+- `createClockifyDropdownSingleSetting()` and `createClockifyDropdownMultipleSetting()` require
+  `allowedValues` alongside the dropdown value.
+- `createClockifyUserDropdownSingleSetting()` and `createClockifyUserDropdownMultipleSetting()`
+  cover user dropdown values without adding a manifest validator or API client.
 
 ## Adapters
 

@@ -36,6 +36,8 @@ for (const name of [
   "ClockifyComponent",
   "ClockifyScope",
   "ClockifySignatureParser",
+  "createClockifyNumberSetting",
+  "withClockifyVerifiedComponentRequest",
 ]) {
   if (!(name in esm)) fail(`ESM build is missing named export '${name}'`);
 }
@@ -45,6 +47,8 @@ expectFn("esm.ClockifyComponent.v1_4Builder", esm.ClockifyComponent.v1_4Builder)
 expectObj("esm.ClockifyScope", esm.ClockifyScope);
 if (esm.ClockifyScope.PROJECT_READ !== "PROJECT_READ")
   fail("esm.ClockifyScope.PROJECT_READ missing");
+expectFn("esm.createClockifyNumberSetting", esm.createClockifyNumberSetting);
+expectFn("esm.withClockifyVerifiedComponentRequest", esm.withClockifyVerifiedComponentRequest);
 expectFn("esm /adapters createNodeHttpAddonServer", esmAdapters.createNodeHttpAddonServer);
 
 // All four subpath entry points (".", "./clockify", "./adapters", "./testing") must load as ESM.
@@ -55,6 +59,7 @@ const esmTesting = await import(path.join(dist, "esm", "testing", "index.js")).c
   fail("ESM /testing import threw: " + e.message),
 );
 expectFn("esm /clockify ClockifyAddon", esmClockify.ClockifyAddon);
+expectFn("esm /clockify createClockifyTextSetting", esmClockify.createClockifyTextSetting);
 expectFn("esm /testing generateTestKeys", esmTesting.generateTestKeys);
 expectFn("esm root testing.signTestToken", esm.testing && esm.testing.signTestToken);
 
@@ -69,12 +74,17 @@ for (const name of [
   "ClockifyComponent",
   "ClockifyScope",
   "ClockifySignatureParser",
+  "createClockifyNumberSetting",
+  "withClockifyVerifiedComponentRequest",
 ]) {
   if (!(name in cjs)) fail(`CJS build is missing export '${name}'`);
 }
 expectFn("cjs.ClockifyAddon", cjs.ClockifyAddon);
+expectFn("cjs.createClockifyNumberSetting", cjs.createClockifyNumberSetting);
+expectFn("cjs.withClockifyVerifiedComponentRequest", cjs.withClockifyVerifiedComponentRequest);
 expectFn("cjs /adapters createNodeHttpAddonServer", cjsAdapters.createNodeHttpAddonServer);
 expectFn("cjs /clockify ClockifyAddon", cjsClockify.ClockifyAddon);
+expectFn("cjs /clockify createClockifyTextSetting", cjsClockify.createClockifyTextSetting);
 expectFn("cjs /testing generateTestKeys", cjsTesting.generateTestKeys);
 
 // --- 3. The README quick-start must actually boot and serve /manifest (from the ESM build). ---

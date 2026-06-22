@@ -105,8 +105,12 @@ server.listen(8080, () => {
 - **Clockify token helpers** — built-in platform public key, parser factory, RS256 JWT
   verification, component `auth_token` and lifecycle-header helpers, admin-role checks, and
   environment URL normalization.
+- **Verified handler wrappers** that compose the token helpers into small route handlers returning
+  `401 Unauthorized` for failed component, lifecycle, installed lifecycle, and webhook checks.
 - **Lifecycle payload guards** that validate documented lifecycle bodies and narrow verified claims
   before persisting installation or webhook-token data.
+- **Structured setting helpers** for common setting types, keeping value types paired with
+  `TXT`, `NUMBER`, `CHECKBOX`, `LINK`, dropdown, and user dropdown settings.
 - **Adapters** for Node `http`, Express, and the Fetch API (Hono, Cloudflare Workers, Bun, Deno).
 
 ## Testing helpers

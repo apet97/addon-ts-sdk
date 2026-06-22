@@ -6,4 +6,5 @@ export * from "./clockify-public-key";
 export * from "./clockify-request-verification";
 export * from "./clockify-lifecycle";
 export * from "./clockify-models";
+export * from "./clockify-settings";
 export * as generated from "./generated";

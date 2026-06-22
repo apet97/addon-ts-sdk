@@ -91,6 +91,19 @@ The helper returns a typed result instead of throwing, so applications can keep 
 response policy. `withClockifyVerifiedRequest()` is a small convenience wrapper that returns `401`
 for any failed verification.
 
+For common route shapes, use the narrower wrappers:
+
+- `withClockifyVerifiedComponentRequest()` reads `auth_token`, verifies the token, and passes the
+  verified claims to the handler.
+- `withClockifyVerifiedLifecycleRequest()` reads `X-Addon-Lifecycle-Token`, verifies the token, and
+  passes the verified claims to the handler.
+- `withClockifyInstalledLifecycleRequest()` also requires the installed lifecycle body shape and
+  matches the payload `workspaceId`/`addonId` to the verified claims before the handler runs.
+- `withClockifyVerifiedWebhookRequest()` requires `expectedEventType`; it can also call
+  `getExpectedWebhookAuthToken({ workspaceId, addonId, eventType })` after the first JWT pass and
+  then verify the stored webhook token before invoking the handler. Choose either a fixed
+  `expectedWebhookAuthToken` or the lookup callback for a webhook route, not both.
+
 For component and lifecycle routes, use the narrower helpers when you only need to verify the
 signed add-on JWT:
 

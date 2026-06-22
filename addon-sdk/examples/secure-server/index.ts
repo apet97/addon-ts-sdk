@@ -9,13 +9,11 @@ import {
   ClockifyLifecycleMatchedClaims,
   ClockifyManifest,
   ClockifyWebhook,
-  clockifyLifecyclePayloadMatchesClaims,
   createClockifySignatureParser,
   isClockifyAdminRole,
-  isClockifyInstalledLifecyclePayload,
-  verifyClockifyComponentRequest,
-  verifyClockifyLifecycleRequest,
-  verifyClockifyWebhookRequest,
+  withClockifyInstalledLifecycleRequest,
+  withClockifyVerifiedComponentRequest,
+  withClockifyVerifiedWebhookRequest,
 } from "../../src";
 import { createNodeHttpAddonServer } from "../../src/adapters";
 
@@ -94,67 +92,46 @@ export function createSecureServerAddon(
       .path("/component")
       .label("Secure component")
       .build(),
-    async (request) => {
-      const result = await verifyClockifyComponentRequest(parser, request);
-      if (!result.ok) return { status: 401, body: "Unauthorized" };
-      if (!isClockifyAdminRole(result.claims.workspaceRole)) {
+    withClockifyVerifiedComponentRequest(parser, async (_request, claims) => {
+      if (!isClockifyAdminRole(claims.workspaceRole)) {
         return { status: 403, body: "Admins only" };
       }
       return options.renderComponent
-        ? options.renderComponent(result.claims)
+        ? options.renderComponent(claims)
         : {
             status: 200,
             headers: { "content-type": "text/html" },
             body: "<html><body>Secure Clockify component</body></html>",
           };
-    },
+    }),
   );
 
   addon.registerLifecycleEvent(
     ClockifyLifecycleEvent.v1_5Builder().path("/lifecycle/installed").onInstalled().build(),
-    async (request) => {
-      const result = await verifyClockifyLifecycleRequest(parser, request);
-      if (!result.ok) return { status: 401, body: "Unauthorized" };
-
-      if (
-        !isClockifyInstalledLifecyclePayload(request.body) ||
-        !clockifyLifecyclePayloadMatchesClaims(request.body, result.claims)
-      ) {
-        return { status: 401, body: "Unauthorized" };
-      }
-
-      await options.store.saveInstallation(request.body, result.claims);
+    withClockifyInstalledLifecycleRequest(parser, async (_request, payload, claims) => {
+      await options.store.saveInstallation(payload, claims);
       return { status: 204 };
-    },
+    }),
   );
 
   addon.registerWebhook(
     ClockifyWebhook.v1_5Builder().onExpenseCreated().path(EXPENSE_CREATED_WEBHOOK_PATH).build(),
-    async (request) => {
-      const firstPass = await verifyClockifyWebhookRequest(parser, request, {
+    withClockifyVerifiedWebhookRequest(
+      parser,
+      {
         expectedEventType: "EXPENSE_CREATED",
-      });
-      if (!firstPass.ok) return { status: 401, body: "Unauthorized" };
-
-      const storedToken = await options.store.findWebhookAuthToken({
-        workspaceId: firstPass.claims.workspaceId ?? "",
-        addonId: firstPass.claims.addonId ?? "",
-        path: EXPENSE_CREATED_WEBHOOK_PATH,
-        eventType: firstPass.eventType,
-      });
-      if (!storedToken) return { status: 401, body: "Unauthorized" };
-
-      const verified = await verifyClockifyWebhookRequest(parser, request, {
-        expectedEventType: "EXPENSE_CREATED",
-        expectedWebhookAuthToken: storedToken,
-        expectedWorkspaceId: firstPass.claims.workspaceId,
-        expectedAddonId: firstPass.claims.addonId,
-      });
-      if (!verified.ok) return { status: 401, body: "Unauthorized" };
-
-      await options.onExpenseCreated?.(request.body, verified.claims);
-      return { status: 204 };
-    },
+        getExpectedWebhookAuthToken(input) {
+          return options.store.findWebhookAuthToken({
+            ...input,
+            path: EXPENSE_CREATED_WEBHOOK_PATH,
+          });
+        },
+      },
+      async (request, claims) => {
+        await options.onExpenseCreated?.(request.body, claims);
+        return { status: 204 };
+      },
+    ),
   );
 
   return addon;

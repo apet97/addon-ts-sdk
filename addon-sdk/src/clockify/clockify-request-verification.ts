@@ -2,6 +2,12 @@ import { AddonRequest } from "../shared/request";
 import { AddonResponse } from "../shared/response";
 import { RequestHandler } from "../shared/handler";
 import { ClockifyAddonClaims, ClockifySignatureParser } from "./clockify-signature-parser";
+import {
+  ClockifyInstalledLifecyclePayload,
+  ClockifyLifecycleMatchedClaims,
+  clockifyLifecyclePayloadMatchesClaims,
+  isClockifyInstalledLifecyclePayload,
+} from "./clockify-lifecycle";
 
 export const ClockifyHeaders = {
   SIGNATURE: "clockify-signature",
@@ -112,6 +118,78 @@ export type ClockifyVerifiedRequestHandler = (
   context: ClockifyVerifiedRequestContext,
 ) => AddonResponse | Promise<AddonResponse>;
 
+export interface ClockifyVerifiedTokenRequestContext {
+  claims: ClockifyAddonClaims;
+}
+
+export type ClockifyVerifiedTokenRequestHandler = (
+  request: AddonRequest,
+  claims: ClockifyAddonClaims,
+  context: ClockifyVerifiedTokenRequestContext,
+) => AddonResponse | Promise<AddonResponse>;
+
+export type ClockifyVerifiedComponentRequestContext = ClockifyVerifiedTokenRequestContext;
+
+export type ClockifyVerifiedComponentRequestHandler = (
+  request: AddonRequest,
+  claims: ClockifyAddonClaims,
+  context: ClockifyVerifiedComponentRequestContext,
+) => AddonResponse | Promise<AddonResponse>;
+
+export type ClockifyVerifiedLifecycleRequestContext = ClockifyVerifiedTokenRequestContext;
+
+export type ClockifyVerifiedLifecycleRequestHandler = (
+  request: AddonRequest,
+  claims: ClockifyAddonClaims,
+  context: ClockifyVerifiedLifecycleRequestContext,
+) => AddonResponse | Promise<AddonResponse>;
+
+export interface ClockifyInstalledLifecycleRequestContext {
+  claims: ClockifyLifecycleMatchedClaims;
+  payload: ClockifyInstalledLifecyclePayload;
+}
+
+export type ClockifyInstalledLifecycleRequestHandler = (
+  request: AddonRequest,
+  payload: ClockifyInstalledLifecyclePayload,
+  claims: ClockifyLifecycleMatchedClaims,
+  context: ClockifyInstalledLifecycleRequestContext,
+) => AddonResponse | Promise<AddonResponse>;
+
+export interface ClockifyWebhookAuthTokenLookupInput {
+  workspaceId: string;
+  addonId: string;
+  eventType: string;
+}
+
+export type ClockifyWebhookAuthTokenLookup = (
+  input: ClockifyWebhookAuthTokenLookupInput,
+) => string | undefined | Promise<string | undefined>;
+
+export type ClockifyVerifiedWebhookRequestOptions =
+  | (ClockifyWebhookVerificationOptions & {
+      getExpectedWebhookAuthToken?: undefined;
+    })
+  | (Omit<ClockifyWebhookVerificationOptions, "expectedWebhookAuthToken"> & {
+      getExpectedWebhookAuthToken: ClockifyWebhookAuthTokenLookup;
+      expectedWebhookAuthToken?: never;
+    });
+
+export interface ClockifyVerifiedWebhookRequestContext {
+  claims: ClockifyAddonClaims;
+  eventType: string;
+}
+
+export type ClockifyVerifiedWebhookRequestHandler = (
+  request: AddonRequest,
+  claims: ClockifyAddonClaims,
+  context: ClockifyVerifiedWebhookRequestContext,
+) => AddonResponse | Promise<AddonResponse>;
+
+function unauthorizedResponse(): AddonResponse {
+  return { status: 401, body: "Unauthorized" };
+}
+
 export function getClockifyHeader(
   headers: AddonRequest["headers"],
   name: string,
@@ -148,6 +226,10 @@ function normalizeClockifyVersionedBaseUrl(value: string | undefined): string | 
 
 function firstNonEmpty(...values: Array<string | undefined>): string | undefined {
   return values.find((value) => value !== undefined && value.trim() !== "");
+}
+
+function isNonEmptyString(value: unknown): value is string {
+  return typeof value === "string" && value.trim() !== "";
 }
 
 export function resolveClockifyApiBaseUrl(input: {
@@ -329,12 +411,137 @@ export function withClockifyVerifiedRequest(
   return async (request) => {
     const result = await verifyClockifyRequest(parser, request, options);
     if (!result.ok) {
-      return { status: 401, body: "Unauthorized" };
+      return unauthorizedResponse();
     }
 
     return handler(request, result.claims, {
       claims: result.claims,
       eventType: result.eventType,
+    });
+  };
+}
+
+export function withClockifyVerifiedComponentRequest(
+  parser: ClockifySignatureParser,
+  handler: ClockifyVerifiedComponentRequestHandler,
+  options: ClockifyTokenVerificationOptions = {},
+): RequestHandler {
+  return async (request) => {
+    const result = await verifyClockifyComponentRequest(parser, request, options);
+    if (!result.ok) {
+      return unauthorizedResponse();
+    }
+
+    return handler(request, result.claims, { claims: result.claims });
+  };
+}
+
+export function withClockifyVerifiedLifecycleRequest(
+  parser: ClockifySignatureParser,
+  handler: ClockifyVerifiedLifecycleRequestHandler,
+  options: ClockifyTokenVerificationOptions = {},
+): RequestHandler {
+  return async (request) => {
+    const result = await verifyClockifyLifecycleRequest(parser, request, options);
+    if (!result.ok) {
+      return unauthorizedResponse();
+    }
+
+    return handler(request, result.claims, { claims: result.claims });
+  };
+}
+
+export function withClockifyInstalledLifecycleRequest(
+  parser: ClockifySignatureParser,
+  handler: ClockifyInstalledLifecycleRequestHandler,
+  options: ClockifyTokenVerificationOptions = {},
+): RequestHandler {
+  return async (request) => {
+    const result = await verifyClockifyLifecycleRequest(parser, request, options);
+    if (!result.ok) {
+      return unauthorizedResponse();
+    }
+
+    if (
+      !isClockifyInstalledLifecyclePayload(request.body) ||
+      !clockifyLifecyclePayloadMatchesClaims(request.body, result.claims)
+    ) {
+      return unauthorizedResponse();
+    }
+
+    return handler(request, request.body, result.claims, {
+      claims: result.claims,
+      payload: request.body,
+    });
+  };
+}
+
+export function withClockifyVerifiedWebhookRequest(
+  parser: ClockifySignatureParser,
+  options: ClockifyVerifiedWebhookRequestOptions,
+  handler: ClockifyVerifiedWebhookRequestHandler,
+): RequestHandler {
+  return async (request) => {
+    if (options == null) {
+      return unauthorizedResponse();
+    }
+
+    if (
+      options.getExpectedWebhookAuthToken !== undefined &&
+      options.expectedWebhookAuthToken !== undefined
+    ) {
+      return unauthorizedResponse();
+    }
+
+    if (options.getExpectedWebhookAuthToken === undefined) {
+      const result = await verifyClockifyWebhookRequest(parser, request, options);
+      if (!result.ok) {
+        return unauthorizedResponse();
+      }
+
+      return handler(request, result.claims, {
+        claims: result.claims,
+        eventType: result.eventType,
+      });
+    }
+
+    const {
+      getExpectedWebhookAuthToken,
+      expectedWebhookAuthToken: _expectedWebhookAuthToken,
+      ...firstPassOptions
+    } = options;
+    const firstPass = await verifyClockifyWebhookRequest(parser, request, firstPassOptions);
+    if (!firstPass.ok) {
+      return unauthorizedResponse();
+    }
+
+    const { workspaceId, addonId } = firstPass.claims;
+    if (!isNonEmptyString(workspaceId) || !isNonEmptyString(addonId)) {
+      return unauthorizedResponse();
+    }
+
+    const expectedWebhookAuthToken = await getExpectedWebhookAuthToken({
+      workspaceId,
+      addonId,
+      eventType: firstPass.eventType,
+    });
+    if (!isNonEmptyString(expectedWebhookAuthToken)) {
+      return unauthorizedResponse();
+    }
+
+    const verified = await verifyClockifyWebhookRequest(parser, request, {
+      ...firstPassOptions,
+      expectedWorkspaceId: workspaceId,
+      expectedAddonId: addonId,
+      expectedWebhookAuthToken,
+    });
+    if (!verified.ok) {
+      return unauthorizedResponse();
+    }
+
+    return handler(request, verified.claims, {
+      claims: verified.claims,
+      eventType: verified.eventType,
     });
   };
 }
