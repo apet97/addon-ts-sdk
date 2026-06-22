@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { ClockifyAddon, ClockifyManifest } from "../src";
 import { ValidationException, IllegalArgumentException } from "../src/shared/errors";
 
@@ -81,20 +81,46 @@ describe("Router", () => {
     expect(response.body).toBe("Method Not Allowed");
   });
 
-  it("should return 500 on handler exceptions", async () => {
+  it("should return 500 on handler exceptions without logging by default", async () => {
     const addon = new ClockifyAddon(mockManifest);
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
     addon.registerHandler("/fail", "GET", () => {
       throw new Error("Simulated failure");
     });
 
-    const response = await addon.handle({
-      method: "GET",
-      path: "/fail",
-      headers: {},
+    try {
+      const response = await addon.handle({
+        method: "GET",
+        path: "/fail",
+        headers: {},
+      });
+
+      expect(response.status).toBe(500);
+      expect(response.body).toBe("Internal Server Error");
+      expect(consoleError).not.toHaveBeenCalled();
+    } finally {
+      consoleError.mockRestore();
+    }
+  });
+
+  it("reports handled router errors when an error reporter is configured", async () => {
+    const onError = vi.fn();
+    const addon = new ClockifyAddon(mockManifest, undefined, { onError });
+    addon.registerHandler("/fail", "GET", () => {
+      throw new Error("Reported failure");
     });
 
+    const request = { method: "GET", path: "/fail", headers: {} };
+    const response = await addon.handle(request);
+
     expect(response.status).toBe(500);
-    expect(response.body).toBe("Internal Server Error");
+    expect(onError).toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({
+        source: "router",
+        request,
+      }),
+    );
   });
 
   it("should execute middleware chain in order", async () => {
@@ -152,8 +178,9 @@ describe("Router", () => {
     expect(res.body).toBe("Forbidden by middleware");
   });
 
-  it("should handle middleware that calls next multiple times gracefully or as expected", async () => {
+  it("should reject middleware that calls next multiple times after one handler execution", async () => {
     const addon = new ClockifyAddon(mockManifest);
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
     let count = 0;
     addon.use(async (req, next) => {
       await next(req);
@@ -166,8 +193,14 @@ describe("Router", () => {
       return { status: 200, body: `run-${count}` };
     });
 
-    const res = await addon.handle({ method: "GET", path: "/mid-double", headers: {} });
-    expect(count).toBe(2);
-    expect(res.body).toBe("run-2");
+    try {
+      const res = await addon.handle({ method: "GET", path: "/mid-double", headers: {} });
+      expect(count).toBe(1);
+      expect(res.status).toBe(500);
+      expect(res.body).toBe("Internal Server Error");
+      expect(consoleError).not.toHaveBeenCalled();
+    } finally {
+      consoleError.mockRestore();
+    }
   });
 });

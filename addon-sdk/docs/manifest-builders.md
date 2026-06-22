@@ -44,7 +44,7 @@ The builders generate idiomatic helper methods from the schema enums:
   - `widget()`
   - `activityTab()`
   - `scheduleTab()`
-  // and so on.
+    // and so on.
 
 ## Schema 1.5 Coverage
 

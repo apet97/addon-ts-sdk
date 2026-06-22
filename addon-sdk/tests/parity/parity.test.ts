@@ -1,6 +1,5 @@
 import { describe, it, expect } from "vitest";
 import { ClockifyAddon, ClockifyManifest } from "../../src";
-import { ValidationException, IllegalArgumentException } from "../../src/shared/errors";
 import { generated } from "../../src";
 
 describe("Parity Checks", () => {
@@ -76,14 +75,16 @@ describe("Parity Checks", () => {
     const manifest = getCleanManifest();
     const addon = new ClockifyAddon(manifest);
 
-    const component1 = generated.v1_4.ClockifyComponentBuilder()
+    const component1 = generated.v1_4
+      .ClockifyComponentBuilder()
       .type("sidebar")
       .allowAdmins()
       .path("/ui/test-mutation-order")
       .label("Tab 1")
       .build();
 
-    const component2 = generated.v1_4.ClockifyComponentBuilder()
+    const component2 = generated.v1_4
+      .ClockifyComponentBuilder()
       .type("widget")
       .allowEveryone()
       .path("/ui/test-mutation-order") // duplicate path

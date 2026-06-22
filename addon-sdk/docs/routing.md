@@ -5,6 +5,7 @@ This document describes how request routing, trailing slashes, duplicate checks,
 ## Path Constraints
 
 Path validation constraints match the Java SDK exactly:
+
 1. Registered paths must start with a slash `/`.
 2. Registered paths must not end with a slash `/`.
 3. Attempting to register an invalid path throws a `ValidationException`.
@@ -20,6 +21,7 @@ addon.registerHandler("invalid", "GET", () => ({ status: 200 })); // Throws Vali
 ## Trailing Slash Trim at Dispatch
 
 Incoming requests have their trailing slash trimmed when executing route dispatch:
+
 - A request to `/manifest/` matches the `/manifest` handler.
 - A request to `/component/` matches the `/component` handler.
 
@@ -35,6 +37,10 @@ addon.use(async (request, next) => {
   return response;
 });
 ```
+
+Each middleware receives a single-use `next()` function. If middleware calls `next()` more than once,
+the SDK throws before a second dispatch can reach the route handler and returns the same handled 500
+response shape as any other router error.
 
 ## Request Body Limits
 
@@ -55,4 +61,24 @@ For Express, configure the host app's body parser directly:
 ```typescript
 app.use(express.json({ limit: "1mb" }));
 app.use(createExpressAddonHandler(addon));
+```
+
+## Handled Errors
+
+Router, Fetch adapter, and Node `http` adapter errors that become handled 500 responses are quiet by
+default. Pass `onError(error, context)` when the host application wants to log, count, or redact them:
+
+```typescript
+import { AddonErrorReporter, ClockifyAddon } from "@apet97/clockify-addon-sdk";
+import { createNodeHttpAddonServer } from "@apet97/clockify-addon-sdk/adapters";
+
+const addonErrorReporter: AddonErrorReporter = (error, context) => {
+  appLogger.error({ error, source: context.source }, "Clockify addon request failed");
+};
+
+const addon = new ClockifyAddon(manifest, undefined, {
+  onError: addonErrorReporter,
+});
+
+const server = createNodeHttpAddonServer(addon, { onError: addonErrorReporter });
 ```

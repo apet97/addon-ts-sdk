@@ -19,7 +19,8 @@ Conventions for anyone (human or agent) working in this repository.
   returns HTTP 400).
 - `addon-sdk/schemas/clockify-manifests/provenance.json` records the supported schema list, source
   labels, and raw SHA-256 hashes. `npm run verify:generated` must fail if a supported schema is
-  missing, changed without updating provenance, or if the supported version set drifts.
+  missing, changed without updating provenance, if the supported version set drifts, or if a fresh
+  temporary generation differs from committed generated output.
 - `addon-sdk/src/clockify/generated/**` is generated from those schemas. **Never edit it by hand** —
   change the schema or the generator, then `npm run generate`.
 - Builder step order follows each schema's `required` array (matching the upstream processor).
@@ -44,22 +45,25 @@ Conventions for anyone (human or agent) working in this repository.
 
 ## Gates
 
-| Command | Checks |
-|---|---|
-| `npm run ci:verify` | Canonical root gate: type-check, generated drift, tests, build, dist import smoke, pack dry-run, and audits. |
-| `npm run type-check` | `src`, generator, examples, and the type-state probes. A weakened builder must fail this. |
-| `npm run verify:generated` | Regenerates from the schemas; fails on drift. |
-| `npm run test` | vitest suite. |
-| `npm run build` | ESM + CJS output. |
-| `npm run verify:dist` | Imports the **built** ESM and CJS and boots the quick-start. A green `build` alone does not prove the package imports. |
-| `npm run pack:dry-run` | Tarball contents (`dist` + `docs` + `schemas/clockify-manifests` + `LICENSE` + `README`). |
-| `npm run audit:prod` / `npm run audit:all` | Production and full dependency audits; both should report 0 vulnerabilities. |
+| Command                                    | Checks                                                                                                                                        |
+| ------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| `npm run ci:verify`                        | Canonical root gate: type-check, generated drift, tests, lint, format check, build, dist import smoke, pack dry-run, and audits.              |
+| `npm run type-check`                       | `src`, generator, examples, and the type-state probes. A weakened builder must fail this.                                                     |
+| `npm run verify:generated`                 | Checks schema provenance, generates to a temporary directory, compares against committed generated files, and leaves tracked files untouched. |
+| `npm run test`                             | vitest suite.                                                                                                                                 |
+| `npm run lint`                             | Check-only ESLint over the package.                                                                                                           |
+| `npm run format:check`                     | Check-only Prettier over the package.                                                                                                         |
+| `npm run build`                            | ESM + CJS output.                                                                                                                             |
+| `npm run verify:dist`                      | Imports the **built** ESM and CJS and boots the quick-start. A green `build` alone does not prove the package imports.                        |
+| `npm run pack:dry-run`                     | Tarball contents (`dist` + `docs` + `schemas/clockify-manifests` + `LICENSE` + `README`).                                                     |
+| `npm run audit:prod` / `npm run audit:all` | Production and full dependency audits; both should report 0 vulnerabilities.                                                                  |
 
 GitHub Actions runs `npm run ci:verify` on Node 22.x and 24.x for pushes to `main`, pull requests,
 and manual dispatches.
 
-Linting and formatting are intentionally deferred. `npm run lint` and `npm run format:check` remain
-no-op stubs until a focused tooling pass adds check-only ESLint/Prettier without mass churn.
+Linting and formatting are check-only CI gates. ESLint and Prettier intentionally ignore
+`node_modules`, `dist`, `coverage`, `*.tgz`, vendored Marketplace docs, manifest schemas, and
+generated Clockify models.
 
 ## Git / publish workflow
 

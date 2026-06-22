@@ -1,4 +1,4 @@
-import { Addon } from "../shared/addon";
+import { Addon, AddonErrorReporter, reportAddonError } from "../shared/addon";
 import { AddonRequest } from "../shared/request";
 import { AddonResponse, isJsonBody } from "../shared/response";
 import { BodyLimitOptions, PayloadTooLargeError, resolveMaxBodyBytes } from "./body-limit";
@@ -40,7 +40,7 @@ async function readFetchBody(request: Request, maxBodyBytes: number): Promise<Ui
 export async function handleFetchRequest(
   addon: Addon<unknown>,
   request: Request,
-  options: BodyLimitOptions = {},
+  options: BodyLimitOptions & { readonly onError?: AddonErrorReporter } = {},
 ): Promise<Response> {
   const maxBodyBytes = resolveMaxBodyBytes(options);
 
@@ -110,7 +110,10 @@ export async function handleFetchRequest(
       headers: responseHeaders,
     });
   } catch (e) {
-    console.error(e);
+    reportAddonError(options.onError, e, {
+      source: "fetch-adapter",
+      nativeRequest: request,
+    });
     return new Response("Internal Server Error", { status: 500 });
   }
 }

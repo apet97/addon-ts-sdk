@@ -15,7 +15,8 @@ describe("Clockify Addon Hooks", () => {
     const manifest = getCleanManifest();
     const addon = new ClockifyAddon(manifest);
 
-    const webhook = generated.v1_4.ClockifyWebhookBuilder()
+    const webhook = generated.v1_4
+      .ClockifyWebhookBuilder()
       .event("NEW_PROJECT")
       .path("/hooks/new-project")
       .build();
@@ -31,7 +32,8 @@ describe("Clockify Addon Hooks", () => {
     const manifest = getCleanManifest();
     const addon = new ClockifyAddon(manifest);
 
-    const lifecycle = generated.v1_4.ClockifyLifecycleEventBuilder()
+    const lifecycle = generated.v1_4
+      .ClockifyLifecycleEventBuilder()
       .path("/lifecycle/install")
       .onInstalled()
       .build();
@@ -47,7 +49,8 @@ describe("Clockify Addon Hooks", () => {
     const manifest = getCleanManifest();
     const addon = new ClockifyAddon(manifest);
 
-    const component = generated.v1_4.ClockifyComponentBuilder()
+    const component = generated.v1_4
+      .ClockifyComponentBuilder()
       .type("sidebar")
       .allowAdmins()
       .path("/ui/sidebar")
@@ -76,14 +79,16 @@ describe("Clockify Addon Hooks", () => {
     const manifest = getCleanManifest();
     const addon = new ClockifyAddon(manifest);
 
-    const component1 = generated.v1_4.ClockifyComponentBuilder()
+    const component1 = generated.v1_4
+      .ClockifyComponentBuilder()
       .type("sidebar")
       .allowAdmins()
       .path("/ui/dup")
       .label("Tab 1")
       .build();
 
-    const component2 = generated.v1_4.ClockifyComponentBuilder()
+    const component2 = generated.v1_4
+      .ClockifyComponentBuilder()
       .type("widget")
       .allowEveryone()
       .path("/ui/dup")

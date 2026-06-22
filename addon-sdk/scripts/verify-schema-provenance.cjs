@@ -74,10 +74,7 @@ for (const version of versions) {
     continue;
   }
 
-  const actual = crypto
-    .createHash("sha256")
-    .update(fs.readFileSync(filePath))
-    .digest("hex");
+  const actual = crypto.createHash("sha256").update(fs.readFileSync(filePath)).digest("hex");
 
   if (actual !== entry.sha256) {
     fail(`Schema hash mismatch: ${entry.file} expected ${entry.sha256} got ${actual}`);

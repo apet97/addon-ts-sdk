@@ -56,20 +56,29 @@ describe("Ported EXPENSE_CREATED webhook (real RS256 token)", () => {
     const { addon, conversions } = buildAddon();
     const token = await validToken();
     const res = await addon.handle(
-      post(PATH, { [SIG]: token, [EVENT]: "EXPENSE_CREATED", "content-type": "application/json" }, {
-        id: "exp-1",
-        workspaceId: "ws-webhook",
-        userId: "user-1",
-        date: "2026-05-24",
-        categoryId: "cat-input",
-        quantity: 37.4,
-        billable: true,
-        total: 0,
-      }),
+      post(
+        PATH,
+        { [SIG]: token, [EVENT]: "EXPENSE_CREATED", "content-type": "application/json" },
+        {
+          id: "exp-1",
+          workspaceId: "ws-webhook",
+          userId: "user-1",
+          date: "2026-05-24",
+          categoryId: "cat-input",
+          quantity: 37.4,
+          billable: true,
+          total: 0,
+        },
+      ),
     );
     expect(res.status).toBe(200);
     expect(conversions).toEqual([
-      { workspaceId: "ws-webhook", expenseId: "exp-1", source: "WEBHOOK_CREATED", eventType: "EXPENSE_CREATED" },
+      {
+        workspaceId: "ws-webhook",
+        expenseId: "exp-1",
+        source: "WEBHOOK_CREATED",
+        eventType: "EXPENSE_CREATED",
+      },
     ]);
   });
 
@@ -77,16 +86,25 @@ describe("Ported EXPENSE_CREATED webhook (real RS256 token)", () => {
     const { addon, conversions } = buildAddon();
     const token = await validToken();
     const res = await addon.handle(
-      post(PATH, { [SIG]: token, [EVENT]: "EXPENSE_CREATED" }, {
-        workspaceId: "ws-webhook",
-        userId: "user-1",
-        expenseId: "exp-ref",
-        categoryId: "cat-input",
-      }),
+      post(
+        PATH,
+        { [SIG]: token, [EVENT]: "EXPENSE_CREATED" },
+        {
+          workspaceId: "ws-webhook",
+          userId: "user-1",
+          expenseId: "exp-ref",
+          categoryId: "cat-input",
+        },
+      ),
     );
     expect(res.status).toBe(200);
     expect(conversions).toEqual([
-      { workspaceId: "ws-webhook", expenseId: "exp-ref", source: "WEBHOOK_CREATED", eventType: "EXPENSE_CREATED" },
+      {
+        workspaceId: "ws-webhook",
+        expenseId: "exp-ref",
+        source: "WEBHOOK_CREATED",
+        eventType: "EXPENSE_CREATED",
+      },
     ]);
   });
 
@@ -94,7 +112,11 @@ describe("Ported EXPENSE_CREATED webhook (real RS256 token)", () => {
     const { addon, conversions } = buildAddon();
     const token = await validToken();
     const res = await addon.handle(
-      post(PATH, { [SIG]: token, [EVENT]: "EXPENSE_CREATED" }, { workspaceId: "ws-webhook", categoryId: "cat-input" }),
+      post(
+        PATH,
+        { [SIG]: token, [EVENT]: "EXPENSE_CREATED" },
+        { workspaceId: "ws-webhook", categoryId: "cat-input" },
+      ),
     );
     expect(res.status).toBe(200);
     expect(conversions).toEqual([]);
@@ -102,7 +124,9 @@ describe("Ported EXPENSE_CREATED webhook (real RS256 token)", () => {
 
   it("missing signature header → 401, no conversion", async () => {
     const { addon, conversions } = buildAddon();
-    const res = await addon.handle(post(PATH, { "content-type": "application/json" }, { id: "exp-1" }));
+    const res = await addon.handle(
+      post(PATH, { "content-type": "application/json" }, { id: "exp-1" }),
+    );
     expect(res.status).toBe(401);
     expect(conversions).toEqual([]);
   });
@@ -116,7 +140,9 @@ describe("Ported EXPENSE_CREATED webhook (real RS256 token)", () => {
 
   it("token signed for a different add-on key (subject mismatch) → 401", async () => {
     const { addon, conversions } = buildAddon();
-    const wrong = await signTestToken(keys.privateKey, "some-other-addon", { workspaceId: "ws-webhook" });
+    const wrong = await signTestToken(keys.privateKey, "some-other-addon", {
+      workspaceId: "ws-webhook",
+    });
     const res = await addon.handle(post(PATH, { [SIG]: wrong }, { id: "exp-1" }));
     expect(res.status).toBe(401);
     expect(conversions).toEqual([]);
@@ -133,7 +159,9 @@ describe("Ported EXPENSE_CREATED webhook (real RS256 token)", () => {
   it("mismatched webhook event header → 401, no conversion", async () => {
     const { addon, conversions } = buildAddon();
     const token = await validToken();
-    const res = await addon.handle(post(PATH, { [SIG]: token, [EVENT]: "EXPENSE_DELETED" }, { id: "exp-1" }));
+    const res = await addon.handle(
+      post(PATH, { [SIG]: token, [EVENT]: "EXPENSE_DELETED" }, { id: "exp-1" }),
+    );
     expect(res.status).toBe(401);
     expect(conversions).toEqual([]);
   });

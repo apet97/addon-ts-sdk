@@ -28,7 +28,11 @@ function buildStopEstimateManifest() {
     v13.ClockifyLifecycleEventBuilder().path("/lifecycle/installed").onInstalled().build(),
     v13.ClockifyLifecycleEventBuilder().path("/lifecycle/deleted").onDeleted().build(),
     v13.ClockifyLifecycleEventBuilder().path("/lifecycle/status-changed").onStatusChanged().build(),
-    v13.ClockifyLifecycleEventBuilder().path("/lifecycle/settings-updated").onSettingsUpdated().build(),
+    v13
+      .ClockifyLifecycleEventBuilder()
+      .path("/lifecycle/settings-updated")
+      .onSettingsUpdated()
+      .build(),
   ];
 
   const webhooks = [

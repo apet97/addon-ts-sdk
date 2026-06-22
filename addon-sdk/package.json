@@ -61,14 +61,14 @@
   "scripts": {
     "generate": "tsx scripts/generate-clockify-manifest.ts",
     "type-check": "tsc -p tsconfig.typecheck.json",
-    "verify:generated": "node scripts/verify-schema-provenance.cjs && node scripts/snapshot-generated.cjs && npm run generate && node scripts/diff-generated.cjs",
+    "verify:generated": "node scripts/verify-schema-provenance.cjs && node scripts/verify-generated.cjs",
     "clean": "node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true })\"",
     "build": "npm run clean && npm run generate && tsc -p tsconfig.esm.json && node scripts/fix-esm-extensions.cjs && tsc -p tsconfig.cjs.json && node scripts/finalize-cjs.js",
     "verify:dist": "node scripts/verify-dist.mjs",
     "test": "vitest run",
-    "lint": "echo \"No linter configured (lightweight build)\"",
-    "format:check": "echo \"No formatter configured (lightweight build)\"",
-    "prepack": "npm run type-check && npm run verify:generated && npm run test && npm run build && npm run verify:dist"
+    "lint": "eslint .",
+    "format:check": "prettier . --check",
+    "prepack": "npm run type-check && npm run verify:generated && npm run test && npm run lint && npm run format:check && npm run build && npm run verify:dist"
   },
   "dependencies": {
     "jose": "^5.9.6"
@@ -82,11 +82,16 @@
     }
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@types/express": "^5.0.6",
     "@types/node": "^20.11.24",
+    "eslint": "^10.5.0",
+    "eslint-config-prettier": "^10.1.8",
     "express": "^5.2.1",
+    "prettier": "^3.8.4",
     "tsx": "^4.7.1",
     "typescript": "^5.3.3",
+    "typescript-eslint": "^8.62.0",
     "vite": "6.4.3",
     "vitest": "3.2.6"
   }

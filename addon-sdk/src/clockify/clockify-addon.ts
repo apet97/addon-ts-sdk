@@ -1,4 +1,4 @@
-import { Addon } from "../shared/addon";
+import { Addon, AddonOptions } from "../shared/addon";
 import { RequestHandler } from "../shared/handler";
 import { ClockifyManifest, ClockifySchemaVersion } from "./clockify-manifest";
 import { ClockifyWebhook, ClockifyLifecycleEvent, ClockifyComponent } from "./clockify-models";
@@ -16,8 +16,8 @@ import { ClockifyWebhook, ClockifyLifecycleEvent, ClockifyComponent } from "./cl
 export class ClockifyAddon<
   M extends { readonly schemaVersion: ClockifySchemaVersion } = ClockifyManifest<"1.4">,
 > extends Addon<M> {
-  constructor(manifest: M, manifestPath?: string) {
-    super(manifest, manifestPath);
+  constructor(manifest: M, manifestPath?: string, options?: AddonOptions) {
+    super(manifest, manifestPath, options);
   }
 
   registerWebhook(webhook: ClockifyWebhook<M["schemaVersion"]>, handler: RequestHandler): void {

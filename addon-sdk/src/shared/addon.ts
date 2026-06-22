@@ -4,12 +4,7 @@ import { RequestHandler, AddonMiddleware } from "./handler";
 import { ValidationException, IllegalArgumentException } from "./errors";
 
 function isValidManifestPath(path: string): boolean {
-  return (
-    !!path &&
-    path.length > 0 &&
-    path.startsWith("/") &&
-    !path.endsWith("/")
-  );
+  return !!path && path.length > 0 && path.startsWith("/") && !path.endsWith("/");
 }
 
 function trimTrailingSlash(path: string): string {
@@ -19,17 +14,45 @@ function trimTrailingSlash(path: string): string {
   return path;
 }
 
+export type AddonErrorSource = "router" | "fetch-adapter" | "node-http-adapter";
+
+export interface AddonErrorContext {
+  readonly source: AddonErrorSource;
+  readonly request?: AddonRequest;
+  readonly nativeRequest?: unknown;
+}
+
+export type AddonErrorReporter = (error: unknown, context: AddonErrorContext) => void;
+
+export interface AddonOptions {
+  readonly onError?: AddonErrorReporter;
+}
+
+export function reportAddonError(
+  reporter: AddonErrorReporter | undefined,
+  error: unknown,
+  context: AddonErrorContext,
+): void {
+  try {
+    reporter?.(error, context);
+  } catch {
+    // Error reporters must not change the response path.
+  }
+}
+
 export abstract class Addon<M> {
   static readonly PATH_MANIFEST = "/manifest";
   static readonly HTTP_GET = "GET";
   static readonly HTTP_POST = "POST";
 
   protected readonly manifest: M;
+  private readonly options: AddonOptions;
   private readonly requestHandlers = new Map<string, RequestHandler>();
   private readonly middlewares: AddonMiddleware[] = [];
 
-  constructor(manifest: M, manifestPath: string = Addon.PATH_MANIFEST) {
+  constructor(manifest: M, manifestPath: string = Addon.PATH_MANIFEST, options: AddonOptions = {}) {
     this.manifest = manifest;
+    this.options = options;
 
     this.registerHandler(manifestPath, Addon.HTTP_GET, () => {
       return {
@@ -46,9 +69,7 @@ export abstract class Addon<M> {
 
   registerHandler(path: string, method: string, handler: RequestHandler): void {
     if (!isValidManifestPath(path)) {
-      throw new ValidationException(
-        "Url should be an absolute path and not end with a slash."
-      );
+      throw new ValidationException("Url should be an absolute path and not end with a slash.");
     }
 
     const key = `${method.toUpperCase()}:${path}`;
@@ -87,7 +108,14 @@ export abstract class Addon<M> {
         const dispatch = async (i: number, req: AddonRequest): Promise<AddonResponse> => {
           if (i < this.middlewares.length) {
             const mw = this.middlewares[i];
-            return await mw(req, (nextReq) => dispatch(i + 1, nextReq));
+            let nextCalled = false;
+            return await mw(req, (nextReq) => {
+              if (nextCalled) {
+                throw new Error("Middleware next() called multiple times.");
+              }
+              nextCalled = true;
+              return dispatch(i + 1, nextReq);
+            });
           }
           return await handler(req);
         };
@@ -99,7 +127,7 @@ export abstract class Addon<M> {
         body: "Method Not Allowed",
       };
     } catch (e) {
-      console.error(e);
+      reportAddonError(this.options.onError, e, { source: "router", request });
       return {
         status: 500,
         body: "Internal Server Error",

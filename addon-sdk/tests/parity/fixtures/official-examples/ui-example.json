@@ -95,26 +95,15 @@
             "accessLevel": "EVERYONE",
             "type": "DROPDOWN_SINGLE",
             "value": "option 1",
-            "allowedValues": [
-              "option 1",
-              "option 2",
-              "option 3"
-            ]
+            "allowedValues": ["option 1", "option 2", "option 3"]
           },
           {
             "id": "addon-dropdown-multiple-setting-1",
             "name": "Dropdown multiple setting",
             "accessLevel": "ADMINS",
             "type": "DROPDOWN_MULTIPLE",
-            "value": [
-              "option 1",
-              "option 2"
-            ],
-            "allowedValues": [
-              "option 1",
-              "option 2",
-              "option 3"
-            ]
+            "value": ["option 1", "option 2"],
+            "allowedValues": ["option 1", "option 2", "option 3"]
           }
         ],
         "groups": [

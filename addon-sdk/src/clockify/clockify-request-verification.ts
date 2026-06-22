@@ -134,7 +134,9 @@ export function getClockifyQueryParam(
 }
 
 export function isClockifyAdminRole(role: unknown): boolean {
-  const normalized = String(role ?? "").trim().toLowerCase();
+  const normalized = String(role ?? "")
+    .trim()
+    .toLowerCase();
   return normalized === "owner" || normalized === "admin";
 }
 
@@ -155,9 +157,7 @@ export function resolveClockifyApiBaseUrl(input: {
   return normalizeClockifyVersionedBaseUrl(firstNonEmpty(input.apiUrl, input.backendUrl));
 }
 
-export function resolveClockifyReportsBaseUrl(input: {
-  reportsUrl?: string;
-}): string | undefined {
+export function resolveClockifyReportsBaseUrl(input: { reportsUrl?: string }): string | undefined {
   return normalizeClockifyVersionedBaseUrl(input.reportsUrl);
 }
 
@@ -183,7 +183,10 @@ function checkClockifyClaimContext(
   claims: ClockifyAddonClaims,
   options: ClockifyTokenVerificationOptions,
 ): "workspace-id-mismatch" | "addon-id-mismatch" | undefined {
-  if (options.expectedWorkspaceId !== undefined && claims.workspaceId !== options.expectedWorkspaceId) {
+  if (
+    options.expectedWorkspaceId !== undefined &&
+    claims.workspaceId !== options.expectedWorkspaceId
+  ) {
     return "workspace-id-mismatch";
   }
   if (options.expectedAddonId !== undefined && claims.addonId !== options.expectedAddonId) {

@@ -65,7 +65,7 @@ addon.registerComponent(
       headers: { "content-type": "text/html" },
       body: "<html><body>Hello Clockify!</body></html>",
     };
-  }
+  },
 );
 
 // 4. Start the server

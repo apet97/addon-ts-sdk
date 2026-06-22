@@ -4,19 +4,20 @@ This guide maps features, classes, and code patterns directly from the Clockify 
 
 ## API Comparison
 
-| Java Addon SDK | TypeScript Addon SDK |
-|---|---|
-| `ClockifyManifest.v1_4Builder()` | `ClockifyManifest.v1_4Builder()` |
-| `ClockifyComponent.builder()` | `ClockifyComponent.v1_4Builder()` / `v1_2Builder()` etc. |
-| `RequestHandler<HttpRequest>` | `async (request: AddonRequest) => AddonResponse` |
-| `AddonServlet` | `createExpressAddonHandler` or `handleFetchRequest` |
-| `EmbeddedServer` | `createNodeHttpAddonServer` |
-| `ClockifySignatureParser` | `ClockifySignatureParser` |
-| `Filter` / `FilterChain` | `AddonMiddleware` |
+| Java Addon SDK                   | TypeScript Addon SDK                                     |
+| -------------------------------- | -------------------------------------------------------- |
+| `ClockifyManifest.v1_4Builder()` | `ClockifyManifest.v1_4Builder()`                         |
+| `ClockifyComponent.builder()`    | `ClockifyComponent.v1_4Builder()` / `v1_2Builder()` etc. |
+| `RequestHandler<HttpRequest>`    | `async (request: AddonRequest) => AddonResponse`         |
+| `AddonServlet`                   | `createExpressAddonHandler` or `handleFetchRequest`      |
+| `EmbeddedServer`                 | `createNodeHttpAddonServer`                              |
+| `ClockifySignatureParser`        | `ClockifySignatureParser`                                |
+| `Filter` / `FilterChain`         | `AddonMiddleware`                                        |
 
 ## Java vs TypeScript Hook Registration
 
 ### Java
+
 ```java
 ClockifyAddon addon = new ClockifyAddon(
     ClockifyManifest.v1_4Builder()
@@ -44,6 +45,7 @@ addon.registerComponent(
 ```
 
 ### TypeScript
+
 ```typescript
 import { ClockifyAddon, ClockifyManifest, ClockifyComponent } from "@apet97/clockify-addon-sdk";
 
@@ -53,22 +55,17 @@ const addon = new ClockifyAddon(
     .name("My Add-on")
     .baseUrl("https://example.com")
     .requireProPlan()
-    .build()
+    .build(),
 );
 
 addon.registerComponent(
-  ClockifyComponent.v1_4Builder()
-    .activityTab()
-    .allowAdmins()
-    .path("/tab")
-    .label("My Tab")
-    .build(),
+  ClockifyComponent.v1_4Builder().activityTab().allowAdmins().path("/tab").label("My Tab").build(),
   async (request) => {
     return {
       status: 200,
       headers: { "content-type": "text/html" },
-      body: "<h1>My Tab Content</h1>"
+      body: "<h1>My Tab Content</h1>",
     };
-  }
+  },
 );
 ```

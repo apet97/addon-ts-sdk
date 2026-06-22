@@ -166,11 +166,9 @@ describe("Marketplace request verification helpers", () => {
     ).resolves.toEqual({ ok: false, reason: "missing-expected-event-type" });
 
     await expect(
-      verifyClockifyWebhookRequest(
-        parser(),
-        request({ [ClockifyHeaders.SIGNATURE]: token }),
-        { expectedEventType: "EXPENSE_CREATED" },
-      ),
+      verifyClockifyWebhookRequest(parser(), request({ [ClockifyHeaders.SIGNATURE]: token }), {
+        expectedEventType: "EXPENSE_CREATED",
+      }),
     ).resolves.toEqual({ ok: false, reason: "missing-event-type" });
 
     await expect(
@@ -244,7 +242,10 @@ describe("Marketplace request verification helpers", () => {
       },
     );
 
-    expect(result).toMatchObject({ ok: true, claims: { workspaceId: WORKSPACE_ID, addonId: ADDON_ID } });
+    expect(result).toMatchObject({
+      ok: true,
+      claims: { workspaceId: WORKSPACE_ID, addonId: ADDON_ID },
+    });
   });
 
   it("verifies raw tokens without throwing for missing or invalid input", async () => {
@@ -329,9 +330,9 @@ describe("Marketplace request verification helpers", () => {
       }),
     ).toBe("https://developer.clockify.me/api/v1");
     expect(resolveClockifyApiBaseUrl({})).toBeUndefined();
-    expect(resolveClockifyReportsBaseUrl({ reportsUrl: "https://developer.clockify.me/report" })).toBe(
-      "https://developer.clockify.me/report/v1",
-    );
+    expect(
+      resolveClockifyReportsBaseUrl({ reportsUrl: "https://developer.clockify.me/report" }),
+    ).toBe("https://developer.clockify.me/report/v1");
   });
 
   it("wraps handlers and returns 401 for failed verification", async () => {

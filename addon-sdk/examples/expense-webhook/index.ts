@@ -36,7 +36,8 @@ export interface ExpenseWebhookPayload {
 export function resolveExpenseId(payload: ExpenseWebhookPayload | null | undefined): string | null {
   if (!payload) return null;
   if (typeof payload.id === "string" && payload.id.trim() !== "") return payload.id;
-  if (typeof payload.expenseId === "string" && payload.expenseId.trim() !== "") return payload.expenseId;
+  if (typeof payload.expenseId === "string" && payload.expenseId.trim() !== "")
+    return payload.expenseId;
   return null;
 }
 
@@ -62,9 +63,9 @@ export interface ExpenseWebhookAddonOptions {
  * Builds a Clockify add-on that registers the EXPENSE_CREATED webhook (schema 1.5) and routes it
  * through signature verification + the mileage conversion logic.
  */
-export function createExpenseWebhookAddon(opts: ExpenseWebhookAddonOptions): ClockifyAddon<
-  generated.v1_5.ClockifyManifest
-> {
+export function createExpenseWebhookAddon(
+  opts: ExpenseWebhookAddonOptions,
+): ClockifyAddon<generated.v1_5.ClockifyManifest> {
   const parser = new ClockifySignatureParser(opts.key, opts.publicKey);
 
   const manifest = ClockifyManifest.v1_5Builder()
@@ -83,31 +84,23 @@ export function createExpenseWebhookAddon(opts: ExpenseWebhookAddonOptions): Clo
     .path("/webhook/expense-created")
     .build();
 
-  addon.registerWebhook(
-    webhook,
-    async (req) => {
-      const verification = await verifyClockifyWebhookRequest(parser, req, {
-        expectedEventType: "EXPENSE_CREATED",
-        eventHeader: ClockifyHeaders.WEBHOOK_EVENT_TYPE,
-      });
-      if (!verification.ok) {
-        return { status: 401, body: "Unauthorized" };
-      }
+  addon.registerWebhook(webhook, async (req) => {
+    const verification = await verifyClockifyWebhookRequest(parser, req, {
+      expectedEventType: "EXPENSE_CREATED",
+      eventHeader: ClockifyHeaders.WEBHOOK_EVENT_TYPE,
+    });
+    if (!verification.ok) {
+      return { status: 401, body: "Unauthorized" };
+    }
 
-      const expenseId = resolveExpenseId(req.body as ExpenseWebhookPayload | undefined);
-      if (!expenseId) {
-        // Java handler returns void -> 200 with no conversion.
-        return { status: 200 };
-      }
-      await opts.onConvert(
-        verification.claims,
-        expenseId,
-        "WEBHOOK_CREATED",
-        verification.eventType,
-      );
+    const expenseId = resolveExpenseId(req.body as ExpenseWebhookPayload | undefined);
+    if (!expenseId) {
+      // Java handler returns void -> 200 with no conversion.
       return { status: 200 };
-    },
-  );
+    }
+    await opts.onConvert(verification.claims, expenseId, "WEBHOOK_CREATED", verification.eventType);
+    return { status: 200 };
+  });
 
   return addon;
 }

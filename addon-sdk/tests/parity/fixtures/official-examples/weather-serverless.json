@@ -4,8 +4,7 @@
   "name": "Weather Addon",
   "description": "A sample addon that renders a UI component",
   "baseUrl": "https://271a-95-107-169-8.eu.ngrok.io",
-  "lifecycle": [
-  ],
+  "lifecycle": [],
   "webhooks": [],
   "components": [
     {
@@ -16,6 +15,6 @@
       "label": "Weather Widget"
     }
   ],
-  "minimalSubscriptionPlan" : "FREE",
+  "minimalSubscriptionPlan": "FREE",
   "scopes": []
 }

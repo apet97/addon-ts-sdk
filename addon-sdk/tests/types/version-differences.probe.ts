@@ -11,14 +11,26 @@ type Includes<Union, Member> = Member extends Union ? true : false;
 type Optional<T> = undefined extends T ? true : false;
 
 // --- component "type" enum: "invoices.action" exists only in 1.4+ (added that version). ---
-type _v12NoInvoices = IsFalse<Includes<generated.v1_2.ClockifyComponent["type"], "invoices.action">>;
-type _v13NoInvoices = IsFalse<Includes<generated.v1_3.ClockifyComponent["type"], "invoices.action">>;
-type _v14HasInvoices = IsTrue<Includes<generated.v1_4.ClockifyComponent["type"], "invoices.action">>;
-type _v15HasInvoices = IsTrue<Includes<generated.v1_5.ClockifyComponent["type"], "invoices.action">>;
+type _v12NoInvoices = IsFalse<
+  Includes<generated.v1_2.ClockifyComponent["type"], "invoices.action">
+>;
+type _v13NoInvoices = IsFalse<
+  Includes<generated.v1_3.ClockifyComponent["type"], "invoices.action">
+>;
+type _v14HasInvoices = IsTrue<
+  Includes<generated.v1_4.ClockifyComponent["type"], "invoices.action">
+>;
+type _v15HasInvoices = IsTrue<
+  Includes<generated.v1_5.ClockifyComponent["type"], "invoices.action">
+>;
 
 // --- webhook "event" enum: "TIME_ENTRY_SPLIT" exists only in the latest 1.5 schema. ---
-type _v14NoTimeEntrySplit = IsFalse<Includes<generated.v1_4.ClockifyWebhook["event"], "TIME_ENTRY_SPLIT">>;
-type _v15HasTimeEntrySplit = IsTrue<Includes<generated.v1_5.ClockifyWebhook["event"], "TIME_ENTRY_SPLIT">>;
+type _v14NoTimeEntrySplit = IsFalse<
+  Includes<generated.v1_4.ClockifyWebhook["event"], "TIME_ENTRY_SPLIT">
+>;
+type _v15HasTimeEntrySplit = IsTrue<
+  Includes<generated.v1_5.ClockifyWebhook["event"], "TIME_ENTRY_SPLIT">
+>;
 
 // --- component "label": optional in 1.2 (not in `required`), required in 1.3+. ---
 type _v12LabelOptional = IsTrue<Optional<generated.v1_2.ClockifyComponent["label"]>>;
@@ -33,14 +45,32 @@ type _v14ScopesOptional = IsTrue<Optional<generated.v1_4.ClockifyManifest["scope
 type _v15ScopesOptional = IsTrue<Optional<generated.v1_5.ClockifyManifest["scopes"]>>;
 
 // --- manifest "settings": v1.5 supports both self-hosted path settings and structured settings. ---
-type _v15SettingsAllowsSelfHostedPath = IsTrue<Includes<NonNullable<generated.v1_5.ClockifyManifest["settings"]>, string>>;
-type _v15SettingsAllowsStructuredSettings = IsTrue<Includes<NonNullable<generated.v1_5.ClockifyManifest["settings"]>, generated.v1_5.ClockifySettings>>;
+type _v15SettingsAllowsSelfHostedPath = IsTrue<
+  Includes<NonNullable<generated.v1_5.ClockifyManifest["settings"]>, string>
+>;
+type _v15SettingsAllowsStructuredSettings = IsTrue<
+  Includes<
+    NonNullable<generated.v1_5.ClockifyManifest["settings"]>,
+    generated.v1_5.ClockifySettings
+  >
+>;
 
 // Reference the aliases so `noUnusedLocals`-style tooling sees them as used (they are compile-time only).
 export type _VersionDifferenceProbes = [
-  _v12NoInvoices, _v13NoInvoices, _v14HasInvoices, _v15HasInvoices,
-  _v14NoTimeEntrySplit, _v15HasTimeEntrySplit,
-  _v12LabelOptional, _v13LabelRequired, _v14LabelRequired, _v15LabelRequired,
-  _v12ScopesRequired, _v13ScopesOptional, _v14ScopesOptional, _v15ScopesOptional,
-  _v15SettingsAllowsSelfHostedPath, _v15SettingsAllowsStructuredSettings
+  _v12NoInvoices,
+  _v13NoInvoices,
+  _v14HasInvoices,
+  _v15HasInvoices,
+  _v14NoTimeEntrySplit,
+  _v15HasTimeEntrySplit,
+  _v12LabelOptional,
+  _v13LabelRequired,
+  _v14LabelRequired,
+  _v15LabelRequired,
+  _v12ScopesRequired,
+  _v13ScopesOptional,
+  _v14ScopesOptional,
+  _v15ScopesOptional,
+  _v15SettingsAllowsSelfHostedPath,
+  _v15SettingsAllowsStructuredSettings,
 ];

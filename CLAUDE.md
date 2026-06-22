@@ -13,13 +13,13 @@ starts at Node 22. Independent, unofficial project, not affiliated with Clockify
 
 ## Non-negotiables
 
-- **Never hand-edit `addon-sdk/src/clockify/generated/**`.** It is generated from
+- **Generated output:** never hand-edit `addon-sdk/src/clockify/generated/**`. It is generated from
   `addon-sdk/schemas/clockify-manifests/*.json`; change the schema or generator, then
   `npm run generate`. Builder step order follows each schema's `required` array; required array
   setters must be called at runtime even when Java-parity defaults initialize arrays to `[]`.
-- **Schema provenance is part of the source of truth.** `verify:generated` first runs
-  `scripts/verify-schema-provenance.cjs`, which enforces exactly schema versions 1.2, 1.3, 1.4, and
-  1.5, source labels, schema file presence, and raw SHA-256 hashes.
+- **Schema provenance is part of the source of truth.** `verify:generated` enforces exactly schema
+  versions 1.2, 1.3, 1.4, and 1.5, source labels, schema file presence, raw SHA-256 hashes, and a
+  check-only fresh generation that must match committed output without rewriting tracked files.
 - **Keep it lean.** No REST client, token-exchange client, UI/window-event framework, persistence
   layer, or custom manifest validator without an explicit ask.
 - **Tokens:** verify `RS256` only, with `iss=clockify`, `type=addon`, `sub=<manifest key>`. Webhooks
@@ -31,6 +31,9 @@ starts at Node 22. Independent, unofficial project, not affiliated with Clockify
   return 413 before dispatch when exceeded. Express body limits belong to the host app
   (`express.json({ limit: "1mb" })`). Express is an optional peer; do not leak Express-specific types
   into root exports or shared adapter contracts.
+- **Handled errors stay quiet by default.** Router, Fetch, and Node adapter 500 paths report only
+  through the optional `onError(error, context)` hook. Middleware `next()` is single-use so a bad
+  middleware cannot dispatch the handler twice.
 
 ## Before claiming done — root gate green
 
@@ -38,8 +41,8 @@ starts at Node 22. Independent, unofficial project, not affiliated with Clockify
 npm run ci:verify
 ```
 
-This runs type-check, generated drift, tests, build, `verify:dist`, pack dry-run, production audit,
-and full audit. GitHub Actions runs the same gate on Node 22.x and 24.x.
+This runs type-check, generated drift, tests, lint, format check, build, `verify:dist`, pack dry-run,
+production audit, and full audit. GitHub Actions runs the same gate on Node 22.x and 24.x.
 
 ## Gotchas (learned the hard way)
 
@@ -52,8 +55,9 @@ and full audit. GitHub Actions runs the same gate on Node 22.x and 24.x.
   no-hardcoded-fallback environment URL behavior.
 - `npm pack --dry-run` invokes `prepack`, so it re-runs the heavy gate chain. Use
   `find addon-sdk -maxdepth 1 -name '*.tgz' -print` afterward when checking for accidental artifacts.
-- Linting and formatting are intentionally deferred. `npm run lint` and `npm run format:check` are
-  no-op stubs until a focused check-only tooling pass is worth the dependency churn.
+- `npm run lint` and `npm run format:check` are real check-only gates. The package configs ignore
+  vendored Marketplace docs, schema/provenance files, generated Clockify models, `dist`, `coverage`,
+  `node_modules`, and dry-run tarballs.
 - If asked to push directly to `main`, commit on the work branch, `git fetch origin`, confirm
   `main` can fast-forward to the branch, then fast-forward `main` and push `origin main`. Do not open
   a PR when the user explicitly says to push to main. If the GitHub CLI is authenticated, watch the

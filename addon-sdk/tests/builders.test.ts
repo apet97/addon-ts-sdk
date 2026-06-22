@@ -118,9 +118,7 @@ describe("Builders", () => {
   });
 
   it("should build v1.5 structured and self-hosted settings manifests", () => {
-    const header = ClockifySettingsHeader.v1_5Builder()
-      .title("Mileage settings")
-      .build();
+    const header = ClockifySettingsHeader.v1_5Builder().title("Mileage settings").build();
     const rate = ClockifySetting.v1_5Builder()
       .id("rate")
       .name("Mileage rate")
@@ -140,9 +138,7 @@ describe("Builders", () => {
       .name("General")
       .groups([group])
       .build();
-    const settings = ClockifySettings.v1_5Builder()
-      .tabs([tab])
-      .build();
+    const settings = ClockifySettings.v1_5Builder().tabs([tab]).build();
 
     const structured = ClockifyManifest.v1_5Builder()
       .key("structured-settings")
@@ -186,7 +182,9 @@ describe("Builders", () => {
       .name("test")
       .baseUrl("https://example.com");
     // Missing minimalSubscriptionPlan
-    expect(() => (builder as any).build()).toThrow("Required field 'minimalSubscriptionPlan' is missing.");
+    expect(() => (builder as any).build()).toThrow(
+      "Required field 'minimalSubscriptionPlan' is missing.",
+    );
   });
 
   it("should throw when required array setters are skipped through any escape hatches", () => {
@@ -197,9 +195,7 @@ describe("Builders", () => {
       .requireBasicPlan();
     expect(() => (v12Manifest as any).build()).toThrow("Required field 'scopes' is missing.");
 
-    const settingsGroup = ClockifySettingsGroup.v1_5Builder()
-      .id("group")
-      .title("Group");
+    const settingsGroup = ClockifySettingsGroup.v1_5Builder().id("group").title("Group");
     expect(() => (settingsGroup as any).build()).toThrow("Required field 'settings' is missing.");
 
     const settings = ClockifySettings.v1_5Builder();
@@ -207,10 +203,7 @@ describe("Builders", () => {
   });
 
   it("should keep optional arrays defaulting to empty lists", () => {
-    const tab = ClockifySettingsTab.v1_5Builder()
-      .id("general")
-      .name("General")
-      .build();
+    const tab = ClockifySettingsTab.v1_5Builder().id("general").name("General").build();
 
     expect(tab.groups).toEqual([]);
     expect(tab.settings).toEqual([]);

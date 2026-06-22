@@ -10,7 +10,7 @@ export async function signTestToken(
   privateKey: KeyLike | Uint8Array,
   addonKey: string,
   claims: Record<string, unknown> = {},
-  expiresIn = "30m"
+  expiresIn = "30m",
 ) {
   return await new SignJWT({
     type: "addon",

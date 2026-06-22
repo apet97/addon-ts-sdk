@@ -32,9 +32,11 @@ describe("Express runtime adapter", () => {
     const app = express();
     app.use(express.json({ limit: "1mb" }));
     app.use(createExpressAddonHandler(addon));
-    app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
-      res.status(599).send(err.message);
-    });
+    app.use(
+      (err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+        res.status(599).send(err.message);
+      },
+    );
     server = app.listen(0);
     return new Promise((resolve) => {
       server!.on("listening", () => resolve((server!.address() as AddressInfo).port));

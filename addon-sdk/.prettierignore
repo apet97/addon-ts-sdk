@@ -1,0 +1,9 @@
+node_modules
+dist
+coverage
+*.tgz
+
+# Vendored or generated source-of-truth files.
+../MARKETPLACE_DOCS
+schemas/clockify-manifests
+src/clockify/generated

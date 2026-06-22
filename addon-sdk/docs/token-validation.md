@@ -34,6 +34,7 @@ console.log("Clockify API URL:", env.backendUrl);
 ## Validation Constraints
 
 The signature parser checks that:
+
 1. JWT `alg` is exactly `RS256`.
 2. Issuer is exactly `clockify`.
 3. Subject matches the manifest `key` / `addonKey`.
@@ -55,13 +56,13 @@ that need to pin or inspect the key directly.
 The SDK exports constants for the Marketplace wire names so routes do not hardcode subtly different
 header spellings:
 
-| Purpose | SDK constant | Wire name |
-|---|---|---|
-| Webhook signature JWT | `ClockifyHeaders.SIGNATURE` | `clockify-signature` |
-| Webhook event type | `ClockifyHeaders.WEBHOOK_EVENT_TYPE` | `clockify-webhook-event-type` |
-| Lifecycle signature JWT | `ClockifyHeaders.LIFECYCLE_TOKEN` | `x-addon-lifecycle-token` |
-| Clockify API token | `ClockifyHeaders.ADDON_TOKEN` | `x-addon-token` |
-| Component user token query param | `ClockifyQueryParams.AUTH_TOKEN` | `auth_token` |
+| Purpose                          | SDK constant                         | Wire name                     |
+| -------------------------------- | ------------------------------------ | ----------------------------- |
+| Webhook signature JWT            | `ClockifyHeaders.SIGNATURE`          | `clockify-signature`          |
+| Webhook event type               | `ClockifyHeaders.WEBHOOK_EVENT_TYPE` | `clockify-webhook-event-type` |
+| Lifecycle signature JWT          | `ClockifyHeaders.LIFECYCLE_TOKEN`    | `x-addon-lifecycle-token`     |
+| Clockify API token               | `ClockifyHeaders.ADDON_TOKEN`        | `x-addon-token`               |
+| Component user token query param | `ClockifyQueryParams.AUTH_TOKEN`     | `auth_token`                  |
 
 Use `getClockifyHeader(headers, name)` for case-insensitive request header lookup and
 `getClockifyQueryParam(query, name)` for component query tokens.

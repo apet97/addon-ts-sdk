@@ -25,7 +25,7 @@ addon.registerComponent(
       headers: { "content-type": "text/html" },
       body: "<h1>Welcome to the Express Component!</h1>",
     };
-  }
+  },
 );
 
 const app = express();

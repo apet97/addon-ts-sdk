@@ -1,4 +1,4 @@
-import { describe, it, expect, afterEach } from "vitest";
+import { describe, it, expect, afterEach, vi } from "vitest";
 import type { Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { ClockifyAddon, ClockifyManifest, generated } from "../src";
@@ -96,5 +96,25 @@ describe("Node HTTP server boot (integration)", () => {
     const addon = new ClockifyAddon(base());
 
     expect(() => createNodeHttpAddonServer(addon, { maxBodyBytes: 0 })).toThrow(/positive integer/);
+  });
+
+  it("reports Node HTTP adapter errors when dispatch throws outside the router", async () => {
+    const error = new Error("server exploded");
+    const onError = vi.fn();
+    const addon = {
+      handle: vi.fn().mockRejectedValue(error),
+    } as unknown as ClockifyAddon;
+
+    const port = await listen(addon, { onError });
+    const res = await fetch(`http://127.0.0.1:${port}/manifest`);
+
+    expect(res.status).toBe(500);
+    expect(await res.text()).toBe("Internal Server Error");
+    expect(onError).toHaveBeenCalledWith(
+      error,
+      expect.objectContaining({
+        source: "node-http-adapter",
+      }),
+    );
   });
 });

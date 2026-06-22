@@ -53,7 +53,11 @@ const EXPECTED_MANIFEST = {
 
 function buildMileageManifest() {
   const lifecycle = [
-    generated.v1_5.ClockifyLifecycleEventBuilder().path("/lifecycle/installed").onInstalled().build(),
+    generated.v1_5
+      .ClockifyLifecycleEventBuilder()
+      .path("/lifecycle/installed")
+      .onInstalled()
+      .build(),
     generated.v1_5.ClockifyLifecycleEventBuilder().path("/lifecycle/deleted").onDeleted().build(),
     generated.v1_5
       .ClockifyLifecycleEventBuilder()
@@ -68,10 +72,26 @@ function buildMileageManifest() {
   ];
 
   const webhooks = [
-    generated.v1_5.ClockifyWebhookBuilder().event("EXPENSE_CREATED").path("/webhook/expense-created").build(),
-    generated.v1_5.ClockifyWebhookBuilder().event("EXPENSE_UPDATED").path("/webhook/expense-updated").build(),
-    generated.v1_5.ClockifyWebhookBuilder().event("EXPENSE_DELETED").path("/webhook/expense-deleted").build(),
-    generated.v1_5.ClockifyWebhookBuilder().event("EXPENSE_RESTORED").path("/webhook/expense-restored").build(),
+    generated.v1_5
+      .ClockifyWebhookBuilder()
+      .event("EXPENSE_CREATED")
+      .path("/webhook/expense-created")
+      .build(),
+    generated.v1_5
+      .ClockifyWebhookBuilder()
+      .event("EXPENSE_UPDATED")
+      .path("/webhook/expense-updated")
+      .build(),
+    generated.v1_5
+      .ClockifyWebhookBuilder()
+      .event("EXPENSE_DELETED")
+      .path("/webhook/expense-deleted")
+      .build(),
+    generated.v1_5
+      .ClockifyWebhookBuilder()
+      .event("EXPENSE_RESTORED")
+      .path("/webhook/expense-restored")
+      .build(),
   ];
 
   const components = [

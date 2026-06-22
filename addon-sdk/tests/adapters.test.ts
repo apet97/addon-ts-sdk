@@ -24,7 +24,9 @@ describe("Adapters", () => {
     expect(resolveMaxBodyBytes()).toBe(DEFAULT_MAX_BODY_BYTES);
     expect(resolveMaxBodyBytes({ maxBodyBytes: 2 })).toBe(2);
     expect(() => resolveMaxBodyBytes({ maxBodyBytes: 0 })).toThrow(/positive integer/);
-    expect(() => resolveMaxBodyBytes({ maxBodyBytes: Number.POSITIVE_INFINITY })).toThrow(/positive integer/);
+    expect(() => resolveMaxBodyBytes({ maxBodyBytes: Number.POSITIVE_INFINITY })).toThrow(
+      /positive integer/,
+    );
   });
 
   it("throws configuration errors instead of dispatching with an invalid Fetch body limit", async () => {
@@ -101,6 +103,47 @@ describe("Adapters", () => {
     expect(response.status).toBe(400);
     expect(await response.text()).toBe("Bad Request");
     expect(dispatched).toBe(false);
+  });
+
+  it("returns 500 from Fetch adapter errors without logging by default", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const addon = {
+      handle: vi.fn().mockRejectedValue(new Error("adapter exploded")),
+    } as unknown as ClockifyAddon;
+
+    try {
+      const response = await handleFetchRequest(
+        addon,
+        new Request("https://example.com/manifest", { method: "GET" }),
+      );
+
+      expect(response.status).toBe(500);
+      expect(await response.text()).toBe("Internal Server Error");
+      expect(consoleError).not.toHaveBeenCalled();
+    } finally {
+      consoleError.mockRestore();
+    }
+  });
+
+  it("reports Fetch adapter errors when an error reporter is configured", async () => {
+    const onError = vi.fn();
+    const error = new Error("adapter exploded");
+    const addon = {
+      handle: vi.fn().mockRejectedValue(error),
+    } as unknown as ClockifyAddon;
+
+    await handleFetchRequest(
+      addon,
+      new Request("https://example.com/manifest", { method: "GET" }),
+      { onError },
+    );
+
+    expect(onError).toHaveBeenCalledWith(
+      error,
+      expect.objectContaining({
+        source: "fetch-adapter",
+      }),
+    );
   });
 
   it("returns 413 when a Fetch request body exceeds maxBodyBytes", async () => {
@@ -275,7 +318,10 @@ describe("Adapters", () => {
 
   it("preserves Uint8Array response bodies as raw bytes via the Fetch adapter", async () => {
     const addon = new ClockifyAddon(mockManifest);
-    addon.registerHandler("/binary", "POST", () => ({ status: 200, body: new Uint8Array([1, 2, 3]) }));
+    addon.registerHandler("/binary", "POST", () => ({
+      status: 200,
+      body: new Uint8Array([1, 2, 3]),
+    }));
 
     const response = await handleFetchRequest(
       addon,
@@ -289,10 +335,20 @@ describe("Adapters", () => {
 
   it("sends Uint8Array response bodies as raw bytes via the Express adapter", async () => {
     const addon = new ClockifyAddon(mockManifest);
-    addon.registerHandler("/binary", "POST", () => ({ status: 200, body: new Uint8Array([1, 2, 3]) }));
+    addon.registerHandler("/binary", "POST", () => ({
+      status: 200,
+      body: new Uint8Array([1, 2, 3]),
+    }));
     const handler = createExpressAddonHandler(addon);
 
-    const mockReq = { method: "POST", url: "/binary", path: "/binary", headers: {}, query: {}, body: {} };
+    const mockReq = {
+      method: "POST",
+      url: "/binary",
+      path: "/binary",
+      headers: {},
+      query: {},
+      body: {},
+    };
     const sendSpy = vi.fn().mockReturnThis();
     const jsonSpy = vi.fn().mockReturnThis();
     const mockRes = {

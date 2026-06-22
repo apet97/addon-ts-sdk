@@ -96,7 +96,7 @@ describe("ClockifySignatureParser", () => {
   it("should fail validation if signature is signed by a different key", async () => {
     const { publicKey } = await generateTestKeys();
     const otherKeys = await generateTestKeys();
-    
+
     // Sign token with different private key
     const token = await signTestToken(otherKeys.privateKey, addonKey);
 

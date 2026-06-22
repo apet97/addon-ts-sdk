@@ -41,7 +41,11 @@ function getDefinitionSimpleClassName(defName: string): string {
   return toClassName("Clockify_" + suffix);
 }
 
-function getEnumSetterMethodName(definition: string | null, property: string, value: string): string {
+function getEnumSetterMethodName(
+  definition: string | null,
+  property: string,
+  value: string,
+): string {
   let val = value;
   if (definition === "component") {
     if (property === "accessLevel") {
@@ -93,12 +97,14 @@ function getTSType(node: SchemaNode, definitions: Record<string, SchemaNode>): s
   }
   const type = node.type;
   if (Array.isArray(type)) {
-    return type.map((t) => {
-      if (t === "integer") return "number";
-      if (t === "array") return "any[]";
-      if (t === "object") return "Record<string, any>";
-      return t;
-    }).join(" | ");
+    return type
+      .map((t) => {
+        if (t === "integer") return "number";
+        if (t === "array") return "any[]";
+        if (t === "object") return "Record<string, any>";
+        return t;
+      })
+      .join(" | ");
   }
   if (type === "integer") {
     return "number";
@@ -147,14 +153,21 @@ function getPropertiesInfo(
 
 // The manifest plus every `object` definition, each carrying its resolved properties and required
 // list. The manifest is appended last with `defName: null` (it has no definition name).
-function collectObjectDefs(schema: SchemaNode, definitions: Record<string, SchemaNode>): ObjectDef[] {
+function collectObjectDefs(
+  schema: SchemaNode,
+  definitions: Record<string, SchemaNode>,
+): ObjectDef[] {
   const objectDefs: ObjectDef[] = [];
   for (const [defName, defNode] of Object.entries(definitions)) {
     if (defNode.type === "object") {
       objectDefs.push({
         defName,
         className: getDefinitionSimpleClassName(defName),
-        properties: getPropertiesInfo(defNode.properties ?? {}, defNode.required ?? [], definitions),
+        properties: getPropertiesInfo(
+          defNode.properties ?? {},
+          defNode.required ?? [],
+          definitions,
+        ),
         requiredList: defNode.required ?? [],
       });
     }
@@ -179,9 +192,15 @@ function splitProps(obj: ObjectDef): { requiredProps: PropInfo[]; optionalProps:
   return { requiredProps, optionalProps };
 }
 
-function firstStepName(obj: ObjectDef, requiredProps: PropInfo[], optionalProps: PropInfo[]): string {
+function firstStepName(
+  obj: ObjectDef,
+  requiredProps: PropInfo[],
+  optionalProps: PropInfo[],
+): string {
   if (requiredProps.length > 0) return `${obj.className}Builder_${requiredProps[0].name}`;
-  return optionalProps.length > 0 ? `${obj.className}Builder_Optional` : `${obj.className}Builder_Build`;
+  return optionalProps.length > 0
+    ? `${obj.className}Builder_Optional`
+    : `${obj.className}Builder_Build`;
 }
 
 // Top-level enum constants (scope, minimalSubscriptionPlan, ...) as `as const` objects.
@@ -205,7 +224,8 @@ function emitEnums(definitions: Record<string, SchemaNode>): string {
 // The readonly data interface for one model (manifest or definition).
 function emitInterface(obj: ObjectDef, version: string): string {
   const isManifest = obj.defName === null;
-  const isResource = obj.defName !== null && ["lifecycle", "webhook", "component"].includes(obj.defName);
+  const isResource =
+    obj.defName !== null && ["lifecycle", "webhook", "component"].includes(obj.defName);
   const heritage = isResource ? " extends ClockifyResource" : "";
 
   let out = `export interface ${obj.className}${heritage} {\n`;
@@ -232,9 +252,12 @@ function emitStepInterfaces(
   for (let i = 0; i < requiredProps.length; i++) {
     const prop = requiredProps[i];
     const stepName = `${obj.className}Builder_${prop.name}`;
-    const nextStepName = i === requiredProps.length - 1
-      ? (optionalProps.length > 0 ? `${obj.className}Builder_Optional` : `${obj.className}Builder_Build`)
-      : `${obj.className}Builder_${requiredProps[i + 1].name}`;
+    const nextStepName =
+      i === requiredProps.length - 1
+        ? optionalProps.length > 0
+          ? `${obj.className}Builder_Optional`
+          : `${obj.className}Builder_Build`
+        : `${obj.className}Builder_${requiredProps[i + 1].name}`;
 
     out += `export interface ${stepName} {\n`;
     out += `  ${prop.name}(value: ${prop.tsType}): ${nextStepName};\n`;
@@ -314,9 +337,10 @@ function emitImplClass(
 
   out += `  build(): ${obj.className} {\n`;
   for (const prop of requiredProps) {
-    const missingCheck = prop.node.type === "array"
-      ? `!this._${prop.name}Set || this._${prop.name} === undefined || this._${prop.name} === null`
-      : `this._${prop.name} === undefined || this._${prop.name} === null`;
+    const missingCheck =
+      prop.node.type === "array"
+        ? `!this._${prop.name}Set || this._${prop.name} === undefined || this._${prop.name} === null`
+        : `this._${prop.name} === undefined || this._${prop.name} === null`;
     out += `    if (${missingCheck}) {\n`;
     out += `      throw new Error("Required field '${prop.name}' is missing.");\n`;
     out += `    }\n`;
@@ -348,7 +372,11 @@ function emitEntrypoints(obj: ObjectDef, firstStep: string): string {
   return out;
 }
 
-function emitObjectBuilder(obj: ObjectDef, version: string, definitions: Record<string, SchemaNode>): string {
+function emitObjectBuilder(
+  obj: ObjectDef,
+  version: string,
+  definitions: Record<string, SchemaNode>,
+): string {
   const { requiredProps, optionalProps } = splitProps(obj);
   const firstStep = firstStepName(obj, requiredProps, optionalProps);
   return (
@@ -374,10 +402,20 @@ function generateVersion(schemaPath: string, outDir: string): void {
   console.log(`Generated manifest builder for version ${version} at ${outPath}`);
 }
 
+function argValue(name: string): string | undefined {
+  const index = process.argv.indexOf(name);
+  if (index === -1) return undefined;
+  return process.argv[index + 1];
+}
+
 function main() {
   const rootDir = path.join(__dirname, "..");
-  const schemasDir = path.join(rootDir, "schemas", "clockify-manifests");
-  const outDir = path.join(rootDir, "src", "clockify", "generated");
+  const schemasDir = path.resolve(
+    argValue("--schemas-dir") ?? path.join(rootDir, "schemas", "clockify-manifests"),
+  );
+  const outDir = path.resolve(
+    argValue("--out-dir") ?? path.join(rootDir, "src", "clockify", "generated"),
+  );
 
   fs.mkdirSync(outDir, { recursive: true });
 

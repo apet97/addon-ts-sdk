@@ -1,3 +1,4 @@
+import * as path from "node:path";
 import {
   AddonResponse,
   ClockifyAddon,
@@ -14,6 +15,8 @@ import {
   verifyClockifyWebhookRequest,
 } from "../../src";
 import { createNodeHttpAddonServer } from "../../src/adapters";
+
+const EXPENSE_CREATED_WEBHOOK_PATH = "/webhooks/expense-created";
 
 interface StoredWebhookTokenLookup {
   workspaceId: string;
@@ -32,7 +35,9 @@ interface SecureServerStore {
     payload: ClockifyInstalledLifecyclePayload,
     claims: VerifiedInstallationClaims,
   ): void | Promise<void>;
-  findWebhookAuthToken(input: StoredWebhookTokenLookup): string | undefined | Promise<string | undefined>;
+  findWebhookAuthToken(
+    input: StoredWebhookTokenLookup,
+  ): string | undefined | Promise<string | undefined>;
 }
 
 interface SecureServerOptions {
@@ -42,6 +47,33 @@ interface SecureServerOptions {
   store: SecureServerStore;
   renderComponent?: (claims: ClockifyAddonClaims) => AddonResponse | Promise<AddonResponse>;
   onExpenseCreated?: (payload: unknown, claims: ClockifyAddonClaims) => void | Promise<void>;
+}
+
+function normalizePath(path: string): string {
+  const normalized = path.trim().replace(/\/+$/, "");
+  return normalized === "" ? "/" : normalized;
+}
+
+function normalizeWebhookPath(path: string, baseUrl?: string): string {
+  let pathname = path;
+  try {
+    pathname = new URL(path).pathname;
+  } catch {
+    // Relative manifest paths are expected.
+  }
+
+  if (baseUrl) {
+    try {
+      const basePath = normalizePath(new URL(baseUrl).pathname);
+      if (basePath !== "/" && pathname.startsWith(`${basePath}/`)) {
+        pathname = pathname.slice(basePath.length);
+      }
+    } catch {
+      // Invalid example base URLs should not hide the original path.
+    }
+  }
+
+  return normalizePath(pathname.startsWith("/") ? pathname : `/${pathname}`);
 }
 
 function isInstalledPayload(value: unknown): value is ClockifyInstalledLifecyclePayload {
@@ -97,10 +129,7 @@ export function createSecureServerAddon(
   );
 
   addon.registerLifecycleEvent(
-    ClockifyLifecycleEvent.v1_5Builder()
-      .path("/lifecycle/installed")
-      .onInstalled()
-      .build(),
+    ClockifyLifecycleEvent.v1_5Builder().path("/lifecycle/installed").onInstalled().build(),
     async (request) => {
       const result = await verifyClockifyLifecycleRequest(parser, request);
       if (!result.ok) return { status: 401, body: "Unauthorized" };
@@ -118,10 +147,7 @@ export function createSecureServerAddon(
   );
 
   addon.registerWebhook(
-    ClockifyWebhook.v1_5Builder()
-      .onExpenseCreated()
-      .path("/webhooks/expense-created")
-      .build(),
+    ClockifyWebhook.v1_5Builder().onExpenseCreated().path(EXPENSE_CREATED_WEBHOOK_PATH).build(),
     async (request) => {
       const firstPass = await verifyClockifyWebhookRequest(parser, request, {
         expectedEventType: "EXPENSE_CREATED",
@@ -131,7 +157,7 @@ export function createSecureServerAddon(
       const storedToken = await options.store.findWebhookAuthToken({
         workspaceId: firstPass.claims.workspaceId ?? "",
         addonId: firstPass.claims.addonId ?? "",
-        path: "/webhooks/expense-created",
+        path: EXPENSE_CREATED_WEBHOOK_PATH,
         eventType: firstPass.eventType,
       });
       if (!storedToken) return { status: 401, body: "Unauthorized" };
@@ -152,24 +178,46 @@ export function createSecureServerAddon(
   return addon;
 }
 
-const webhookTokens = new Map<string, string>();
+export function createInMemorySecureServerStore(baseUrl?: string): SecureServerStore {
+  const webhookTokens = new Map<string, string>();
+  const key = (workspaceId: string, addonId: string, path: string) =>
+    `${workspaceId}:${addonId}:${normalizeWebhookPath(path, baseUrl)}`;
 
-const addon = createSecureServerAddon({
-  key: "secure-addon",
-  name: "Secure Addon Example",
-  baseUrl: "https://example.com/addon",
-  store: {
+  return {
     saveInstallation(payload, claims) {
       for (const webhook of payload.webhooks ?? []) {
-        webhookTokens.set(`${claims.workspaceId}:${claims.addonId}:${webhook.path}`, webhook.authToken);
+        webhookTokens.set(key(claims.workspaceId, claims.addonId, webhook.path), webhook.authToken);
       }
     },
     findWebhookAuthToken(input) {
-      return webhookTokens.get(`${input.workspaceId}:${input.addonId}:${input.path}`);
+      return webhookTokens.get(key(input.workspaceId, input.addonId, input.path));
     },
-  },
-});
+  };
+}
 
-createNodeHttpAddonServer(addon).listen(3000, () => {
-  console.log("Secure addon server listening on http://localhost:3000");
-});
+export function startSecureServerExample(): void {
+  const baseUrl = "https://example.com/addon";
+  const addon = createSecureServerAddon({
+    key: "secure-addon",
+    name: "Secure Addon Example",
+    baseUrl,
+    store: createInMemorySecureServerStore(baseUrl),
+  });
+
+  createNodeHttpAddonServer(addon).listen(3000, () => {
+    console.log("Secure addon server listening on http://localhost:3000");
+  });
+}
+
+function isSecureServerExampleEntrypoint(): boolean {
+  const entrypoint = process.argv[1];
+  return (
+    entrypoint !== undefined &&
+    path.basename(path.dirname(entrypoint)) === "secure-server" &&
+    path.basename(entrypoint).startsWith("index.")
+  );
+}
+
+if (isSecureServerExampleEntrypoint()) {
+  startSecureServerExample();
+}

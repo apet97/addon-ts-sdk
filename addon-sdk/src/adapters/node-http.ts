@@ -1,5 +1,5 @@
 import { createServer, IncomingMessage, ServerResponse } from "node:http";
-import { Addon } from "../shared/addon";
+import { Addon, AddonErrorReporter, reportAddonError } from "../shared/addon";
 import { AddonRequest } from "../shared/request";
 import { AddonResponse, isJsonBody } from "../shared/response";
 import {
@@ -79,7 +79,7 @@ export function writeNodeResponse(res: ServerResponse, addonResponse: AddonRespo
 
 export function createNodeHttpAddonServer(
   addon: Addon<unknown>,
-  options: BodyLimitOptions = {},
+  options: BodyLimitOptions & { readonly onError?: AddonErrorReporter } = {},
 ) {
   const maxBodyBytes = resolveMaxBodyBytes(options);
 
@@ -97,7 +97,10 @@ export function createNodeHttpAddonServer(
         });
         return;
       }
-      console.error(e);
+      reportAddonError(options.onError, e, {
+        source: "node-http-adapter",
+        nativeRequest: req,
+      });
       res.statusCode = 500;
       res.end("Internal Server Error");
     }

@@ -5,7 +5,7 @@ export default defineConfig({
     environment: "node",
     include: ["tests/**/*.test.ts"],
     typecheck: {
-      checker: "tsc"
-    }
-  }
+      checker: "tsc",
+    },
+  },
 });

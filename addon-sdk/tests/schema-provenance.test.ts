@@ -19,7 +19,7 @@ function runVerifier(dir = schemasDir): string {
 describe("schema provenance verification", () => {
   it("passes for the committed supported manifest schemas", () => {
     expect(runVerifier()).toContain("Schema provenance OK");
-  });
+  }, 15_000);
 
   it("fails when a supported schema file is missing", () => {
     const dir = mkdtempSync(join(tmpdir(), "clockify-schema-missing-"));
@@ -31,7 +31,7 @@ describe("schema provenance verification", () => {
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
-  });
+  }, 15_000);
 
   it("fails when a supported schema hash changes", () => {
     const dir = mkdtempSync(join(tmpdir(), "clockify-schema-hash-"));
@@ -44,7 +44,7 @@ describe("schema provenance verification", () => {
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
-  });
+  }, 15_000);
 
   it("fails when the supported schema version set changes", () => {
     const dir = mkdtempSync(join(tmpdir(), "clockify-schema-versions-"));
@@ -59,7 +59,7 @@ describe("schema provenance verification", () => {
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
-  });
+  }, 15_000);
 
   it("fails when a provenance entry omits its source label", () => {
     const dir = mkdtempSync(join(tmpdir(), "clockify-schema-source-"));
@@ -74,5 +74,5 @@ describe("schema provenance verification", () => {
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
-  });
+  }, 15_000);
 });

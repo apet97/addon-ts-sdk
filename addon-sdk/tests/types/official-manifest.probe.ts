@@ -4,7 +4,6 @@
 // Clockify actually ships, `satisfies` fails to compile. Compiled by tsconfig.typecheck.json.
 import { generated } from "../../src";
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const _uiExample = {
   schemaVersion: "1.2",
   key: "ui-examples",
@@ -19,14 +18,62 @@ const _uiExample = {
   webhooks: [],
   components: [
     { type: "widget", accessLevel: "EVERYONE", label: "Chat", path: "/chat.html" },
-    { type: "sidebar", accessLevel: "EVERYONE", path: "/", label: "Sidebar", iconPath: "/tab_icon.svg" },
-    { type: "timeoff.tab", accessLevel: "EVERYONE", path: "/chart.html", label: "Monthly Time Offs", iconPath: "/tab_icon.svg" },
-    { type: "schedule.tab", accessLevel: "EVERYONE", path: "/", label: "Schedule Tab", iconPath: "/tab_icon.svg" },
-    { type: "approvals.tab", accessLevel: "EVERYONE", path: "/", label: "Approvals Tab", iconPath: "/tab_icon.svg" },
-    { type: "reports.tab", accessLevel: "EVERYONE", path: "/", label: "Reports Tab", iconPath: "/tab_icon.svg" },
-    { type: "activity.tab", accessLevel: "EVERYONE", path: "/", label: "Activity Tab", iconPath: "/tab_icon.svg" },
-    { type: "team.tab", accessLevel: "EVERYONE", path: "/", label: "Team Tab", iconPath: "/tab_icon.svg" },
-    { type: "projects.tab", accessLevel: "EVERYONE", path: "/", label: "Projects Tab", iconPath: "/tab_icon.svg" },
+    {
+      type: "sidebar",
+      accessLevel: "EVERYONE",
+      path: "/",
+      label: "Sidebar",
+      iconPath: "/tab_icon.svg",
+    },
+    {
+      type: "timeoff.tab",
+      accessLevel: "EVERYONE",
+      path: "/chart.html",
+      label: "Monthly Time Offs",
+      iconPath: "/tab_icon.svg",
+    },
+    {
+      type: "schedule.tab",
+      accessLevel: "EVERYONE",
+      path: "/",
+      label: "Schedule Tab",
+      iconPath: "/tab_icon.svg",
+    },
+    {
+      type: "approvals.tab",
+      accessLevel: "EVERYONE",
+      path: "/",
+      label: "Approvals Tab",
+      iconPath: "/tab_icon.svg",
+    },
+    {
+      type: "reports.tab",
+      accessLevel: "EVERYONE",
+      path: "/",
+      label: "Reports Tab",
+      iconPath: "/tab_icon.svg",
+    },
+    {
+      type: "activity.tab",
+      accessLevel: "EVERYONE",
+      path: "/",
+      label: "Activity Tab",
+      iconPath: "/tab_icon.svg",
+    },
+    {
+      type: "team.tab",
+      accessLevel: "EVERYONE",
+      path: "/",
+      label: "Team Tab",
+      iconPath: "/tab_icon.svg",
+    },
+    {
+      type: "projects.tab",
+      accessLevel: "EVERYONE",
+      path: "/",
+      label: "Projects Tab",
+      iconPath: "/tab_icon.svg",
+    },
   ],
   settings: {
     tabs: [
@@ -58,9 +105,27 @@ const _uiExample = {
             header: { title: "Addon settings" },
             description: "Addon settings group 1",
             settings: [
-              { id: "addon-txt-setting", name: "Txt setting", accessLevel: "ADMINS", type: "TXT", value: "Some text" },
-              { id: "addon-link-setting", name: "Link setting", accessLevel: "EVERYONE", type: "LINK", value: "https://clockify.me" },
-              { id: "addon-number-setting", name: "Number setting", accessLevel: "EVERYONE", type: "NUMBER", value: 5 },
+              {
+                id: "addon-txt-setting",
+                name: "Txt setting",
+                accessLevel: "ADMINS",
+                type: "TXT",
+                value: "Some text",
+              },
+              {
+                id: "addon-link-setting",
+                name: "Link setting",
+                accessLevel: "EVERYONE",
+                type: "LINK",
+                value: "https://clockify.me",
+              },
+              {
+                id: "addon-number-setting",
+                name: "Number setting",
+                accessLevel: "EVERYONE",
+                type: "NUMBER",
+                value: 5,
+              },
             ],
           },
         ],
