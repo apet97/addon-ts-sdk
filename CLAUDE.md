@@ -48,7 +48,8 @@ npm run ci:verify
 
 This runs workspace dependency resolution, type-check, generated drift, tests, lint, format check,
 build, `verify:public-api`, `verify:dist`, pack dry-run, installed-package consumer smoke,
-production audit, and full audit. GitHub Actions runs the same gate on Node 22.x and 24.x.
+package lint, production audit, and full audit. GitHub Actions runs the same gate on Node 22.x and
+24.x.
 
 ## Gotchas (learned the hard way)
 
@@ -65,9 +66,12 @@ production audit, and full audit. GitHub Actions runs the same gate on Node 22.x
 - `npm pack --dry-run` invokes `prepack`, so it re-runs the heavy gate chain. Use
   `find addon-sdk -maxdepth 1 -name '*.tgz' -print` afterward when checking for accidental artifacts.
 - `verify:package-consumer` stays outside `prepack`: it packs the already-built package with scripts
-  ignored, installs that tarball into temporary ESM, CJS, and TypeScript consumers, imports public
-  subpaths from the installed dependency, signs/verifies test tokens from ESM and CJS, and catches
-  declaration leaks such as non-optional Express types.
+  ignored, installs that tarball into temporary runtime ESM/CJS and TypeScript ESM/CJS consumers,
+  imports public subpaths from the installed dependency, signs/verifies test tokens from ESM and CJS,
+  and catches declaration leaks such as non-optional Express types.
+- `verify:package-lint` also stays outside `prepack` because it packs the tarball. It runs
+  `publint --strict` and Are The Types Wrong with the Node16 profile, which matches this Node 22+
+  SDK's supported modern package resolution story; Node10 findings are not release blockers.
 - `npm run lint` and `npm run format:check` are real check-only gates. The package configs ignore
   vendored Marketplace docs, schema/provenance files, generated Clockify models, `dist`, `coverage`,
   `node_modules`, and dry-run tarballs.

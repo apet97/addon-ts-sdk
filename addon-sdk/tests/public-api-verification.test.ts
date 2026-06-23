@@ -44,6 +44,62 @@ function writeFixturePackageJson(root: string, rootTypes = "./dist/esm/index.d.t
   );
 }
 
+function writeNestedExportFixturePackageJson(root: string) {
+  writeFileSync(
+    join(root, "package.json"),
+    JSON.stringify(
+      {
+        name: "fixture",
+        exports: {
+          ".": {
+            import: {
+              types: "./dist/esm/index.d.ts",
+              default: "./dist/esm/index.js",
+            },
+            require: {
+              types: "./dist/cjs/index.d.cts",
+              default: "./dist/cjs/index.js",
+            },
+          },
+          "./clockify": {
+            import: {
+              types: "./dist/esm/clockify/index.d.ts",
+              default: "./dist/esm/clockify/index.js",
+            },
+            require: {
+              types: "./dist/cjs/clockify/index.d.cts",
+              default: "./dist/cjs/clockify/index.js",
+            },
+          },
+          "./adapters": {
+            import: {
+              types: "./dist/esm/adapters/index.d.ts",
+              default: "./dist/esm/adapters/index.js",
+            },
+            require: {
+              types: "./dist/cjs/adapters/index.d.cts",
+              default: "./dist/cjs/adapters/index.js",
+            },
+          },
+          "./testing": {
+            import: {
+              types: "./dist/esm/testing/index.d.ts",
+              default: "./dist/esm/testing/index.js",
+            },
+            require: {
+              types: "./dist/cjs/testing/index.d.cts",
+              default: "./dist/cjs/testing/index.js",
+            },
+          },
+        },
+      },
+      null,
+      2,
+    ),
+    "utf8",
+  );
+}
+
 function runVerifier(cwd: string, snapshotPath: string, distDir: string): string {
   return execFileSync(
     node,
@@ -140,6 +196,48 @@ describe("public API verification", () => {
       expect(snapshotText).toContain("package-root.d.ts");
       expect(snapshotText).toContain("ExportedFromPackageMap");
       expect(snapshotText).not.toContain("Widget");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("tracks ESM declarations from nested package export import types", () => {
+    const dir = mkdtempSync(join(tmpdir(), "clockify-public-api-nested-exports-"));
+    try {
+      writeFixtureDist(dir);
+      mkdirSync(join(dir, "dist", "cjs", "clockify"), { recursive: true });
+      mkdirSync(join(dir, "dist", "cjs", "adapters"), { recursive: true });
+      mkdirSync(join(dir, "dist", "cjs", "testing"), { recursive: true });
+      writeFileSync(
+        join(dir, "dist", "cjs", "index.d.cts"),
+        "export interface CjsOnlyDeclaration { readonly id: string; }\n",
+        "utf8",
+      );
+      for (const entry of ["clockify", "adapters", "testing"]) {
+        writeFileSync(join(dir, "dist", "cjs", entry, "index.d.cts"), "export {};\n", "utf8");
+      }
+      writeNestedExportFixturePackageJson(dir);
+
+      const snapshot = join(dir, "public-api.snapshot.txt");
+      execFileSync(
+        node,
+        [
+          scriptPath,
+          "--snapshot",
+          snapshot,
+          "--dist-dir",
+          join(dir, "dist", "esm"),
+          "--package-json",
+          join(dir, "package.json"),
+          "--update",
+        ],
+        { cwd: dir, stdio: "pipe" },
+      );
+
+      const snapshotText = readFileSync(snapshot, "utf8");
+      expect(snapshotText).toContain("widget.d.ts");
+      expect(snapshotText).toContain("Widget");
+      expect(snapshotText).not.toContain("CjsOnlyDeclaration");
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

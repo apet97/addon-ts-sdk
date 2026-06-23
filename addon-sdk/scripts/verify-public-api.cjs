@@ -37,11 +37,21 @@ function readJson(file) {
 
 function exportTypesSpecifier(packageJson, exportKey) {
   const entry = packageJson.exports && packageJson.exports[exportKey];
-  if (entry && typeof entry === "object" && typeof entry.types === "string") {
-    return entry.types;
+  if (entry && typeof entry === "object") {
+    if (
+      entry.import &&
+      typeof entry.import === "object" &&
+      typeof entry.import.types === "string"
+    ) {
+      return entry.import.types;
+    }
+
+    if (typeof entry.types === "string") {
+      return entry.types;
+    }
   }
 
-  fail(`Missing package.json exports["${exportKey}"].types declaration.`);
+  fail(`Missing package.json exports["${exportKey}"] import types declaration.`);
 }
 
 function entrypointsFromPackageJson(packageJson, packageRoot) {

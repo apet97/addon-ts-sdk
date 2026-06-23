@@ -251,16 +251,64 @@ void ambiguousWebhookOptions;
   });
 }
 
+function runCommonJsTypeScriptConsumer(dir) {
+  writeFileSync(
+    join(dir, "tsconfig.json"),
+    JSON.stringify(
+      {
+        compilerOptions: {
+          target: "ES2022",
+          module: "NodeNext",
+          moduleResolution: "NodeNext",
+          lib: ["ES2022"],
+          strict: true,
+          noEmit: true,
+          resolveJsonModule: true,
+          skipLibCheck: false,
+          typeRoots: [typesRoot],
+          types: ["node"],
+        },
+        include: ["smoke.cts"],
+      },
+      null,
+      2,
+    ),
+    "utf8",
+  );
+  writeFileSync(
+    join(dir, "smoke.cts"),
+    `import sdk = require("@apet97/clockify-addon-sdk");
+import clockify = require("@apet97/clockify-addon-sdk/clockify");
+import adapters = require("@apet97/clockify-addon-sdk/adapters");
+import testing = require("@apet97/clockify-addon-sdk/testing");
+
+void sdk.ClockifyAddon;
+void sdk.ClockifyManifest.v1_5Builder;
+void sdk.generated.v1_5.ClockifyManifestBuilder;
+void clockify.verifyClockifyLifecycleRequest;
+void adapters.createNodeHttpAddonServer;
+void testing.generateTestKeys;
+`,
+    "utf8",
+  );
+  run(process.execPath, [tscBin, "-p", "tsconfig.json", "--noEmit"], {
+    cwd: dir,
+    stdio: "inherit",
+  });
+}
+
 try {
   const tarball = packTarball();
   mkdirSync(join(workspace, "esm-consumer"), { recursive: true });
   mkdirSync(join(workspace, "cjs-consumer"), { recursive: true });
   mkdirSync(join(workspace, "ts-consumer"), { recursive: true });
+  mkdirSync(join(workspace, "cts-consumer"), { recursive: true });
   runEsmConsumer(prepareConsumer("esm-consumer", "module", tarball));
   runCjsConsumer(prepareConsumer("cjs-consumer", "commonjs", tarball));
   runTypeScriptConsumer(prepareConsumer("ts-consumer", "module", tarball));
+  runCommonJsTypeScriptConsumer(prepareConsumer("cts-consumer", "commonjs", tarball));
   console.log(
-    "verify:package-consumer OK - packed tarball imports in ESM and CJS consumers, signs/verifies test tokens, and type-checks in a TypeScript consumer.",
+    "verify:package-consumer OK - packed tarball imports in ESM and CJS consumers, signs/verifies test tokens, and type-checks in ESM and CJS TypeScript consumers.",
   );
 } finally {
   rmSync(workspace, { recursive: true, force: true });

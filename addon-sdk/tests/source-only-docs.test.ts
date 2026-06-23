@@ -47,6 +47,7 @@ describe("source-only distribution docs", () => {
     expect(releaseReadiness).toContain("explicit npm-owner approval");
     expect(releaseReadiness).toContain("npm view @apet97/clockify-addon-sdk version");
     expect(qualityGates).toContain("npm run verify:public-api");
+    expect(qualityGates).toContain("npm run verify:package-lint");
     expect(qualityGates).toContain("public-api.snapshot.md");
     expect(dependencyStrategy).toContain("`jose@6` is ESM-only");
     expect(dependencyStrategy).toContain("npm run verify:package-consumer");

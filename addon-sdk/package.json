@@ -34,29 +34,50 @@
     "README.md"
   ],
   "sideEffects": false,
+  "type": "commonjs",
   "main": "./dist/cjs/index.js",
   "module": "./dist/esm/index.js",
   "types": "./dist/esm/index.d.ts",
   "exports": {
     ".": {
-      "types": "./dist/esm/index.d.ts",
-      "import": "./dist/esm/index.js",
-      "require": "./dist/cjs/index.js"
+      "import": {
+        "types": "./dist/esm/index.d.ts",
+        "default": "./dist/esm/index.js"
+      },
+      "require": {
+        "types": "./dist/cjs/index.d.cts",
+        "default": "./dist/cjs/index.js"
+      }
     },
     "./clockify": {
-      "types": "./dist/esm/clockify/index.d.ts",
-      "import": "./dist/esm/clockify/index.js",
-      "require": "./dist/cjs/clockify/index.js"
+      "import": {
+        "types": "./dist/esm/clockify/index.d.ts",
+        "default": "./dist/esm/clockify/index.js"
+      },
+      "require": {
+        "types": "./dist/cjs/clockify/index.d.cts",
+        "default": "./dist/cjs/clockify/index.js"
+      }
     },
     "./adapters": {
-      "types": "./dist/esm/adapters/index.d.ts",
-      "import": "./dist/esm/adapters/index.js",
-      "require": "./dist/cjs/adapters/index.js"
+      "import": {
+        "types": "./dist/esm/adapters/index.d.ts",
+        "default": "./dist/esm/adapters/index.js"
+      },
+      "require": {
+        "types": "./dist/cjs/adapters/index.d.cts",
+        "default": "./dist/cjs/adapters/index.js"
+      }
     },
     "./testing": {
-      "types": "./dist/esm/testing/index.d.ts",
-      "import": "./dist/esm/testing/index.js",
-      "require": "./dist/cjs/testing/index.js"
+      "import": {
+        "types": "./dist/esm/testing/index.d.ts",
+        "default": "./dist/esm/testing/index.js"
+      },
+      "require": {
+        "types": "./dist/cjs/testing/index.d.cts",
+        "default": "./dist/cjs/testing/index.js"
+      }
     },
     "./schemas/clockify-manifests/provenance.json": "./schemas/clockify-manifests/provenance.json",
     "./schemas/clockify-manifests/*.json": "./schemas/clockify-manifests/*.json"
@@ -67,9 +88,10 @@
     "verify:generated": "node scripts/verify-schema-provenance.cjs && node scripts/verify-generated.cjs",
     "verify:schema-live": "node scripts/verify-live-schemas.mjs",
     "clean": "node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true })\"",
-    "build": "npm run clean && npm run generate && tsc -p tsconfig.esm.json && node scripts/fix-esm-extensions.cjs && tsc -p tsconfig.cjs.json && node scripts/finalize-cjs.js",
+    "build": "npm run clean && npm run generate && tsc -p tsconfig.esm.json && node scripts/fix-esm-extensions.cjs && tsc -p tsconfig.cjs.json && node scripts/finalize-cjs.js && node scripts/fix-cjs-declarations.cjs",
     "verify:public-api": "node scripts/verify-public-api.cjs",
     "verify:dist": "node scripts/verify-dist.mjs",
+    "verify:package-lint": "node scripts/verify-package-lint.mjs",
     "verify:package-consumer": "node scripts/verify-package-consumer.mjs",
     "dev:clockify-local": "tsx scripts/dev-clockify-local.ts",
     "test:replay": "vitest run tests/clockify-local-replay.test.ts",
@@ -91,6 +113,7 @@
     }
   },
   "devDependencies": {
+    "@arethetypeswrong/cli": "^0.18.4",
     "@eslint/js": "^10.0.1",
     "@types/express": "^5.0.6",
     "@types/node": "^22.20.0",
@@ -98,6 +121,7 @@
     "eslint-config-prettier": "^10.1.8",
     "express": "^5.2.1",
     "prettier": "^3.8.4",
+    "publint": "^0.3.21",
     "tsx": "^4.7.1",
     "typescript": "^5.3.3",
     "typescript-eslint": "^8.62.0",

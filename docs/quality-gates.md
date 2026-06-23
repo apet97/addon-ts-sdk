@@ -1,8 +1,8 @@
 # Quality Gates: @apet97/clockify-addon-sdk
 
 The root `npm run ci:verify` script is the canonical local and CI gate. It runs the package checks
-through npm workspaces and mirrors the package's `prepack` chain, so the published tarball is always
-built and verified from a green tree.
+through npm workspaces, includes the package's `prepack` chain, and adds installed-package checks so
+the published tarball is always built and verified from a green tree.
 
 For day-to-day SDK hacking, use **`npm run verify:fast`** from the repo root. It runs type-check,
 generated drift, the local Clockify replay tests, build, and `verify:dist` without pack, package
@@ -32,11 +32,14 @@ consumer, audit, or live-schema checks.
    green `build` alone does not prove the package imports.
 10. **`npm run pack:dry-run`** — confirms the tarball contents (`dist` + `docs` + vendored
     `schemas/clockify-manifests` + `LICENSE` + `README`).
-11. **`npm run verify:package-consumer`** — packs the already-built package with `--ignore-scripts`,
-    installs that tarball into temporary ESM, CJS, and TypeScript consumers, imports the root and
-    subpath entry points, checks `generated.v1_5`, type-checks declarations without requiring
-    Express types, and boots a `/manifest` server smoke from the installed package.
-12. **`npm audit --omit=dev --json` and `npm audit --json`** — production and full dependency audit;
+11. **`npm run verify:package-lint`** — packs the already-built package with `--ignore-scripts`,
+    then runs `publint --strict` and Are The Types Wrong with the Node16 profile against the packed
+    tarball. Node10 findings are not release blockers because this SDK supports Node 22+.
+12. **`npm run verify:package-consumer`** — packs the already-built package with `--ignore-scripts`,
+    installs that tarball into temporary runtime ESM/CJS and TypeScript ESM/CJS consumers, imports
+    the root and subpath entry points, checks `generated.v1_5`, type-checks declarations without
+    requiring Express types, and boots a `/manifest` server smoke from the installed package.
+13. **`npm audit --omit=dev --json` and `npm audit --json`** — production and full dependency audit;
     both should report 0 vulnerabilities.
 
 Manual freshness check:
@@ -51,5 +54,6 @@ and manual dispatches. Node 22 is the minimum supported runtime.
 
 The package `prepack` chain includes type-check, generated drift, tests, lint, format check, build,
 `verify:public-api`, and `verify:dist`; `npm pack --dry-run` is therefore both a contents check and
-a final package smoke. `verify:package-consumer` stays outside `prepack` to avoid recursive package
-creation while still proving the tarball works exactly as an installed dependency.
+a final package smoke. `verify:package-lint` and `verify:package-consumer` stay outside `prepack` to
+avoid recursive package creation while still proving the tarball has a correct package shape and
+works exactly as an installed dependency.
