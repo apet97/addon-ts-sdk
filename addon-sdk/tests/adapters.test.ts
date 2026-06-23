@@ -201,6 +201,36 @@ describe("Adapters", () => {
     expect(jsonSpy).toHaveBeenCalledWith(mockManifest);
   });
 
+  it("parses query params from req.url when Express-like req.query is unavailable", async () => {
+    const addon = new ClockifyAddon(mockManifest);
+    const seen: string[] = [];
+    addon.registerHandler("/component", "GET", (request) => {
+      seen.push(request.path);
+      seen.push(...request.query.getAll("auth_token"));
+      seen.push(request.query.get("mode") ?? "");
+      return { status: 204 };
+    });
+    const handler = createExpressAddonHandler(addon);
+
+    const mockReq = {
+      method: "GET",
+      url: "/component?auth_token=abc&auth_token=def&mode=compact",
+      headers: {},
+    };
+
+    const mockRes = {
+      status: vi.fn().mockReturnThis(),
+      set: vi.fn().mockReturnThis(),
+      json: vi.fn().mockReturnThis(),
+      send: vi.fn().mockReturnThis(),
+      end: vi.fn().mockReturnThis(),
+    };
+
+    await handler(mockReq, mockRes);
+
+    expect(seen).toEqual(["/component", "abc", "def", "compact"]);
+  });
+
   it("should serialize Node HTTP mock response properly", () => {
     const mockRes = new ServerResponse(new IncomingMessage(new Socket()));
     const writeSpy = vi.spyOn(mockRes, "end").mockImplementation(() => mockRes);

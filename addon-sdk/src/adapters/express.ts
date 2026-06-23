@@ -22,6 +22,25 @@ export interface ExpressLikeResponse {
 
 export type ExpressLikeNextFunction = (error?: unknown) => void;
 
+function queryParamsFromExpressRequest(
+  req: ExpressLikeRequest,
+  requestUrl: URL,
+): URLSearchParams {
+  if (req.query !== undefined) {
+    const queryParams = new URLSearchParams();
+    for (const [key, val] of Object.entries(req.query)) {
+      if (Array.isArray(val)) {
+        val.forEach((v) => queryParams.append(key, String(v)));
+      } else if (val !== undefined && val !== null) {
+        queryParams.append(key, String(val));
+      }
+    }
+    return queryParams;
+  }
+
+  return requestUrl.searchParams;
+}
+
 export function createExpressAddonHandler(addon: Addon<unknown>) {
   return async function clockifyAddonExpressHandler(
     req: ExpressLikeRequest,
@@ -29,20 +48,12 @@ export function createExpressAddonHandler(addon: Addon<unknown>) {
     next?: ExpressLikeNextFunction,
   ) {
     try {
-      const queryParams = new URLSearchParams();
-      if (req.query) {
-        for (const [key, val] of Object.entries(req.query)) {
-          if (Array.isArray(val)) {
-            val.forEach((v) => queryParams.append(key, String(v)));
-          } else if (val !== undefined && val !== null) {
-            queryParams.append(key, String(val));
-          }
-        }
-      }
+      const requestUrl = new URL(req.url || "", "http://localhost");
+      const queryParams = queryParamsFromExpressRequest(req, requestUrl);
 
       const addonRequest: AddonRequest = {
         method: req.method || "GET",
-        path: req.path || new URL(req.url || "", "http://localhost").pathname,
+        path: req.path || requestUrl.pathname,
         headers: req.headers ?? {},
         query: queryParams,
         body: req.body,
