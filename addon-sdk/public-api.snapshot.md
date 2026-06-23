@@ -105,6 +105,7 @@ export declare class IllegalArgumentException extends Error {
 export * from "./clockify-addon.js";
 export * from "./clockify-manifest.js";
 export * from "./clockify-resource.js";
+export * from "./clockify-crypto-key.js";
 export * from "./clockify-signature-parser.js";
 export * from "./clockify-public-key.js";
 export * from "./clockify-request-verification.js";
@@ -164,10 +165,19 @@ export interface ClockifyResource {
 }
 ```
 
+### clockify/clockify-crypto-key.d.ts
+
+```ts
+import type { CryptoKey, JWK, KeyObject } from "jose" with { "resolution-mode": "import" };
+export type ClockifyCryptoKey = CryptoKey | KeyObject | JWK | Uint8Array;
+export type ClockifyPublicKeyInput = string | ClockifyCryptoKey;
+export type ClockifyPrivateKeyInput = ClockifyCryptoKey;
+```
+
 ### clockify/clockify-signature-parser.d.ts
 
 ```ts
-import { KeyLike } from "jose";
+import type { ClockifyPublicKeyInput } from "./clockify-crypto-key.js";
 export declare const ClockifySignatureClaims: {
     readonly TYPE: "type";
     readonly BACKEND_URL: "backendUrl";
@@ -205,7 +215,7 @@ export declare class ClockifySignatureParser {
     private readonly addonKey;
     private readonly publicKey;
     private resolvedKey;
-    constructor(addonKey: string, publicKey: string | KeyLike | Uint8Array);
+    constructor(addonKey: string, publicKey: ClockifyPublicKeyInput);
     parseClaims(token: string): Promise<ClockifyAddonClaims>;
 }
 ```
@@ -213,7 +223,7 @@ export declare class ClockifySignatureParser {
 ### clockify/clockify-public-key.d.ts
 
 ```ts
-import type { KeyLike } from "jose";
+import type { ClockifyPublicKeyInput } from "./clockify-crypto-key.js";
 import { ClockifySignatureParser } from "./clockify-signature-parser.js";
 /**
  * SHA-256 fingerprint of the public key, computed over its DER/SPKI encoding
@@ -228,7 +238,7 @@ export declare const CLOCKIFY_PLATFORM_PUBLIC_KEY_SHA256 = "0cebc449014cf940ad07
  */
 export declare const CLOCKIFY_PLATFORM_PUBLIC_KEY_PEM = "-----BEGIN PUBLIC KEY-----\nMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAubktufFNO/op+E5WBWL6\n/Y9QRZGSGGCsV00FmPRl5A0mSfQu3yq2Yaq47IlN0zgFy9IUG8/JJfwiehsmbrKa\n49t/xSkpG1u9w1GUyY0g4eKDUwofHKAt3IPw0St4qsWLK9mO+koUo56CGQOEpTui\n5bMfmefVBBfShXTaZOtXPB349FdzSuYlU/5o3L12zVWMutNhiJCKyGfsuu2uXa9+\n6uQnZBw1wO3/QEci7i4TbC+ZXqW1rCcbogSMORqHAP6qSAcTFRmrjFAEsOWiUUhZ\nrLDg2QJ8VTDghFnUhYklNTJlGgfo80qEWe1NLIwvZj0h3bWRfrqZHsD/Yjh0duk6\nyQIDAQAB\n-----END PUBLIC KEY-----\n";
 export interface CreateClockifySignatureParserOptions {
-    publicKey?: string | KeyLike | Uint8Array;
+    publicKey?: ClockifyPublicKeyInput;
 }
 /**
  * Creates a Clockify add-on JWT parser using the platform public key by default.
@@ -2698,13 +2708,14 @@ export declare function isPayloadTooLargeError(error: unknown): error is Payload
 ### testing/index.d.ts
 
 ```ts
-import { type KeyLike } from "jose";
-export declare function generateTestKeys(): Promise<{
-    publicKey: KeyLike;
-    privateKey: KeyLike;
+import type { ClockifyCryptoKey, ClockifyPrivateKeyInput } from "../clockify/clockify-crypto-key.js";
+export interface ClockifyTestKeys {
+    publicKey: ClockifyCryptoKey;
+    privateKey: ClockifyPrivateKeyInput;
     pem: string;
-}>;
-export declare function signTestToken(privateKey: KeyLike | Uint8Array, addonKey: string, claims?: Record<string, unknown>, expiresIn?: string): Promise<string>;
+}
+export declare function generateTestKeys(): Promise<ClockifyTestKeys>;
+export declare function signTestToken(privateKey: ClockifyPrivateKeyInput, addonKey: string, claims?: Record<string, unknown>, expiresIn?: string): Promise<string>;
 ```
 
 ## clockify
@@ -2715,6 +2726,7 @@ export declare function signTestToken(privateKey: KeyLike | Uint8Array, addonKey
 export * from "./clockify-addon.js";
 export * from "./clockify-manifest.js";
 export * from "./clockify-resource.js";
+export * from "./clockify-crypto-key.js";
 export * from "./clockify-signature-parser.js";
 export * from "./clockify-public-key.js";
 export * from "./clockify-request-verification.js";
@@ -2774,10 +2786,19 @@ export interface ClockifyResource {
 }
 ```
 
+### clockify/clockify-crypto-key.d.ts
+
+```ts
+import type { CryptoKey, JWK, KeyObject } from "jose" with { "resolution-mode": "import" };
+export type ClockifyCryptoKey = CryptoKey | KeyObject | JWK | Uint8Array;
+export type ClockifyPublicKeyInput = string | ClockifyCryptoKey;
+export type ClockifyPrivateKeyInput = ClockifyCryptoKey;
+```
+
 ### clockify/clockify-signature-parser.d.ts
 
 ```ts
-import { KeyLike } from "jose";
+import type { ClockifyPublicKeyInput } from "./clockify-crypto-key.js";
 export declare const ClockifySignatureClaims: {
     readonly TYPE: "type";
     readonly BACKEND_URL: "backendUrl";
@@ -2815,7 +2836,7 @@ export declare class ClockifySignatureParser {
     private readonly addonKey;
     private readonly publicKey;
     private resolvedKey;
-    constructor(addonKey: string, publicKey: string | KeyLike | Uint8Array);
+    constructor(addonKey: string, publicKey: ClockifyPublicKeyInput);
     parseClaims(token: string): Promise<ClockifyAddonClaims>;
 }
 ```
@@ -2823,7 +2844,7 @@ export declare class ClockifySignatureParser {
 ### clockify/clockify-public-key.d.ts
 
 ```ts
-import type { KeyLike } from "jose";
+import type { ClockifyPublicKeyInput } from "./clockify-crypto-key.js";
 import { ClockifySignatureParser } from "./clockify-signature-parser.js";
 /**
  * SHA-256 fingerprint of the public key, computed over its DER/SPKI encoding
@@ -2838,7 +2859,7 @@ export declare const CLOCKIFY_PLATFORM_PUBLIC_KEY_SHA256 = "0cebc449014cf940ad07
  */
 export declare const CLOCKIFY_PLATFORM_PUBLIC_KEY_PEM = "-----BEGIN PUBLIC KEY-----\nMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAubktufFNO/op+E5WBWL6\n/Y9QRZGSGGCsV00FmPRl5A0mSfQu3yq2Yaq47IlN0zgFy9IUG8/JJfwiehsmbrKa\n49t/xSkpG1u9w1GUyY0g4eKDUwofHKAt3IPw0St4qsWLK9mO+koUo56CGQOEpTui\n5bMfmefVBBfShXTaZOtXPB349FdzSuYlU/5o3L12zVWMutNhiJCKyGfsuu2uXa9+\n6uQnZBw1wO3/QEci7i4TbC+ZXqW1rCcbogSMORqHAP6qSAcTFRmrjFAEsOWiUUhZ\nrLDg2QJ8VTDghFnUhYklNTJlGgfo80qEWe1NLIwvZj0h3bWRfrqZHsD/Yjh0duk6\nyQIDAQAB\n-----END PUBLIC KEY-----\n";
 export interface CreateClockifySignatureParserOptions {
-    publicKey?: string | KeyLike | Uint8Array;
+    publicKey?: ClockifyPublicKeyInput;
 }
 /**
  * Creates a Clockify add-on JWT parser using the platform public key by default.
@@ -5312,11 +5333,12 @@ export declare function isPayloadTooLargeError(error: unknown): error is Payload
 ### testing/index.d.ts
 
 ```ts
-import { type KeyLike } from "jose";
-export declare function generateTestKeys(): Promise<{
-    publicKey: KeyLike;
-    privateKey: KeyLike;
+import type { ClockifyCryptoKey, ClockifyPrivateKeyInput } from "../clockify/clockify-crypto-key.js";
+export interface ClockifyTestKeys {
+    publicKey: ClockifyCryptoKey;
+    privateKey: ClockifyPrivateKeyInput;
     pem: string;
-}>;
-export declare function signTestToken(privateKey: KeyLike | Uint8Array, addonKey: string, claims?: Record<string, unknown>, expiresIn?: string): Promise<string>;
+}
+export declare function generateTestKeys(): Promise<ClockifyTestKeys>;
+export declare function signTestToken(privateKey: ClockifyPrivateKeyInput, addonKey: string, claims?: Record<string, unknown>, expiresIn?: string): Promise<string>;
 ```

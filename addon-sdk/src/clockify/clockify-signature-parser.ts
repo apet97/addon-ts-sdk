@@ -1,4 +1,4 @@
-import { jwtVerify, importSPKI, KeyLike } from "jose";
+import type { ClockifyCryptoKey, ClockifyPublicKeyInput } from "./clockify-crypto-key";
 
 export const ClockifySignatureClaims = {
   TYPE: "type",
@@ -38,15 +38,17 @@ export interface ClockifyAddonClaims {
 
 export class ClockifySignatureParser {
   private readonly addonKey: string;
-  private readonly publicKey: string | KeyLike | Uint8Array;
-  private resolvedKey: KeyLike | Uint8Array | null = null;
+  private readonly publicKey: ClockifyPublicKeyInput;
+  private resolvedKey: ClockifyCryptoKey | null = null;
 
-  constructor(addonKey: string, publicKey: string | KeyLike | Uint8Array) {
+  constructor(addonKey: string, publicKey: ClockifyPublicKeyInput) {
     this.addonKey = addonKey;
     this.publicKey = publicKey;
   }
 
   async parseClaims(token: string): Promise<ClockifyAddonClaims> {
+    const { jwtVerify, importSPKI } = await import("jose");
+
     if (!this.resolvedKey) {
       if (typeof this.publicKey === "string") {
         this.resolvedKey = await importSPKI(this.publicKey, "RS256");

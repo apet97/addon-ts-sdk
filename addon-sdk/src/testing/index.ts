@@ -1,17 +1,26 @@
-import { generateKeyPair, SignJWT, exportSPKI, type KeyLike } from "jose";
+import type { ClockifyCryptoKey, ClockifyPrivateKeyInput } from "../clockify/clockify-crypto-key";
 
-export async function generateTestKeys() {
+export interface ClockifyTestKeys {
+  publicKey: ClockifyCryptoKey;
+  privateKey: ClockifyPrivateKeyInput;
+  pem: string;
+}
+
+export async function generateTestKeys(): Promise<ClockifyTestKeys> {
+  const { generateKeyPair, exportSPKI } = await import("jose");
   const { publicKey, privateKey } = await generateKeyPair("RS256");
   const pem = await exportSPKI(publicKey);
   return { publicKey, privateKey, pem };
 }
 
 export async function signTestToken(
-  privateKey: KeyLike | Uint8Array,
+  privateKey: ClockifyPrivateKeyInput,
   addonKey: string,
   claims: Record<string, unknown> = {},
   expiresIn = "30m",
 ) {
+  const { SignJWT } = await import("jose");
+
   return await new SignJWT({
     type: "addon",
     ...claims,

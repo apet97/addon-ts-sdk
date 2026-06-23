@@ -42,7 +42,8 @@ consumer, audit, or live-schema checks.
 13. **`npm run verify:package-consumer`** — packs the already-built package with `--ignore-scripts`,
     installs that tarball into temporary runtime ESM/CJS and TypeScript ESM/CJS consumers, imports
     the root and subpath entry points, checks `generated.v1_5`, type-checks declarations without
-    requiring Express types, and boots a `/manifest` server smoke from the installed package.
+    requiring Express types, signs/verifies JWTs through `jose@6` dynamic imports, and boots a
+    `/manifest` server smoke from the installed package.
 14. **`npm audit --omit=dev --json` and `npm audit --json`** — production and full dependency audit;
     both should report 0 vulnerabilities.
 

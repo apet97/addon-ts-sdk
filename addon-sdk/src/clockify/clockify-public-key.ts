@@ -1,4 +1,4 @@
-import type { KeyLike } from "jose";
+import type { ClockifyPublicKeyInput } from "./clockify-crypto-key";
 import { ClockifySignatureParser } from "./clockify-signature-parser";
 
 /**
@@ -26,7 +26,7 @@ yQIDAQAB
 `;
 
 export interface CreateClockifySignatureParserOptions {
-  publicKey?: string | KeyLike | Uint8Array;
+  publicKey?: ClockifyPublicKeyInput;
 }
 
 /**

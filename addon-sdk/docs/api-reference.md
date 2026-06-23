@@ -36,6 +36,8 @@ client, persistence layer, UI event framework, or custom manifest validator.
 
 - `createClockifySignatureParser(addonKey, options?)` creates a JWT parser using Clockify's published
   RS256 public key by default.
+- `ClockifyCryptoKey`, `ClockifyPublicKeyInput`, and `ClockifyPrivateKeyInput` are the public key
+  input aliases for parser overrides and testing helpers.
 - `CLOCKIFY_PLATFORM_PUBLIC_KEY_PEM` and `CLOCKIFY_PLATFORM_PUBLIC_KEY_SHA256` expose the non-secret
   platform key and pinned fingerprint.
 - `verifyClockifyWebhookRequest()`, `verifyClockifyComponentRequest()`,

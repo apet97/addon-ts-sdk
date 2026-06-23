@@ -35,6 +35,8 @@ Conventions for anyone (human or agent) working in this repository.
   `sub=<manifest key>`. Webhooks should use `verifyClockifyWebhookRequest()` with
   `expectedEventType`; lifecycle routes should use `X-Addon-Lifecycle-Token`; Clockify API calls use
   `X-Addon-Token`.
+- `jose@6` is ESM-only. Keep SDK runtime references to `jose` behind dynamic imports so the CommonJS
+  build and installed CJS consumer smoke stay clean.
 - Do not hardcode Clockify API/report/location/screenshot hosts. Use verified token claims such as
   `backendUrl`, `reportsUrl`, `locationsUrl`, and `screenshotsUrl`.
 - Node `http` and Fetch adapters enforce `DEFAULT_MAX_BODY_BYTES` (`1_048_576`) before dispatch and

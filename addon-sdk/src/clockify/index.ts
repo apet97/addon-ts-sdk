@@ -1,6 +1,7 @@
 export * from "./clockify-addon";
 export * from "./clockify-manifest";
 export * from "./clockify-resource";
+export * from "./clockify-crypto-key";
 export * from "./clockify-signature-parser";
 export * from "./clockify-public-key";
 export * from "./clockify-request-verification";

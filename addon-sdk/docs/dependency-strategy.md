@@ -6,27 +6,26 @@ guarantees.
 
 ## `jose`
 
-SDK 1.x stays on `jose@5` because it supports the current RS256 verification implementation while
-preserving the CommonJS build. Registry metadata checked during release hardening showed that
-`jose@6` is ESM-only (`"type": "module"` with no `require` export condition), while `jose@5`
-still exposes CommonJS entry points. A future `jose@6` upgrade must be handled as a compatibility
-spike:
+SDK 1.x uses `jose@6` while preserving CommonJS support. `jose@6` is ESM-only (`"type": "module"`
+with no `require` export condition), so SDK runtime code must not statically import it in files that
+also build to CommonJS. Use dynamic `import("jose")` inside the signing and verification paths
+instead.
 
-1. install `jose@6` on a branch,
-2. run `npm run type-check`,
-3. run `npm run build && npm run verify:public-api && npm run verify:dist`,
-4. run `npm run verify:package-consumer`,
-5. specifically prove that CommonJS consumers can still verify and sign test tokens, and
-6. if CommonJS support has to change, ship that as a major release instead of a routine dependency
-   bump.
+The public SDK no longer exposes `jose`'s removed `KeyLike` type. Use the SDK-owned aliases
+`ClockifyCryptoKey`, `ClockifyPublicKeyInput`, and `ClockifyPrivateKeyInput`, which map to the key
+inputs accepted by `jose@6`.
 
-Do not bump `jose` across a major version as routine maintenance.
+Spike result on 2026-06-23:
 
-Initial spike result on 2026-06-23: a temporary project with `jose@6.2.3` loaded `require("jose")`
-successfully on Node 22.20.0 and the current local Node. That proves a simple CommonJS load is not
-enough reason to block the upgrade, but it is not a package-level migration by itself; the full SDK
-upgrade still needs the gates above, including installed ESM/CJS token signing and verification from
-`npm run verify:package-consumer`.
+- `npm run type-check`, `npm run build`, `npm run verify:public-api`, `npm run verify:dist`,
+  `npm run verify:package-lint`, and `npm run verify:package-consumer` passed with `jose@6.2.3`.
+- Direct `require("jose")` still emits an experimental warning on Node 22.12.0 and is clean on
+  Node 22.13.0.
+- The packed SDK's installed ESM/CJS runtime consumers and TypeScript ESM/CJS consumers passed under
+  Node 22.12.0 and Node 22.13.0 because the SDK uses dynamic imports internally.
+
+Do not reintroduce static `jose` runtime imports in CJS-built SDK files unless the package drops its
+CommonJS build or raises its runtime floor with explicit owner approval.
 
 ## Build and test tooling
 

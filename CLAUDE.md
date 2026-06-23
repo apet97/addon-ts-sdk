@@ -29,6 +29,8 @@ supported Node 22 line, but package runtime support remains `>=22`.
 - **Tokens:** verify `RS256` only, with `iss=clockify`, `type=addon`, `sub=<manifest key>`. Webhooks
   should use `verifyClockifyWebhookRequest()` with an explicit `expectedEventType`; lifecycle uses
   `X-Addon-Lifecycle-Token`; Clockify API calls use `X-Addon-Token`.
+- **`jose@6`:** it is ESM-only. Keep SDK runtime use behind dynamic `import("jose")` so the CJS build
+  and installed CJS consumer smoke do not rely on `require("jose")`.
 - **Lifecycle bodies:** use the exported payload guards plus
   `clockifyLifecyclePayloadMatchesClaims()`. The matcher narrows claims to required
   `workspaceId`/`addonId`, so examples should not need installation-claim casts.
@@ -78,7 +80,7 @@ This is advisory and excludes generated Clockify models.
 - `verify:package-consumer` stays outside `prepack`: it packs the already-built package with scripts
   ignored, installs that tarball into temporary runtime ESM/CJS and TypeScript ESM/CJS consumers,
   imports public subpaths from the installed dependency, signs/verifies test tokens from ESM and CJS,
-  and catches declaration leaks such as non-optional Express types.
+  and catches declaration leaks such as non-optional Express types or static `jose` ESM/CJS mistakes.
 - `verify:package-lint` also stays outside `prepack` because it packs the tarball. It runs
   `publint --strict` and Are The Types Wrong with the Node16 profile, which matches this Node 22+
   SDK's supported modern package resolution story; Node10 findings are not release blockers.
