@@ -4,8 +4,11 @@ import {
   AddonRequest,
   ClockifyHeaders,
   ClockifyQueryParams,
+  ClockifyDeletedLifecyclePayload,
   ClockifySignatureParser,
   ClockifyInstalledLifecyclePayload,
+  ClockifySettingsUpdatedLifecyclePayload,
+  ClockifyStatusChangedLifecyclePayload,
   getClockifyEnvironmentContext,
   getClockifyHeader,
   getClockifyQueryParam,
@@ -18,6 +21,9 @@ import {
   verifyClockifyWebhookRequest,
   verifyClockifyToken,
   withClockifyInstalledLifecycleRequest,
+  withClockifyDeletedLifecycleRequest,
+  withClockifySettingsUpdatedLifecycleRequest,
+  withClockifyStatusChangedLifecycleRequest,
   withClockifyVerifiedComponentRequest,
   withClockifyVerifiedLifecycleRequest,
   withClockifyVerifiedRequest,
@@ -154,6 +160,42 @@ describe("Marketplace request verification helpers", () => {
         { expectedEventType: "EXPENSE_CREATED" },
       ),
     ).resolves.toEqual({ ok: false, reason: "event-type-mismatch" });
+  });
+
+  it("rejects ambiguous signature and event headers during verification", async () => {
+    const token = await validToken();
+
+    await expect(
+      verifyClockifyRequest(
+        parser(),
+        request({
+          [ClockifyHeaders.SIGNATURE]: [token, token],
+          [ClockifyHeaders.WEBHOOK_EVENT_TYPE]: "EXPENSE_CREATED",
+        }),
+      ),
+    ).resolves.toEqual({ ok: false, reason: "ambiguous-signature" });
+
+    await expect(
+      verifyClockifyRequest(
+        parser(),
+        request({
+          [ClockifyHeaders.SIGNATURE]: token,
+          [ClockifyHeaders.WEBHOOK_EVENT_TYPE]: ["EXPENSE_CREATED", "EXPENSE_CREATED"],
+        }),
+        { expectedEventType: "EXPENSE_CREATED" },
+      ),
+    ).resolves.toEqual({ ok: false, reason: "ambiguous-event-type" });
+
+    await expect(
+      verifyClockifyWebhookRequest(
+        parser(),
+        request({
+          [ClockifyHeaders.SIGNATURE]: token,
+          [ClockifyHeaders.WEBHOOK_EVENT_TYPE]: ["EXPENSE_CREATED", "EXPENSE_CREATED"],
+        }),
+        { expectedEventType: "EXPENSE_CREATED" },
+      ),
+    ).resolves.toEqual({ ok: false, reason: "ambiguous-event-type" });
   });
 
   it("verifies webhook requests with event, workspace, add-on, and stored webhook token checks", async () => {
@@ -306,6 +348,31 @@ describe("Marketplace request verification helpers", () => {
     });
 
     const token = await validToken();
+    await expect(
+      verifyClockifyComponentRequest(
+        parser(),
+        componentRequest(
+          new URLSearchParams([
+            [ClockifyQueryParams.AUTH_TOKEN, token],
+            [ClockifyQueryParams.AUTH_TOKEN, token],
+          ]),
+        ),
+      ),
+    ).resolves.toEqual({
+      ok: false,
+      reason: "ambiguous-token",
+    });
+
+    await expect(
+      verifyClockifyLifecycleRequest(
+        parser(),
+        request({ [ClockifyHeaders.LIFECYCLE_TOKEN]: [token, token] }),
+      ),
+    ).resolves.toEqual({
+      ok: false,
+      reason: "ambiguous-token",
+    });
+
     await expect(
       verifyClockifyLifecycleRequest(parser(), request({ "X-Addon-Lifecycle-Token": token })),
     ).resolves.toMatchObject({
@@ -468,6 +535,91 @@ describe("Marketplace request verification helpers", () => {
       body: { addonId: ADDON_ID, workspaceId: WORKSPACE_ID },
     });
     expect(invalidPayload).toEqual({ status: 401, body: "Unauthorized" });
+  });
+
+  it("wraps non-installed lifecycle handlers with matched typed payloads and claims", async () => {
+    const token = await validToken();
+    const statusPayload: ClockifyStatusChangedLifecyclePayload = {
+      addonId: ADDON_ID,
+      workspaceId: WORKSPACE_ID,
+      status: "ACTIVE",
+    };
+    const settingsPayload: ClockifySettingsUpdatedLifecyclePayload = {
+      addonId: ADDON_ID,
+      workspaceId: WORKSPACE_ID,
+      settings: [{ id: "setting-1", name: "Setting", value: true }],
+    };
+    const deletedPayload: ClockifyDeletedLifecyclePayload = {
+      addonId: ADDON_ID,
+      workspaceId: WORKSPACE_ID,
+      asUser: "admin-user",
+    };
+    const headers = { [ClockifyHeaders.LIFECYCLE_TOKEN]: token };
+
+    let statusHandled = false;
+    const statusHandler = withClockifyStatusChangedLifecycleRequest(
+      parser(),
+      async (_request, payload, claims, context) => {
+        statusHandled = true;
+        expect(payload).toBe(statusPayload);
+        expect(context.payload).toBe(statusPayload);
+        const workspaceId: string = claims.workspaceId;
+        const addonId: string = claims.addonId;
+        return { status: 200, body: { workspaceId, addonId, lifecycleStatus: payload.status } };
+      },
+      { expectedWorkspaceId: WORKSPACE_ID, expectedAddonId: ADDON_ID },
+    );
+
+    await expect(statusHandler({ ...request(headers), body: statusPayload })).resolves.toEqual({
+      status: 200,
+      body: { workspaceId: WORKSPACE_ID, addonId: ADDON_ID, lifecycleStatus: "ACTIVE" },
+    });
+    expect(statusHandled).toBe(true);
+
+    const settingsHandler = withClockifySettingsUpdatedLifecycleRequest(
+      parser(),
+      async (_request, payload, claims, context) => {
+        expect(payload).toBe(settingsPayload);
+        expect(context.claims).toBe(claims);
+        return { status: 200, body: { settings: payload.settings.length } };
+      },
+      { expectedWorkspaceId: WORKSPACE_ID, expectedAddonId: ADDON_ID },
+    );
+    await expect(settingsHandler({ ...request(headers), body: settingsPayload })).resolves.toEqual({
+      status: 200,
+      body: { settings: 1 },
+    });
+
+    const deletedHandler = withClockifyDeletedLifecycleRequest(
+      parser(),
+      async (_request, payload) => ({ status: 200, body: { asUser: payload.asUser } }),
+      { expectedWorkspaceId: WORKSPACE_ID, expectedAddonId: ADDON_ID },
+    );
+    await expect(deletedHandler({ ...request(headers), body: deletedPayload })).resolves.toEqual({
+      status: 200,
+      body: { asUser: "admin-user" },
+    });
+
+    statusHandled = false;
+    await expect(
+      statusHandler({
+        ...request(headers),
+        body: { ...statusPayload, workspaceId: "other-workspace" },
+      }),
+    ).resolves.toEqual({ status: 401, body: "Unauthorized" });
+    expect(statusHandled).toBe(false);
+
+    await expect(
+      settingsHandler({
+        ...request(headers),
+        body: { addonId: ADDON_ID, workspaceId: WORKSPACE_ID, settings: [{ id: "bad" }] },
+      }),
+    ).resolves.toEqual({ status: 401, body: "Unauthorized" });
+
+    await expect(deletedHandler(request({}))).resolves.toEqual({
+      status: 401,
+      body: "Unauthorized",
+    });
   });
 
   it("wraps webhook handlers with stored-token lookup and strict context checks", async () => {

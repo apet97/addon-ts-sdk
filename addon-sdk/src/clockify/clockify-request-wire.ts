@@ -30,14 +30,23 @@ export function getClockifyHeader(
   headers: AddonRequest["headers"],
   name: string,
 ): string | undefined {
+  return getClockifyHeaderValues(headers, name)[0];
+}
+
+export function getClockifyHeaderValues(headers: AddonRequest["headers"], name: string): string[] {
   const expected = name.toLowerCase();
+  const values: string[] = [];
 
   for (const [headerName, value] of Object.entries(headers)) {
     if (headerName.toLowerCase() !== expected) continue;
-    return Array.isArray(value) ? value[0] : value;
+    if (Array.isArray(value)) {
+      values.push(...value);
+    } else if (value !== undefined) {
+      values.push(value);
+    }
   }
 
-  return undefined;
+  return values;
 }
 
 export function getClockifyQueryParam(

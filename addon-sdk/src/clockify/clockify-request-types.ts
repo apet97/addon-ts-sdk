@@ -2,8 +2,11 @@ import type { AddonRequest } from "../shared/request";
 import type { AddonResponse } from "../shared/response";
 import type { ClockifyAddonClaims } from "./clockify-signature-parser";
 import type {
+  ClockifyDeletedLifecyclePayload,
   ClockifyInstalledLifecyclePayload,
   ClockifyLifecycleMatchedClaims,
+  ClockifySettingsUpdatedLifecyclePayload,
+  ClockifyStatusChangedLifecyclePayload,
 } from "./clockify-lifecycle";
 
 export interface ClockifyRequestVerificationOptions {
@@ -30,8 +33,10 @@ export interface ClockifyTokenVerificationOptions {
 
 export type ClockifyRequestVerificationFailureReason =
   | "missing-signature"
+  | "ambiguous-signature"
   | "invalid-signature"
   | "missing-event-type"
+  | "ambiguous-event-type"
   | "event-type-mismatch"
   | "workspace-id-mismatch"
   | "addon-id-mismatch";
@@ -42,6 +47,7 @@ export type ClockifyWebhookVerificationFailureReason =
   | "webhook-token-mismatch";
 
 export type ClockifyTokenVerificationFailureReason =
+  | "ambiguous-token"
   | "missing-token"
   | "invalid-token"
   | "workspace-id-mismatch"
@@ -121,11 +127,47 @@ export interface ClockifyInstalledLifecycleRequestContext {
   payload: ClockifyInstalledLifecyclePayload;
 }
 
+export interface ClockifyStatusChangedLifecycleRequestContext {
+  claims: ClockifyLifecycleMatchedClaims;
+  payload: ClockifyStatusChangedLifecyclePayload;
+}
+
+export interface ClockifySettingsUpdatedLifecycleRequestContext {
+  claims: ClockifyLifecycleMatchedClaims;
+  payload: ClockifySettingsUpdatedLifecyclePayload;
+}
+
+export interface ClockifyDeletedLifecycleRequestContext {
+  claims: ClockifyLifecycleMatchedClaims;
+  payload: ClockifyDeletedLifecyclePayload;
+}
+
 export type ClockifyInstalledLifecycleRequestHandler = (
   request: AddonRequest,
   payload: ClockifyInstalledLifecyclePayload,
   claims: ClockifyLifecycleMatchedClaims,
   context: ClockifyInstalledLifecycleRequestContext,
+) => AddonResponse | Promise<AddonResponse>;
+
+export type ClockifyStatusChangedLifecycleRequestHandler = (
+  request: AddonRequest,
+  payload: ClockifyStatusChangedLifecyclePayload,
+  claims: ClockifyLifecycleMatchedClaims,
+  context: ClockifyStatusChangedLifecycleRequestContext,
+) => AddonResponse | Promise<AddonResponse>;
+
+export type ClockifySettingsUpdatedLifecycleRequestHandler = (
+  request: AddonRequest,
+  payload: ClockifySettingsUpdatedLifecyclePayload,
+  claims: ClockifyLifecycleMatchedClaims,
+  context: ClockifySettingsUpdatedLifecycleRequestContext,
+) => AddonResponse | Promise<AddonResponse>;
+
+export type ClockifyDeletedLifecycleRequestHandler = (
+  request: AddonRequest,
+  payload: ClockifyDeletedLifecyclePayload,
+  claims: ClockifyLifecycleMatchedClaims,
+  context: ClockifyDeletedLifecycleRequestContext,
 ) => AddonResponse | Promise<AddonResponse>;
 
 export interface ClockifyWebhookAuthTokenLookupInput {

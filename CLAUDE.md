@@ -46,9 +46,9 @@ starts at Node 22. Independent, unofficial project, not affiliated with Clockify
 npm run ci:verify
 ```
 
-This runs type-check, generated drift, tests, lint, format check, build, `verify:dist`, pack dry-run,
-installed-package consumer smoke, production audit, and full audit. GitHub Actions runs the same
-gate on Node 22.x and 24.x.
+This runs workspace dependency resolution, type-check, generated drift, tests, lint, format check,
+build, `verify:dist`, pack dry-run, installed-package consumer smoke, production audit, and full
+audit. GitHub Actions runs the same gate on Node 22.x and 24.x.
 
 ## Gotchas (learned the hard way)
 
@@ -62,8 +62,9 @@ gate on Node 22.x and 24.x.
 - `npm pack --dry-run` invokes `prepack`, so it re-runs the heavy gate chain. Use
   `find addon-sdk -maxdepth 1 -name '*.tgz' -print` afterward when checking for accidental artifacts.
 - `verify:package-consumer` stays outside `prepack`: it packs the already-built package with scripts
-  ignored, installs that tarball into temporary ESM and CJS consumers, and imports public subpaths
-  from the installed dependency.
+  ignored, installs that tarball into temporary ESM, CJS, and TypeScript consumers, imports public
+  subpaths from the installed dependency, and catches declaration leaks such as non-optional Express
+  types.
 - `npm run lint` and `npm run format:check` are real check-only gates. The package configs ignore
   vendored Marketplace docs, schema/provenance files, generated Clockify models, `dist`, `coverage`,
   `node_modules`, and dry-run tarballs.

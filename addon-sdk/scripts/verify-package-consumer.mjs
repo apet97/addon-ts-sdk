@@ -1,11 +1,22 @@
 import { execFileSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const packageRoot = join(fileURLToPath(new URL(".", import.meta.url)), "..");
 const workspace = mkdtempSync(join(tmpdir(), "clockify-addon-sdk-consumer-"));
+const require = createRequire(import.meta.url);
+const tscBin = require.resolve("typescript/bin/tsc");
+const nodeTypesPackage = dirname(require.resolve("@types/node/package.json"));
+const undiciTypesPackage = dirname(require.resolve("undici-types/package.json"));
+const typesRoot = join(workspace, "types");
+const tempNodeModules = join(workspace, "node_modules");
+mkdirSync(typesRoot, { recursive: true });
+mkdirSync(tempNodeModules, { recursive: true });
+cpSync(nodeTypesPackage, join(typesRoot, "node"), { recursive: true });
+cpSync(undiciTypesPackage, join(tempNodeModules, "undici-types"), { recursive: true });
 
 function run(command, args, options = {}) {
   return execFileSync(command, args, {
@@ -121,13 +132,111 @@ assert.equal(schemaProvenance.schemas["1.5"].file, "1.5.json");
   run(process.execPath, [script], { cwd: dir, stdio: "inherit" });
 }
 
+function runTypeScriptConsumer(dir) {
+  writeFileSync(
+    join(dir, "tsconfig.json"),
+    JSON.stringify(
+      {
+        compilerOptions: {
+          target: "ES2022",
+          module: "NodeNext",
+          moduleResolution: "NodeNext",
+          lib: ["ES2022"],
+          strict: true,
+          noEmit: true,
+          resolveJsonModule: true,
+          skipLibCheck: false,
+          typeRoots: [typesRoot],
+          types: ["node"],
+        },
+        include: ["smoke.ts"],
+      },
+      null,
+      2,
+    ),
+    "utf8",
+  );
+  writeFileSync(
+    join(dir, "smoke.ts"),
+    `import {
+  ClockifyAddon,
+  ClockifyComponent,
+  ClockifyManifest,
+  createClockifyNumberSetting,
+  generated,
+  testing,
+  withClockifyVerifiedComponentRequest,
+  type ClockifyVerifiedWebhookRequestOptions,
+} from "@apet97/clockify-addon-sdk";
+import * as clockify from "@apet97/clockify-addon-sdk/clockify";
+import { createNodeHttpAddonServer, handleFetchRequest } from "@apet97/clockify-addon-sdk/adapters";
+import { generateTestKeys } from "@apet97/clockify-addon-sdk/testing";
+import schema15 from "@apet97/clockify-addon-sdk/schemas/clockify-manifests/1.5.json" with { type: "json" };
+import schemaProvenance from "@apet97/clockify-addon-sdk/schemas/clockify-manifests/provenance.json" with { type: "json" };
+
+const manifest = ClockifyManifest.v1_5Builder()
+  .key("typed-consumer-addon")
+  .name("Typed Consumer Add-on")
+  .baseUrl("https://example.com/addon")
+  .requireBasicPlan()
+  .build();
+const addon = new ClockifyAddon(manifest);
+addon.registerComponent(
+  ClockifyComponent.v1_5Builder().activityTab().allowAdmins().path("/component").label("Component").build(),
+  withClockifyVerifiedComponentRequest(
+    clockify.createClockifySignatureParser("typed-consumer-addon"),
+    async (_request, claims) => ({ status: 200, body: { user: claims.user } }),
+  ),
+);
+
+const fixedWebhookOptions: ClockifyVerifiedWebhookRequestOptions = {
+  expectedEventType: "EXPENSE_CREATED",
+  expectedWebhookAuthToken: "stored-token",
+};
+
+const lookupWebhookOptions: ClockifyVerifiedWebhookRequestOptions = {
+  expectedEventType: "EXPENSE_CREATED",
+  getExpectedWebhookAuthToken: () => "stored-token",
+};
+
+// @ts-expect-error webhook wrappers must choose either a fixed token or a lookup, not both
+const ambiguousWebhookOptions: ClockifyVerifiedWebhookRequestOptions = {
+  expectedEventType: "EXPENSE_CREATED",
+  expectedWebhookAuthToken: "stored-token",
+  getExpectedWebhookAuthToken: () => "stored-token",
+};
+
+void createClockifyNumberSetting({ id: "n", name: "Number", accessLevel: "ADMINS", value: 1 });
+void generated.v1_5.ClockifyManifestBuilder;
+void testing.signTestToken;
+void generateTestKeys;
+void createNodeHttpAddonServer(addon);
+void handleFetchRequest;
+void schema15.version;
+void schemaProvenance.supportedVersions;
+void fixedWebhookOptions;
+void lookupWebhookOptions;
+void ambiguousWebhookOptions;
+`,
+    "utf8",
+  );
+  run(process.execPath, [tscBin, "-p", "tsconfig.json", "--noEmit"], {
+    cwd: dir,
+    stdio: "inherit",
+  });
+}
+
 try {
   const tarball = packTarball();
   mkdirSync(join(workspace, "esm-consumer"), { recursive: true });
   mkdirSync(join(workspace, "cjs-consumer"), { recursive: true });
+  mkdirSync(join(workspace, "ts-consumer"), { recursive: true });
   runEsmConsumer(prepareConsumer("esm-consumer", "module", tarball));
   runCjsConsumer(prepareConsumer("cjs-consumer", "commonjs", tarball));
-  console.log("verify:package-consumer OK - packed tarball imports in ESM and CJS consumers.");
+  runTypeScriptConsumer(prepareConsumer("ts-consumer", "module", tarball));
+  console.log(
+    "verify:package-consumer OK - packed tarball imports in ESM and CJS consumers and type-checks in a TypeScript consumer.",
+  );
 } finally {
   rmSync(workspace, { recursive: true, force: true });
 }

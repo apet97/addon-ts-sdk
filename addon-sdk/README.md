@@ -181,4 +181,5 @@ console.log(schemaProvenance.supportedVersions);
 - [Manifest Builders](./docs/manifest-builders.md)
 - [Routing and Middleware](./docs/routing.md)
 - [Token Signature Validation](./docs/token-validation.md)
+- [Secure Server Recipe](./docs/secure-server-recipe.md)
 - [Dependency Strategy](./docs/dependency-strategy.md)

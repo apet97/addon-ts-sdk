@@ -88,4 +88,36 @@ describe("live schema verification script", () => {
       await close(server);
     }
   }, 15_000);
+
+  it("fails clearly when the live schema endpoint exceeds the configured timeout", async () => {
+    const server = createServer(() => {
+      // Intentionally never responds; the verification script must enforce its own fetch timeout.
+    });
+
+    const port = await listen(server);
+    try {
+      await expect(
+        execFileAsync(
+          process.execPath,
+          [
+            scriptPath,
+            "--schemas-dir",
+            schemasDir,
+            "--base-url",
+            `http://127.0.0.1:${port}/manifest-schema`,
+            "--unsupported-version",
+            "1.6",
+            "--timeout-ms",
+            "20",
+          ],
+          { cwd: packageRoot, encoding: "utf8", timeout: 1_000 },
+        ),
+      ).rejects.toMatchObject({
+        code: 1,
+        stderr: expect.stringContaining("timed out after 20ms"),
+      });
+    } finally {
+      await close(server);
+    }
+  }, 5_000);
 });

@@ -85,7 +85,8 @@ Plain JavaScript callers that omit `expectedEventType` receive `{ ok: false, rea
 
 Lifecycle and component routes are served by `verifyClockifyLifecycleRequest()` and
 `verifyClockifyComponentRequest()`, which read the `x-addon-lifecycle-token` header and the
-`auth_token` query parameter automatically (shown below).
+`auth_token` query parameter automatically (shown below). They reject duplicate lifecycle-token
+headers or duplicate `auth_token` query parameters instead of accepting an arbitrary first value.
 
 The helper returns a typed result instead of throwing, so applications can keep their own logging and
 response policy. `withClockifyVerifiedRequest()` is a small convenience wrapper that returns `401`

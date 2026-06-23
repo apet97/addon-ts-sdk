@@ -4,27 +4,30 @@ The root `npm run ci:verify` script is the canonical local and CI gate. It runs 
 through npm workspaces and mirrors the package's `prepack` chain, so the published tarball is always
 built and verified from a green tree.
 
-1. **`npm run type-check`** — `tsc -p tsconfig.typecheck.json`. Compiles `src`, the generator,
+1. **`npm run verify:deps`** — `npm ls --workspaces --depth=0`. Confirms the workspace dependency
+   tree resolves before the heavier package checks run.
+2. **`npm run type-check`** — `tsc -p tsconfig.typecheck.json`. Compiles `src`, the generator,
    `examples`, and the type-state probes under `tests/types/*.probe.ts` (guarded by
    `tests/typecheck-gate.test.ts`), so a weakened builder fails this gate.
-2. **`npm run verify:generated`** — verifies schema provenance, generates fresh output in a temporary
+3. **`npm run verify:generated`** — verifies schema provenance, generates fresh output in a temporary
    directory, compares it with committed `src/clockify/generated/**`, and removes the temporary files
    before exit.
-3. **`npm run test`** — the full `vitest` suite.
-4. **`npm run lint`** — check-only ESLint over the package source, tests, scripts, examples, and docs
+4. **`npm run test`** — the full `vitest` suite.
+5. **`npm run lint`** — check-only ESLint over the package source, tests, scripts, examples, and docs
    where applicable.
-5. **`npm run format:check`** — check-only Prettier over the package. Vendored Marketplace docs,
+6. **`npm run format:check`** — check-only Prettier over the package. Vendored Marketplace docs,
    manifest schemas, generated Clockify models, build output, coverage, and tarballs are ignored.
-6. **`npm run build`** — emits the ESM and CJS outputs with type declarations.
-7. **`npm run verify:dist`** — imports the **built** ESM and CJS and boots the README quick-start; a
+7. **`npm run build`** — emits the ESM and CJS outputs with type declarations.
+8. **`npm run verify:dist`** — imports the **built** ESM and CJS and boots the README quick-start; a
    green `build` alone does not prove the package imports.
-8. **`npm run pack:dry-run`** — confirms the tarball contents (`dist` + `docs` + vendored
+9. **`npm run pack:dry-run`** — confirms the tarball contents (`dist` + `docs` + vendored
    `schemas/clockify-manifests` + `LICENSE` + `README`).
-9. **`npm run verify:package-consumer`** — packs the already-built package with `--ignore-scripts`,
-   installs that tarball into temporary ESM and CJS consumers, imports the root and subpath entry
-   points, checks `generated.v1_5`, and boots a `/manifest` server smoke from the installed package.
-10. **`npm audit --omit=dev --json` and `npm audit --json`** — production and full dependency audit;
-   both should report 0 vulnerabilities.
+10. **`npm run verify:package-consumer`** — packs the already-built package with `--ignore-scripts`,
+    installs that tarball into temporary ESM, CJS, and TypeScript consumers, imports the root and
+    subpath entry points, checks `generated.v1_5`, type-checks declarations without requiring
+    Express types, and boots a `/manifest` server smoke from the installed package.
+11. **`npm audit --omit=dev --json` and `npm audit --json`** — production and full dependency audit;
+    both should report 0 vulnerabilities.
 
 Manual freshness check:
 

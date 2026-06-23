@@ -1,13 +1,20 @@
 import type { AddonResponse } from "../shared/response";
 import type { RequestHandler } from "../shared/handler";
 import type { ClockifySignatureParser } from "./clockify-signature-parser";
+import type { ClockifyLifecycleMatchedClaims } from "./clockify-lifecycle";
 import {
   clockifyLifecyclePayloadMatchesClaims,
+  isClockifyDeletedLifecyclePayload,
   isClockifyInstalledLifecyclePayload,
+  isClockifySettingsUpdatedLifecyclePayload,
+  isClockifyStatusChangedLifecyclePayload,
 } from "./clockify-lifecycle";
 import {
+  ClockifyDeletedLifecycleRequestHandler,
   ClockifyInstalledLifecycleRequestHandler,
   ClockifyRequestVerificationOptions,
+  ClockifySettingsUpdatedLifecycleRequestHandler,
+  ClockifyStatusChangedLifecycleRequestHandler,
   ClockifyTokenVerificationOptions,
   ClockifyVerifiedComponentRequestHandler,
   ClockifyVerifiedLifecycleRequestHandler,
@@ -28,6 +35,40 @@ function unauthorizedResponse(): AddonResponse {
 
 function isNonEmptyString(value: unknown): value is string {
   return typeof value === "string" && value.trim() !== "";
+}
+
+function withClockifyMatchedLifecycleRequest<Payload>(
+  parser: ClockifySignatureParser,
+  isPayload: (value: unknown) => value is Payload,
+  handler: (
+    request: Parameters<RequestHandler>[0],
+    payload: Payload,
+    claims: ClockifyLifecycleMatchedClaims,
+    context: {
+      claims: ClockifyLifecycleMatchedClaims;
+      payload: Payload;
+    },
+  ) => ReturnType<RequestHandler>,
+  options: ClockifyTokenVerificationOptions = {},
+): RequestHandler {
+  return async (request) => {
+    const result = await verifyClockifyLifecycleRequest(parser, request, options);
+    if (!result.ok) {
+      return unauthorizedResponse();
+    }
+
+    if (
+      !isPayload(request.body) ||
+      !clockifyLifecyclePayloadMatchesClaims(request.body, result.claims)
+    ) {
+      return unauthorizedResponse();
+    }
+
+    return handler(request, request.body, result.claims, {
+      claims: result.claims,
+      payload: request.body,
+    });
+  };
 }
 
 export function withClockifyVerifiedRequest(
@@ -83,24 +124,51 @@ export function withClockifyInstalledLifecycleRequest(
   handler: ClockifyInstalledLifecycleRequestHandler,
   options: ClockifyTokenVerificationOptions = {},
 ): RequestHandler {
-  return async (request) => {
-    const result = await verifyClockifyLifecycleRequest(parser, request, options);
-    if (!result.ok) {
-      return unauthorizedResponse();
-    }
+  return withClockifyMatchedLifecycleRequest(
+    parser,
+    isClockifyInstalledLifecyclePayload,
+    handler,
+    options,
+  );
+}
 
-    if (
-      !isClockifyInstalledLifecyclePayload(request.body) ||
-      !clockifyLifecyclePayloadMatchesClaims(request.body, result.claims)
-    ) {
-      return unauthorizedResponse();
-    }
+export function withClockifyStatusChangedLifecycleRequest(
+  parser: ClockifySignatureParser,
+  handler: ClockifyStatusChangedLifecycleRequestHandler,
+  options: ClockifyTokenVerificationOptions = {},
+): RequestHandler {
+  return withClockifyMatchedLifecycleRequest(
+    parser,
+    isClockifyStatusChangedLifecyclePayload,
+    handler,
+    options,
+  );
+}
 
-    return handler(request, request.body, result.claims, {
-      claims: result.claims,
-      payload: request.body,
-    });
-  };
+export function withClockifySettingsUpdatedLifecycleRequest(
+  parser: ClockifySignatureParser,
+  handler: ClockifySettingsUpdatedLifecycleRequestHandler,
+  options: ClockifyTokenVerificationOptions = {},
+): RequestHandler {
+  return withClockifyMatchedLifecycleRequest(
+    parser,
+    isClockifySettingsUpdatedLifecyclePayload,
+    handler,
+    options,
+  );
+}
+
+export function withClockifyDeletedLifecycleRequest(
+  parser: ClockifySignatureParser,
+  handler: ClockifyDeletedLifecycleRequestHandler,
+  options: ClockifyTokenVerificationOptions = {},
+): RequestHandler {
+  return withClockifyMatchedLifecycleRequest(
+    parser,
+    isClockifyDeletedLifecyclePayload,
+    handler,
+    options,
+  );
 }
 
 export function withClockifyVerifiedWebhookRequest(

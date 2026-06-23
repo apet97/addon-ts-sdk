@@ -17,8 +17,9 @@
     "pack:dry-run": "npm pack --dry-run -w @apet97/clockify-addon-sdk",
     "release:dry-run": "npm publish --dry-run -w @apet97/clockify-addon-sdk --access public",
     "release:verify": "npm run ci:verify && npm run verify:schema-live && npm run release:dry-run",
+    "verify:deps": "npm ls --workspaces --depth=0",
     "audit:prod": "npm audit --omit=dev --json",
     "audit:all": "npm audit --json",
-    "ci:verify": "npm run type-check && npm run verify:generated && npm run test && npm run lint && npm run format:check && npm run build && npm run verify:dist && npm run pack:dry-run && npm run verify:package-consumer && npm run audit:prod && npm run audit:all"
+    "ci:verify": "npm run verify:deps && npm run type-check && npm run verify:generated && npm run test && npm run lint && npm run format:check && npm run build && npm run verify:dist && npm run pack:dry-run && npm run verify:package-consumer && npm run audit:prod && npm run audit:all"
   }
 }

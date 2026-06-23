@@ -6,11 +6,23 @@ import { fileURLToPath } from "node:url";
 const packageRoot = join(fileURLToPath(new URL(".", import.meta.url)), "..");
 const DEFAULT_BASE_URL = "https://api.clockify.me/api/addons/manifest-schema";
 const DEFAULT_UNSUPPORTED_VERSION = "1.6";
+const DEFAULT_TIMEOUT_MS = 15_000;
 
 function argValue(name) {
   const index = process.argv.indexOf(name);
   if (index === -1) return undefined;
   return process.argv[index + 1];
+}
+
+function positiveIntegerArg(name, fallback) {
+  const raw = argValue(name);
+  if (raw === undefined) return fallback;
+  const value = Number(raw);
+  if (!Number.isSafeInteger(value) || value < 1) {
+    console.error(`${name} must be a positive integer.`);
+    process.exit(1);
+  }
+  return value;
 }
 
 function stable(value) {
@@ -43,10 +55,20 @@ function hashBody(body) {
   return createHash("sha256").update(body).digest("hex");
 }
 
-async function fetchSchema(baseUrl, version) {
-  const response = await fetch(schemaUrl(baseUrl, version));
-  const body = await response.text();
-  return { response, body };
+async function fetchSchema(baseUrl, version, timeoutMs) {
+  try {
+    const response = await fetch(schemaUrl(baseUrl, version), {
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+    const body = await response.text();
+    return { response, body };
+  } catch (error) {
+    if (error?.name === "TimeoutError" || error?.name === "AbortError") {
+      fail(`Live schema ${version} timed out after ${timeoutMs}ms.`);
+      return undefined;
+    }
+    throw error;
+  }
 }
 
 function fail(message) {
@@ -59,6 +81,7 @@ const schemasDir = resolve(
 );
 const baseUrl = argValue("--base-url") ?? DEFAULT_BASE_URL;
 const unsupportedVersion = argValue("--unsupported-version") ?? DEFAULT_UNSUPPORTED_VERSION;
+const timeoutMs = positiveIntegerArg("--timeout-ms", DEFAULT_TIMEOUT_MS);
 const provenance = loadProvenance(schemasDir);
 const supportedVersions = provenance.supportedVersions ?? [];
 
@@ -70,7 +93,9 @@ for (const version of supportedVersions) {
   }
 
   const vendored = JSON.parse(readFileSync(join(schemasDir, entry.file), "utf8"));
-  const { response, body } = await fetchSchema(baseUrl, version);
+  const fetched = await fetchSchema(baseUrl, version, timeoutMs);
+  if (!fetched) continue;
+  const { response, body } = fetched;
 
   if (!response.ok) {
     fail(`Live schema ${version} returned HTTP ${response.status}.`);
@@ -96,8 +121,8 @@ for (const version of supportedVersions) {
   console.log(`OK: live schema ${version} matches ${entry.file} structurally${rawSuffix}`);
 }
 
-const unsupported = await fetchSchema(baseUrl, unsupportedVersion);
-if (unsupported.response.status !== 400) {
+const unsupported = await fetchSchema(baseUrl, unsupportedVersion, timeoutMs);
+if (unsupported && unsupported.response.status !== 400) {
   fail(
     `Expected schema ${unsupportedVersion} to return HTTP 400, got ${unsupported.response.status}.`,
   );

@@ -37,6 +37,10 @@ async function readFetchBody(request: Request, maxBodyBytes: number): Promise<Ui
   return body;
 }
 
+function isHeaderValueArray(value: string | readonly string[]): value is readonly string[] {
+  return Array.isArray(value);
+}
+
 export async function handleFetchRequest(
   addon: Addon<unknown>,
   request: Request,
@@ -89,7 +93,13 @@ export async function handleFetchRequest(
     const responseHeaders = new Headers();
     if (response.headers) {
       for (const [key, value] of Object.entries(response.headers)) {
-        responseHeaders.set(key, value);
+        if (isHeaderValueArray(value)) {
+          for (const item of value) {
+            responseHeaders.append(key, item);
+          }
+        } else {
+          responseHeaders.set(key, value);
+        }
       }
     }
 

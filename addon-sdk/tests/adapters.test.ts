@@ -217,6 +217,20 @@ describe("Adapters", () => {
     expect(writeSpy).toHaveBeenCalledWith("<h1>Hello</h1>");
   });
 
+  it("preserves array-valued response headers in Node HTTP responses", () => {
+    const mockRes = new ServerResponse(new IncomingMessage(new Socket()));
+    const endSpy = vi.spyOn(mockRes, "end").mockImplementation(() => mockRes);
+    const headerSpy = vi.spyOn(mockRes, "setHeader").mockImplementation(() => mockRes);
+
+    writeNodeResponse(mockRes, {
+      status: 204,
+      headers: { "set-cookie": ["a=1", "b=2"] },
+    });
+
+    expect(headerSpy).toHaveBeenCalledWith("set-cookie", ["a=1", "b=2"]);
+    expect(endSpy).toHaveBeenCalled();
+  });
+
   it("should parse Node HTTP requests with JSON and text bodies via fromNodeRequest", async () => {
     const mockReq = new IncomingMessage(new Socket());
     mockReq.headers = { host: "localhost" };
@@ -333,6 +347,22 @@ describe("Adapters", () => {
     expect(Array.from(new Uint8Array(await response.arrayBuffer()))).toEqual([1, 2, 3]);
   });
 
+  it("appends array-valued response headers in the Fetch adapter", async () => {
+    const addon = new ClockifyAddon(mockManifest);
+    addon.registerHandler("/headers", "GET", () => ({
+      status: 204,
+      headers: { "x-clockify-trace": ["first", "second"] },
+    }));
+
+    const response = await handleFetchRequest(
+      addon,
+      new Request("https://example.com/headers", { method: "GET" }),
+    );
+
+    expect(response.status).toBe(204);
+    expect(response.headers.get("x-clockify-trace")).toBe("first, second");
+  });
+
   it("sends Uint8Array response bodies as raw bytes via the Express adapter", async () => {
     const addon = new ClockifyAddon(mockManifest);
     addon.registerHandler("/binary", "POST", () => ({
@@ -363,5 +393,34 @@ describe("Adapters", () => {
 
     expect(jsonSpy).not.toHaveBeenCalled();
     expect(sendSpy).toHaveBeenCalledWith(Buffer.from([1, 2, 3]));
+  });
+
+  it("passes array-valued response headers through the Express adapter", async () => {
+    const addon = new ClockifyAddon(mockManifest);
+    addon.registerHandler("/headers", "GET", () => ({
+      status: 204,
+      headers: { "set-cookie": ["a=1", "b=2"] },
+    }));
+    const handler = createExpressAddonHandler(addon);
+
+    const mockReq = {
+      method: "GET",
+      url: "/headers",
+      path: "/headers",
+      headers: {},
+      query: {},
+    };
+    const setSpy = vi.fn().mockReturnThis();
+    const mockRes = {
+      status: vi.fn().mockReturnThis(),
+      set: setSpy,
+      json: vi.fn().mockReturnThis(),
+      send: vi.fn().mockReturnThis(),
+      end: vi.fn().mockReturnThis(),
+    };
+
+    await handler(mockReq, mockRes);
+
+    expect(setSpy).toHaveBeenCalledWith({ "set-cookie": ["a=1", "b=2"] });
   });
 });

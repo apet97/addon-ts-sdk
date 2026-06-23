@@ -1,6 +1,6 @@
 export interface AddonResponse {
   readonly status?: number;
-  readonly headers?: Record<string, string>;
+  readonly headers?: Record<string, string | readonly string[]>;
   readonly body?: string | Uint8Array | object | null;
 }
 

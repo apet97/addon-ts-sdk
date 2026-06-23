@@ -11,8 +11,7 @@ import {
 import {
   ClockifyHeaders,
   ClockifyQueryParams,
-  getClockifyHeader,
-  getClockifyQueryParam,
+  getClockifyHeaderValues,
 } from "./clockify-request-wire";
 
 function checkClockifyClaimContext(
@@ -31,13 +30,48 @@ function checkClockifyClaimContext(
   return undefined;
 }
 
+function getSingleClockifyHeader<
+  Reason extends "ambiguous-signature" | "ambiguous-event-type" | "ambiguous-token",
+>(
+  headers: AddonRequest["headers"],
+  name: string,
+  ambiguousReason: Reason,
+): { ok: true; value?: string } | { ok: false; reason: Reason } {
+  const values = getClockifyHeaderValues(headers, name);
+  if (values.length > 1) {
+    return { ok: false, reason: ambiguousReason };
+  }
+  return { ok: true, value: values[0] };
+}
+
+function getSingleClockifyQueryParam(
+  query: AddonRequest["query"],
+  name: string,
+): { ok: true; value?: string } | { ok: false; reason: "ambiguous-token" } {
+  const values = query?.getAll(name) ?? [];
+  if (values.length > 1) {
+    return { ok: false, reason: "ambiguous-token" };
+  }
+  return { ok: true, value: values[0] };
+}
+
 export async function verifyClockifyRequest(
   parser: ClockifySignatureParser,
   request: AddonRequest,
   options: ClockifyRequestVerificationOptions = {},
 ): Promise<ClockifyRequestVerificationResult> {
   const signatureHeader = options.signatureHeader ?? ClockifyHeaders.SIGNATURE;
-  const token = getClockifyHeader(request.headers, signatureHeader);
+  const signature = getSingleClockifyHeader(
+    request.headers,
+    signatureHeader,
+    "ambiguous-signature",
+  );
+
+  if (!signature.ok) {
+    return signature;
+  }
+
+  const token = signature.value;
 
   if (!token) {
     return { ok: false, reason: "missing-signature" };
@@ -56,7 +90,13 @@ export async function verifyClockifyRequest(
   }
 
   const eventHeader = options.eventHeader ?? ClockifyHeaders.WEBHOOK_EVENT_TYPE;
-  const eventType = getClockifyHeader(request.headers, eventHeader);
+  const event = getSingleClockifyHeader(request.headers, eventHeader, "ambiguous-event-type");
+
+  if (!event.ok) {
+    return event;
+  }
+
+  const eventType = event.value;
 
   if (options.expectedEventType !== undefined) {
     if (!eventType) {
@@ -84,7 +124,17 @@ export async function verifyClockifyWebhookRequest(
   }
 
   const signatureHeader = options.signatureHeader ?? ClockifyHeaders.SIGNATURE;
-  const token = getClockifyHeader(request.headers, signatureHeader);
+  const signature = getSingleClockifyHeader(
+    request.headers,
+    signatureHeader,
+    "ambiguous-signature",
+  );
+
+  if (!signature.ok) {
+    return signature;
+  }
+
+  const token = signature.value;
 
   if (!token) {
     return { ok: false, reason: "missing-signature" };
@@ -133,26 +183,32 @@ export async function verifyClockifyToken(
   return { ok: true, claims };
 }
 
-export function verifyClockifyComponentRequest(
+export async function verifyClockifyComponentRequest(
   parser: ClockifySignatureParser,
   request: AddonRequest,
   options: ClockifyTokenVerificationOptions = {},
 ): Promise<ClockifyTokenVerificationResult> {
-  return verifyClockifyToken(
-    parser,
-    getClockifyQueryParam(request.query, ClockifyQueryParams.AUTH_TOKEN),
-    options,
-  );
+  const token = getSingleClockifyQueryParam(request.query, ClockifyQueryParams.AUTH_TOKEN);
+  if (!token.ok) {
+    return token;
+  }
+
+  return verifyClockifyToken(parser, token.value, options);
 }
 
-export function verifyClockifyLifecycleRequest(
+export async function verifyClockifyLifecycleRequest(
   parser: ClockifySignatureParser,
   request: AddonRequest,
   options: ClockifyTokenVerificationOptions = {},
 ): Promise<ClockifyTokenVerificationResult> {
-  return verifyClockifyToken(
-    parser,
-    getClockifyHeader(request.headers, ClockifyHeaders.LIFECYCLE_TOKEN),
-    options,
+  const token = getSingleClockifyHeader(
+    request.headers,
+    ClockifyHeaders.LIFECYCLE_TOKEN,
+    "ambiguous-token",
   );
+  if (!token.ok) {
+    return token;
+  }
+
+  return verifyClockifyToken(parser, token.value, options);
 }

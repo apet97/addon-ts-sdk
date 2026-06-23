@@ -14,7 +14,7 @@ export interface ExpressLikeRequest {
 
 export interface ExpressLikeResponse {
   status(code: number): this;
-  set(headers: Record<string, string>): this;
+  set(headers: Record<string, string | readonly string[]>): this;
   json(body: unknown): unknown;
   send(body?: unknown): unknown;
   end(): unknown;

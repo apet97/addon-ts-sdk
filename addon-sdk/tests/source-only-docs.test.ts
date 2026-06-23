@@ -51,4 +51,16 @@ describe("source-only distribution docs", () => {
     expect(evidenceMap).toContain("clockify-request-handlers.ts");
     expect(evidenceMap).toContain("clockify-request-wire.ts");
   });
+
+  it("documents the secure server installation and webhook token recipe", () => {
+    const packageReadme = readFileSync(resolve(packageRoot, "README.md"), "utf8");
+    const recipe = readFileSync(resolve(packageRoot, "docs", "secure-server-recipe.md"), "utf8");
+
+    expect(packageReadme).toContain("Secure Server Recipe");
+    expect(recipe).toContain("withClockifyInstalledLifecycleRequest");
+    expect(recipe).toContain("getExpectedWebhookAuthToken");
+    expect(recipe).toContain("X-Addon-Token");
+    expect(recipe).toContain("server-side");
+    expect(recipe).toContain("does not add a Clockify REST client");
+  });
 });
