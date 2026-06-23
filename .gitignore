@@ -1,5 +1,7 @@
 node_modules/
 dist/
+coverage/
+addon-sdk/coverage/
 *.tgz
 .DS_Store
 .remember/

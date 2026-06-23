@@ -43,6 +43,8 @@ Conventions for anyone (human or agent) working in this repository.
 - Express remains an optional peer. Keep the adapter structurally typed so root imports and non-Express
   consumers do not need Express types installed.
 - Runtime support starts at Node 22. CI verifies Node 22.x and 24.x.
+- Source-build tooling uses TypeScript 6, Vitest 4, and Vite 8. Vite 8 requires Node 22.12+ within
+  the supported Node 22 line; do not raise package runtime support beyond `>=22` just for tooling.
 
 ## Gates
 
@@ -53,6 +55,7 @@ Conventions for anyone (human or agent) working in this repository.
 | `npm run type-check`                       | `src`, generator, examples, and the type-state probes. A weakened builder must fail this.                                                                                                                             |
 | `npm run verify:generated`                 | Checks schema provenance, generates to a temporary directory, compares against committed generated files, and leaves tracked files untouched.                                                                         |
 | `npm run test`                             | vitest suite.                                                                                                                                                                                                         |
+| `npm run test:coverage`                    | Advisory Vitest V8 coverage report over hand-written `src/**/*.ts`, excluding generated Clockify models. Do not add arbitrary thresholds without first recording and justifying the baseline.                       |
 | `npm run lint`                             | Check-only ESLint over the package.                                                                                                                                                                                   |
 | `npm run format:check`                     | Check-only Prettier over the package.                                                                                                                                                                                 |
 | `npm run build`                            | ESM + CJS output.                                                                                                                                                                                                     |

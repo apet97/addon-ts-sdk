@@ -10,6 +10,8 @@ A TypeScript SDK for the server side of a Clockify add-on: typed manifest builde
 router, runtime adapters, and RS256 webhook-signature verification. The package lives in
 `addon-sdk/`, with root npm scripts proxying the package gates through workspaces. Runtime support
 starts at Node 22. Independent, unofficial project, not affiliated with Clockify or CAKE.com.
+Source-build tooling uses TypeScript 6, Vitest 4, and Vite 8; Vite 8 requires Node 22.12+ within the
+supported Node 22 line, but package runtime support remains `>=22`.
 
 ## Non-negotiables
 
@@ -50,6 +52,14 @@ This runs workspace dependency resolution, type-check, generated drift, tests, l
 build, `verify:public-api`, `verify:dist`, pack dry-run, installed-package consumer smoke,
 package lint, production audit, and full audit. GitHub Actions runs the same gate on Node 22.x and
 24.x.
+
+For coverage visibility:
+
+```bash
+npm run test:coverage
+```
+
+This is advisory and excludes generated Clockify models.
 
 ## Gotchas (learned the hard way)
 

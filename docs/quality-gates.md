@@ -19,27 +19,31 @@ consumer, audit, or live-schema checks.
 4. **`npm run test`** — the full `vitest` suite.
    - **`npm run test:replay`** — focused local Clockify replay coverage for component auth-token,
      installed lifecycle, stored-token webhook verification, and negative token/workspace cases.
-5. **`npm run lint`** — check-only ESLint over the package source, tests, scripts, examples, and docs
+5. **`npm run test:coverage`** — advisory Vitest V8 coverage over hand-written `src/**/*.ts`, with
+   generated Clockify models and declaration files excluded. The current baseline from the Task 2
+   tooling pass was 95.32% statements, 89.78% branches, 98% functions, and 96.39% lines; thresholds
+   should only be added below a measured baseline and with generated code excluded.
+6. **`npm run lint`** — check-only ESLint over the package source, tests, scripts, examples, and docs
    where applicable.
-6. **`npm run format:check`** — check-only Prettier over the package. Vendored Marketplace docs,
+7. **`npm run format:check`** — check-only Prettier over the package. Vendored Marketplace docs,
    manifest schemas, generated Clockify models, build output, coverage, and tarballs are ignored.
-7. **`npm run build`** — emits the ESM and CJS outputs with type declarations.
-8. **`npm run verify:public-api`** — compares the built ESM declaration surface for the root,
+8. **`npm run build`** — emits the ESM and CJS outputs with type declarations.
+9. **`npm run verify:public-api`** — compares the built ESM declaration surface for the root,
    `/clockify`, `/adapters`, and `/testing` entry points against
    `addon-sdk/public-api.snapshot.md`. Intentional public API changes must run
    `npm run build && npm run verify:public-api -- --update` and include the snapshot diff.
-9. **`npm run verify:dist`** — imports the **built** ESM and CJS and boots the README quick-start; a
+10. **`npm run verify:dist`** — imports the **built** ESM and CJS and boots the README quick-start; a
    green `build` alone does not prove the package imports.
-10. **`npm run pack:dry-run`** — confirms the tarball contents (`dist` + `docs` + vendored
+11. **`npm run pack:dry-run`** — confirms the tarball contents (`dist` + `docs` + vendored
     `schemas/clockify-manifests` + `LICENSE` + `README`).
-11. **`npm run verify:package-lint`** — packs the already-built package with `--ignore-scripts`,
+12. **`npm run verify:package-lint`** — packs the already-built package with `--ignore-scripts`,
     then runs `publint --strict` and Are The Types Wrong with the Node16 profile against the packed
     tarball. Node10 findings are not release blockers because this SDK supports Node 22+.
-12. **`npm run verify:package-consumer`** — packs the already-built package with `--ignore-scripts`,
+13. **`npm run verify:package-consumer`** — packs the already-built package with `--ignore-scripts`,
     installs that tarball into temporary runtime ESM/CJS and TypeScript ESM/CJS consumers, imports
     the root and subpath entry points, checks `generated.v1_5`, type-checks declarations without
     requiring Express types, and boots a `/manifest` server smoke from the installed package.
-13. **`npm audit --omit=dev --json` and `npm audit --json`** — production and full dependency audit;
+14. **`npm audit --omit=dev --json` and `npm audit --json`** — production and full dependency audit;
     both should report 0 vulnerabilities.
 
 Manual freshness check:
@@ -50,7 +54,8 @@ Manual freshness check:
   depend on Clockify network availability.
 
 GitHub Actions runs the same root gate on Node 22.x and 24.x for pushes to `main`, pull requests,
-and manual dispatches. Node 22 is the minimum supported runtime.
+and manual dispatches. Node 22 is the minimum supported runtime. The source-build toolchain is
+TypeScript 6, Vitest 4, and Vite 8; Vite 8 requires Node 22.12+ within the supported Node 22 line.
 
 The package `prepack` chain includes type-check, generated drift, tests, lint, format check, build,
 `verify:public-api`, and `verify:dist`; `npm pack --dry-run` is therefore both a contents check and

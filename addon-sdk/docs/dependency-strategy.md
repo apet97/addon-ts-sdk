@@ -28,6 +28,20 @@ enough reason to block the upgrade, but it is not a package-level migration by i
 upgrade still needs the gates above, including installed ESM/CJS token signing and verification from
 `npm run verify:package-consumer`.
 
+## Build and test tooling
+
+The source-build toolchain intentionally tracks current majors when they preserve the SDK runtime
+contract:
+
+- TypeScript 6 emits the ESM and CJS declaration surfaces. Emit configs set `rootDir: "./src"` and
+  CJS uses `module`/`moduleResolution: "Node16"` so the package build avoids deprecated Node10
+  resolution.
+- Vitest 4 runs the test suite. `npm run test:coverage` uses the V8 coverage provider with text and
+  JSON summary reporters.
+- Vite 8 powers Vitest and requires Node 22.12+ within the supported Node 22 line. The published
+  package runtime support remains `>=22`; do not raise it just because the source-build tools have a
+  narrower patch-level requirement.
+
 ## Express
 
 The Express adapter is intentionally thin. Express stays an optional peer dependency and the SDK test
