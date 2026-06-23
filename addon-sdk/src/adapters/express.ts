@@ -22,10 +22,7 @@ export interface ExpressLikeResponse {
 
 export type ExpressLikeNextFunction = (error?: unknown) => void;
 
-function queryParamsFromExpressRequest(
-  req: ExpressLikeRequest,
-  requestUrl: URL,
-): URLSearchParams {
+function queryParamsFromExpressRequest(req: ExpressLikeRequest, requestUrl: URL): URLSearchParams {
   if (req.query !== undefined) {
     const queryParams = new URLSearchParams();
     for (const [key, val] of Object.entries(req.query)) {

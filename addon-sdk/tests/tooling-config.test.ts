@@ -23,4 +23,17 @@ describe("tooling configuration", () => {
     expect(config).not.toContain("all:");
     expect(config).not.toContain("extensions:");
   });
+
+  it("keeps Makefile aliases aligned with root npm gates", () => {
+    const makefile = readFileSync(resolve(repoRoot, "Makefile"), "utf8");
+
+    expect(makefile).toContain("verify-fast:");
+    expect(makefile).toContain("\tnpm run verify:fast");
+    expect(makefile).toContain("ci-verify:");
+    expect(makefile).toContain("\tnpm run ci:verify");
+    expect(makefile).toContain("package-lint:");
+    expect(makefile).toContain("\tnpm run verify:package-lint");
+    expect(makefile).toContain("addon-sdk-package: ci-verify");
+    expect(makefile).toContain("addon-sdk-parity: verify-fast");
+  });
 });

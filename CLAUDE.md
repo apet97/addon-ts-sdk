@@ -55,6 +55,10 @@ build, `verify:public-api`, `verify:dist`, pack dry-run, installed-package consu
 package lint, production audit, and full audit. GitHub Actions runs the same gate on Node 22.x and
 24.x.
 
+Live schema freshness is separate: `.github/workflows/schema-live.yml` runs
+`npm run verify:schema-live` on a schedule/manual dispatch so PR CI does not depend on Clockify's
+network.
+
 For coverage visibility:
 
 ```bash

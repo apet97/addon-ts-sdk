@@ -45,6 +45,19 @@ describe("live schema verification script", () => {
     expect(rootPackageJson.scripts["ci:verify"]).not.toContain("verify:schema-live");
   });
 
+  it("has a scheduled/manual GitHub workflow outside deterministic CI", () => {
+    const workflow = readFileSync(
+      resolve(repoRoot, ".github", "workflows", "schema-live.yml"),
+      "utf8",
+    );
+
+    expect(workflow).toContain("name: Live Schema Drift");
+    expect(workflow).toContain("workflow_dispatch:");
+    expect(workflow).toContain("schedule:");
+    expect(workflow).toContain("node-version: 24.x");
+    expect(workflow).toContain("npm run verify:schema-live");
+  });
+
   it("accepts structurally equal live schemas and rejects unsupported 1.6", async () => {
     const server = createServer((req, res) => {
       const url = new URL(req.url ?? "/", "http://127.0.0.1");

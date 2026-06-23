@@ -69,7 +69,8 @@ Conventions for anyone (human or agent) working in this repository.
 | `npm run audit:prod` / `npm run audit:all` | Production and full dependency audits; both should report 0 vulnerabilities.                                                                                                                                          |
 
 GitHub Actions runs `npm run ci:verify` on Node 22.x and 24.x for pushes to `main`, pull requests,
-and manual dispatches.
+and manual dispatches. A separate scheduled/manual `Live Schema Drift` workflow runs
+`npm run verify:schema-live` on Node 24.x so normal PR CI stays deterministic.
 
 Linting and formatting are check-only CI gates. ESLint and Prettier intentionally ignore
 `node_modules`, `dist`, `coverage`, `*.tgz`, vendored Marketplace docs, manifest schemas, and

@@ -52,7 +52,21 @@ Manual freshness check:
 - **`npm run verify:schema-live`** — fetches the live Clockify manifest schema endpoint, verifies
   versions 1.2–1.5 are structurally identical to the vendored schemas, and confirms version 1.6 still
   returns HTTP 400. This is intentionally outside `ci:verify` so CI remains deterministic and does not
-  depend on Clockify network availability.
+  depend on Clockify network availability. `.github/workflows/schema-live.yml` runs this check on a
+  Monday schedule and on manual dispatch; failures should be triaged as possible upstream schema
+  drift or network outages, not as deterministic SDK regressions.
+
+Dependency freshness:
+
+- `.github/dependabot.yml` checks npm and GitHub Actions weekly. npm updates are grouped into
+  SDK-tooling and SDK-runtime PRs so dependency review stays deliberate instead of noisy.
+
+Makefile shortcuts:
+
+- `make verify-fast`, `make ci-verify`, `make release-verify`, `make schema-live`,
+  `make package-lint`, and `make package-consumer` are thin aliases for the canonical root npm
+  scripts. Legacy `addon-sdk-package` and `addon-sdk-parity` targets point at `ci-verify` and
+  `verify-fast` respectively.
 
 GitHub Actions runs the same root gate on Node 22.x and 24.x for pushes to `main`, pull requests,
 and manual dispatches. Node 22 is the minimum supported runtime. The source-build toolchain is

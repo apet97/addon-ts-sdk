@@ -1,0 +1,36 @@
+version: 2
+updates:
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "08:00"
+      timezone: "Europe/Belgrade"
+    open-pull-requests-limit: 5
+    groups:
+      sdk-tooling:
+        patterns:
+          - "vite"
+          - "vitest"
+          - "@vitest/*"
+          - "typescript"
+          - "typescript-eslint"
+          - "@typescript-eslint/*"
+          - "eslint"
+          - "@eslint/js"
+          - "eslint-config-prettier"
+          - "prettier"
+          - "tsx"
+      sdk-runtime:
+        patterns:
+          - "jose"
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "08:30"
+      timezone: "Europe/Belgrade"
+    open-pull-requests-limit: 3

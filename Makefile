@@ -1,4 +1,4 @@
-.PHONY: build test type-check addon-sdk-package addon-sdk-parity
+.PHONY: build test type-check verify-fast ci-verify release-verify schema-live package-lint package-consumer addon-sdk-package addon-sdk-parity
 
 build:
 	npm run build
@@ -9,8 +9,24 @@ test:
 type-check:
 	npm run type-check
 
-addon-sdk-package:
-	cd addon-sdk && npm run type-check && npm run test && npm run build && npm pack --dry-run
+verify-fast:
+	npm run verify:fast
 
-addon-sdk-parity:
-	cd addon-sdk && npm run generate && npm run test -- --run tests/parity
+ci-verify:
+	npm run ci:verify
+
+release-verify:
+	npm run release:verify
+
+schema-live:
+	npm run verify:schema-live
+
+package-lint:
+	npm run verify:package-lint
+
+package-consumer:
+	npm run verify:package-consumer
+
+addon-sdk-package: ci-verify
+
+addon-sdk-parity: verify-fast
