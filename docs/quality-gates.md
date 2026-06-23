@@ -4,6 +4,10 @@ The root `npm run ci:verify` script is the canonical local and CI gate. It runs 
 through npm workspaces and mirrors the package's `prepack` chain, so the published tarball is always
 built and verified from a green tree.
 
+For day-to-day SDK hacking, use **`npm run verify:fast`** from the repo root. It runs type-check,
+generated drift, the local Clockify replay tests, build, and `verify:dist` without pack, package
+consumer, audit, or live-schema checks.
+
 1. **`npm run verify:deps`** — `npm ls --workspaces --depth=0`. Confirms the workspace dependency
    tree resolves before the heavier package checks run.
 2. **`npm run type-check`** — `tsc -p tsconfig.typecheck.json`. Compiles `src`, the generator,
@@ -13,6 +17,8 @@ built and verified from a green tree.
    directory, compares it with committed `src/clockify/generated/**`, and removes the temporary files
    before exit.
 4. **`npm run test`** — the full `vitest` suite.
+   - **`npm run test:replay`** — focused local Clockify replay coverage for component auth-token,
+     installed lifecycle, stored-token webhook verification, and negative token/workspace cases.
 5. **`npm run lint`** — check-only ESLint over the package source, tests, scripts, examples, and docs
    where applicable.
 6. **`npm run format:check`** — check-only Prettier over the package. Vendored Marketplace docs,

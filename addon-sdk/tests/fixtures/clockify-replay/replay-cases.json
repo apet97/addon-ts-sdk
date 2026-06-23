@@ -1,0 +1,192 @@
+{
+  "cases": [
+    {
+      "name": "manifest",
+      "request": {
+        "method": "GET",
+        "path": "/manifest",
+        "headers": {}
+      },
+      "expectedStatus": 200
+    },
+    {
+      "name": "component:admin",
+      "request": {
+        "method": "GET",
+        "path": "/component",
+        "headers": {},
+        "query": [["auth_token", "{{componentAdminToken}}"]]
+      },
+      "expectedStatus": 200
+    },
+    {
+      "name": "component:missing-token",
+      "request": {
+        "method": "GET",
+        "path": "/component",
+        "headers": {}
+      },
+      "expectedStatus": 401
+    },
+    {
+      "name": "component:bad-token",
+      "request": {
+        "method": "GET",
+        "path": "/component",
+        "headers": {},
+        "query": [["auth_token", "not-a-jwt"]]
+      },
+      "expectedStatus": 401
+    },
+    {
+      "name": "component:wrong-workspace",
+      "request": {
+        "method": "GET",
+        "path": "/component",
+        "headers": {},
+        "query": [["auth_token", "{{wrongWorkspaceToken}}"]]
+      },
+      "expectedStatus": 401
+    },
+    {
+      "name": "component:non-admin",
+      "request": {
+        "method": "GET",
+        "path": "/component",
+        "headers": {},
+        "query": [["auth_token", "{{componentUserToken}}"]]
+      },
+      "expectedStatus": 403
+    },
+    {
+      "name": "lifecycle:installed",
+      "request": {
+        "method": "POST",
+        "path": "/lifecycle/installed",
+        "headers": {
+          "content-type": "application/json",
+          "x-addon-lifecycle-token": "{{lifecycleToken}}"
+        },
+        "body": {
+          "addonId": "addon-local",
+          "authToken": "installation-token-local",
+          "workspaceId": "workspace-local",
+          "asUser": "admin-user-local",
+          "apiUrl": "https://developer.clockify.local/api",
+          "addonUserId": "addon-user-local",
+          "webhooks": [
+            {
+              "path": "https://local.clockify.example/addon/webhooks/expense-created",
+              "webhookType": "ADDON",
+              "authToken": "{{webhookToken}}"
+            }
+          ]
+        }
+      },
+      "expectedStatus": 204
+    },
+    {
+      "name": "lifecycle:bad-token",
+      "request": {
+        "method": "POST",
+        "path": "/lifecycle/installed",
+        "headers": {
+          "content-type": "application/json",
+          "x-addon-lifecycle-token": "not-a-jwt"
+        },
+        "body": {
+          "addonId": "addon-local",
+          "authToken": "installation-token-local",
+          "workspaceId": "workspace-local",
+          "asUser": "admin-user-local",
+          "apiUrl": "https://developer.clockify.local/api",
+          "addonUserId": "addon-user-local"
+        }
+      },
+      "expectedStatus": 401
+    },
+    {
+      "name": "webhook:missing-token",
+      "request": {
+        "method": "POST",
+        "path": "/webhooks/expense-created",
+        "headers": {
+          "content-type": "application/json",
+          "clockify-webhook-event-type": "EXPENSE_CREATED"
+        },
+        "body": {
+          "id": "expense-local",
+          "workspaceId": "workspace-local",
+          "userId": "admin-user-local",
+          "categoryId": "category-local",
+          "quantity": 12.4,
+          "date": "2026-06-23"
+        }
+      },
+      "expectedStatus": 401
+    },
+    {
+      "name": "webhook:bad-token",
+      "request": {
+        "method": "POST",
+        "path": "/webhooks/expense-created",
+        "headers": {
+          "content-type": "application/json",
+          "clockify-signature": "not-a-jwt",
+          "clockify-webhook-event-type": "EXPENSE_CREATED"
+        },
+        "body": {
+          "id": "expense-local",
+          "workspaceId": "workspace-local",
+          "userId": "admin-user-local",
+          "categoryId": "category-local",
+          "quantity": 12.4,
+          "date": "2026-06-23"
+        }
+      },
+      "expectedStatus": 401
+    },
+    {
+      "name": "webhook:wrong-workspace",
+      "request": {
+        "method": "POST",
+        "path": "/webhooks/expense-created",
+        "headers": {
+          "content-type": "application/json",
+          "clockify-signature": "{{wrongWorkspaceToken}}",
+          "clockify-webhook-event-type": "EXPENSE_CREATED"
+        },
+        "body": {
+          "id": "expense-local",
+          "workspaceId": "other-workspace",
+          "userId": "admin-user-local",
+          "categoryId": "category-local",
+          "quantity": 12.4,
+          "date": "2026-06-23"
+        }
+      },
+      "expectedStatus": 401
+    },
+    {
+      "name": "webhook:expense-created",
+      "request": {
+        "method": "POST",
+        "path": "/webhooks/expense-created",
+        "headers": {
+          "content-type": "application/json",
+          "clockify-signature": "{{webhookToken}}",
+          "clockify-webhook-event-type": "EXPENSE_CREATED"
+        },
+        "body": {
+          "id": "expense-local",
+          "workspaceId": "workspace-local",
+          "userId": "admin-user-local",
+          "categoryId": "category-local",
+          "quantity": 12.4,
+          "date": "2026-06-23"
+        }
+      },
+      "expectedStatus": 204
+    }
+  ]
+}

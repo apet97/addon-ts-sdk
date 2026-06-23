@@ -8,7 +8,9 @@ import {
   ClockifyLifecycleEvent,
   ClockifyLifecycleMatchedClaims,
   ClockifyManifest,
+  ClockifySignatureParser,
   ClockifyWebhook,
+  CreateClockifySignatureParserOptions,
   createClockifySignatureParser,
   isClockifyAdminRole,
   withClockifyInstalledLifecycleRequest,
@@ -41,6 +43,10 @@ interface SecureServerOptions {
   name: string;
   baseUrl: string;
   store: SecureServerStore;
+  parser?: ClockifySignatureParser;
+  publicKey?: CreateClockifySignatureParserOptions["publicKey"];
+  expectedWorkspaceId?: string;
+  expectedAddonId?: string;
   renderComponent?: (claims: ClockifyAddonClaims) => AddonResponse | Promise<AddonResponse>;
   onExpenseCreated?: (payload: unknown, claims: ClockifyAddonClaims) => void | Promise<void>;
 }
@@ -75,7 +81,12 @@ function normalizeWebhookPath(path: string, baseUrl?: string): string {
 export function createSecureServerAddon(
   options: SecureServerOptions,
 ): ClockifyAddon<ClockifyManifest<"1.5">> {
-  const parser = createClockifySignatureParser(options.key);
+  const parser =
+    options.parser ?? createClockifySignatureParser(options.key, { publicKey: options.publicKey });
+  const expectedContext = {
+    expectedWorkspaceId: options.expectedWorkspaceId,
+    expectedAddonId: options.expectedAddonId,
+  };
   const manifest = ClockifyManifest.v1_5Builder()
     .key(options.key)
     .name(options.name)
@@ -92,26 +103,34 @@ export function createSecureServerAddon(
       .path("/component")
       .label("Secure component")
       .build(),
-    withClockifyVerifiedComponentRequest(parser, async (_request, claims) => {
-      if (!isClockifyAdminRole(claims.workspaceRole)) {
-        return { status: 403, body: "Admins only" };
-      }
-      return options.renderComponent
-        ? options.renderComponent(claims)
-        : {
-            status: 200,
-            headers: { "content-type": "text/html" },
-            body: "<html><body>Secure Clockify component</body></html>",
-          };
-    }),
+    withClockifyVerifiedComponentRequest(
+      parser,
+      async (_request, claims) => {
+        if (!isClockifyAdminRole(claims.workspaceRole)) {
+          return { status: 403, body: "Admins only" };
+        }
+        return options.renderComponent
+          ? options.renderComponent(claims)
+          : {
+              status: 200,
+              headers: { "content-type": "text/html" },
+              body: "<html><body>Secure Clockify component</body></html>",
+            };
+      },
+      expectedContext,
+    ),
   );
 
   addon.registerLifecycleEvent(
     ClockifyLifecycleEvent.v1_5Builder().path("/lifecycle/installed").onInstalled().build(),
-    withClockifyInstalledLifecycleRequest(parser, async (_request, payload, claims) => {
-      await options.store.saveInstallation(payload, claims);
-      return { status: 204 };
-    }),
+    withClockifyInstalledLifecycleRequest(
+      parser,
+      async (_request, payload, claims) => {
+        await options.store.saveInstallation(payload, claims);
+        return { status: 204 };
+      },
+      expectedContext,
+    ),
   );
 
   addon.registerWebhook(
@@ -120,6 +139,7 @@ export function createSecureServerAddon(
       parser,
       {
         expectedEventType: "EXPENSE_CREATED",
+        ...expectedContext,
         getExpectedWebhookAuthToken(input) {
           return options.store.findWebhookAuthToken({
             ...input,

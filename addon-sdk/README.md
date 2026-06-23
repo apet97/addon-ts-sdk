@@ -155,6 +155,26 @@ const token = await signTestToken(privateKey, "my-addon-key", { workspaceId: "w-
 const claims = await new ClockifySignatureParser("my-addon-key", publicKey).parseClaims(token);
 ```
 
+## Local Clockify replay
+
+Run the secure example as a local Clockify emulator/playground:
+
+```bash
+npm run dev:clockify-local
+```
+
+The command boots `examples/secure-server`, generates fake signed test tokens with the SDK testing
+helpers, replays manifest/component/lifecycle/webhook requests, prints the status transcript, and
+then keeps the server running for manual inspection. For automation, use:
+
+```bash
+npm run dev:clockify-local -- --once
+npm run verify:fast
+```
+
+The replay uses local-only keys and tokens. It does not call Clockify and does not produce usable
+Clockify credentials.
+
 ## Schema versions
 
 1.2–1.4 are ported from the Clockify add-on Java SDK; 1.5 is taken from the live schema endpoint

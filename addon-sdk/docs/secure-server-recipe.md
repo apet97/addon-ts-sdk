@@ -49,6 +49,19 @@ addon.registerWebhook(
 The wrapper checks the signed JWT, the expected event header, workspace/add-on context, and the
 stored webhook token before the handler runs.
 
+## Local Replay
+
+The secure example is the canonical local playground for this SDK:
+
+```bash
+npm run dev:clockify-local
+```
+
+It starts the example server, signs fake local component/lifecycle/webhook tokens with
+`@apet97/clockify-addon-sdk/testing`, replays the documented request shapes, and prints the status
+transcript. Use `npm run dev:clockify-local -- --once` when you want the same replay to exit for CI or
+local smoke checks.
+
 ## Scope
 
 This is only a secure request-handling recipe. It does not add a Clockify REST client, token
