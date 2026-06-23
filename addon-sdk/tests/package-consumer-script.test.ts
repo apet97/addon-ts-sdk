@@ -30,5 +30,8 @@ describe("package consumer verification script", () => {
     expect(script).toContain('types: ["node"]');
     expect(script).toContain("undici-types");
     expect(script).toContain("@ts-expect-error");
+    expect(script).toContain("const esmClaims = await new ClockifySignatureParser");
+    expect(script).toContain("const cjsClaims = await new sdk.ClockifySignatureParser");
+    expect(script).toContain("signs/verifies test tokens");
   });
 });

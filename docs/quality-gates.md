@@ -18,15 +18,19 @@ built and verified from a green tree.
 6. **`npm run format:check`** — check-only Prettier over the package. Vendored Marketplace docs,
    manifest schemas, generated Clockify models, build output, coverage, and tarballs are ignored.
 7. **`npm run build`** — emits the ESM and CJS outputs with type declarations.
-8. **`npm run verify:dist`** — imports the **built** ESM and CJS and boots the README quick-start; a
+8. **`npm run verify:public-api`** — compares the built ESM declaration surface for the root,
+   `/clockify`, `/adapters`, and `/testing` entry points against
+   `addon-sdk/public-api.snapshot.md`. Intentional public API changes must run
+   `npm run build && npm run verify:public-api -- --update` and include the snapshot diff.
+9. **`npm run verify:dist`** — imports the **built** ESM and CJS and boots the README quick-start; a
    green `build` alone does not prove the package imports.
-9. **`npm run pack:dry-run`** — confirms the tarball contents (`dist` + `docs` + vendored
-   `schemas/clockify-manifests` + `LICENSE` + `README`).
-10. **`npm run verify:package-consumer`** — packs the already-built package with `--ignore-scripts`,
+10. **`npm run pack:dry-run`** — confirms the tarball contents (`dist` + `docs` + vendored
+    `schemas/clockify-manifests` + `LICENSE` + `README`).
+11. **`npm run verify:package-consumer`** — packs the already-built package with `--ignore-scripts`,
     installs that tarball into temporary ESM, CJS, and TypeScript consumers, imports the root and
     subpath entry points, checks `generated.v1_5`, type-checks declarations without requiring
     Express types, and boots a `/manifest` server smoke from the installed package.
-11. **`npm audit --omit=dev --json` and `npm audit --json`** — production and full dependency audit;
+12. **`npm audit --omit=dev --json` and `npm audit --json`** — production and full dependency audit;
     both should report 0 vulnerabilities.
 
 Manual freshness check:
@@ -40,6 +44,6 @@ GitHub Actions runs the same root gate on Node 22.x and 24.x for pushes to `main
 and manual dispatches. Node 22 is the minimum supported runtime.
 
 The package `prepack` chain includes type-check, generated drift, tests, lint, format check, build,
-and `verify:dist`; `npm pack --dry-run` is therefore both a contents check and a final package smoke.
-`verify:package-consumer` stays outside `prepack` to avoid recursive package creation while still
-proving the tarball works exactly as an installed dependency.
+`verify:public-api`, and `verify:dist`; `npm pack --dry-run` is therefore both a contents check and
+a final package smoke. `verify:package-consumer` stays outside `prepack` to avoid recursive package
+creation while still proving the tarball works exactly as an installed dependency.

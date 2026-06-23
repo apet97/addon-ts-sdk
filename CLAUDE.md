@@ -47,8 +47,8 @@ npm run ci:verify
 ```
 
 This runs workspace dependency resolution, type-check, generated drift, tests, lint, format check,
-build, `verify:dist`, pack dry-run, installed-package consumer smoke, production audit, and full
-audit. GitHub Actions runs the same gate on Node 22.x and 24.x.
+build, `verify:public-api`, `verify:dist`, pack dry-run, installed-package consumer smoke,
+production audit, and full audit. GitHub Actions runs the same gate on Node 22.x and 24.x.
 
 ## Gotchas (learned the hard way)
 
@@ -56,6 +56,9 @@ audit. GitHub Actions runs the same gate on Node 22.x and 24.x.
   live in `tests/types/*.probe.ts`; `tests/typecheck-gate.test.ts` guards that they are compiled.
 - A green `build` does not mean the published package works. `verify:dist` imports the **built** ESM
   and CJS and boots the README quick-start; it is wired into `prepack`.
+- `verify:public-api` compares the built ESM declaration surface for root, `/clockify`, `/adapters`,
+  and `/testing` against `addon-sdk/public-api.snapshot.md`. Intentional public API changes must
+  update that snapshot after `npm run build`.
 - Webhook signature verification alone is incomplete for Marketplace parity. Tests also cover
   event-header mismatches, lifecycle-token headers, workspace/add-on claim mismatches, and
   no-hardcoded-fallback environment URL behavior.
@@ -63,8 +66,8 @@ audit. GitHub Actions runs the same gate on Node 22.x and 24.x.
   `find addon-sdk -maxdepth 1 -name '*.tgz' -print` afterward when checking for accidental artifacts.
 - `verify:package-consumer` stays outside `prepack`: it packs the already-built package with scripts
   ignored, installs that tarball into temporary ESM, CJS, and TypeScript consumers, imports public
-  subpaths from the installed dependency, and catches declaration leaks such as non-optional Express
-  types.
+  subpaths from the installed dependency, signs/verifies test tokens from ESM and CJS, and catches
+  declaration leaks such as non-optional Express types.
 - `npm run lint` and `npm run format:check` are real check-only gates. The package configs ignore
   vendored Marketplace docs, schema/provenance files, generated Clockify models, `dist`, `coverage`,
   `node_modules`, and dry-run tarballs.

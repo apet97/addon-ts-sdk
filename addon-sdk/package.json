@@ -68,12 +68,13 @@
     "verify:schema-live": "node scripts/verify-live-schemas.mjs",
     "clean": "node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true })\"",
     "build": "npm run clean && npm run generate && tsc -p tsconfig.esm.json && node scripts/fix-esm-extensions.cjs && tsc -p tsconfig.cjs.json && node scripts/finalize-cjs.js",
+    "verify:public-api": "node scripts/verify-public-api.cjs",
     "verify:dist": "node scripts/verify-dist.mjs",
     "verify:package-consumer": "node scripts/verify-package-consumer.mjs",
     "test": "vitest run",
     "lint": "eslint .",
     "format:check": "prettier . --check",
-    "prepack": "npm run type-check && npm run verify:generated && npm run test && npm run lint && npm run format:check && npm run build && npm run verify:dist"
+    "prepack": "npm run type-check && npm run verify:generated && npm run test && npm run lint && npm run format:check && npm run build && npm run verify:public-api && npm run verify:dist"
   },
   "dependencies": {
     "jose": "^5.9.6"

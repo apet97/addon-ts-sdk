@@ -57,7 +57,7 @@ function runEsmConsumer(dir) {
   writeFileSync(
     script,
     `import assert from "node:assert/strict";
-import { ClockifyAddon, ClockifyComponent, ClockifyManifest, createClockifyNumberSetting, generated, testing, withClockifyVerifiedComponentRequest } from "@apet97/clockify-addon-sdk";
+import { ClockifyAddon, ClockifyComponent, ClockifyManifest, ClockifySignatureParser, createClockifyNumberSetting, generated, testing, withClockifyVerifiedComponentRequest } from "@apet97/clockify-addon-sdk";
 import * as clockify from "@apet97/clockify-addon-sdk/clockify";
 import { createNodeHttpAddonServer } from "@apet97/clockify-addon-sdk/adapters";
 import { generateTestKeys } from "@apet97/clockify-addon-sdk/testing";
@@ -75,6 +75,16 @@ assert.equal(typeof testing.signTestToken, "function");
 assert.equal(typeof generateTestKeys, "function");
 assert.equal(schema15.version, "1.5");
 assert.equal(schemaProvenance.schemas["1.5"].file, "1.5.json");
+
+const esmKeys = await testing.generateTestKeys();
+const esmToken = await testing.signTestToken(esmKeys.privateKey, "packed-consumer-addon", {
+  workspaceId: "workspace-esm",
+});
+const esmClaims = await new ClockifySignatureParser(
+  "packed-consumer-addon",
+  esmKeys.publicKey,
+).parseClaims(esmToken);
+assert.equal(esmClaims.workspaceId, "workspace-esm");
 
 const manifest = ClockifyManifest.v1_5Builder()
   .key("packed-consumer-addon")
@@ -115,17 +125,32 @@ const testing = require("@apet97/clockify-addon-sdk/testing");
 const schema15 = require("@apet97/clockify-addon-sdk/schemas/clockify-manifests/1.5.json");
 const schemaProvenance = require("@apet97/clockify-addon-sdk/schemas/clockify-manifests/provenance.json");
 
-assert.equal(typeof sdk.ClockifyAddon, "function");
-assert.equal(typeof sdk.ClockifyManifest.v1_5Builder, "function");
-assert.equal(typeof sdk.generated.v1_5.ClockifyManifestBuilder, "function");
-assert.equal(typeof clockify.verifyClockifyLifecycleRequest, "function");
-assert.equal(typeof clockify.createClockifyTextSetting, "function");
-assert.equal(typeof sdk.createClockifyNumberSetting, "function");
-assert.equal(typeof sdk.withClockifyVerifiedComponentRequest, "function");
-assert.equal(typeof adapters.createNodeHttpAddonServer, "function");
-assert.equal(typeof testing.signTestToken, "function");
-assert.equal(schema15.version, "1.5");
-assert.equal(schemaProvenance.schemas["1.5"].file, "1.5.json");
+(async () => {
+  assert.equal(typeof sdk.ClockifyAddon, "function");
+  assert.equal(typeof sdk.ClockifyManifest.v1_5Builder, "function");
+  assert.equal(typeof sdk.generated.v1_5.ClockifyManifestBuilder, "function");
+  assert.equal(typeof clockify.verifyClockifyLifecycleRequest, "function");
+  assert.equal(typeof clockify.createClockifyTextSetting, "function");
+  assert.equal(typeof sdk.createClockifyNumberSetting, "function");
+  assert.equal(typeof sdk.withClockifyVerifiedComponentRequest, "function");
+  assert.equal(typeof adapters.createNodeHttpAddonServer, "function");
+  assert.equal(typeof testing.signTestToken, "function");
+  assert.equal(schema15.version, "1.5");
+  assert.equal(schemaProvenance.schemas["1.5"].file, "1.5.json");
+
+  const cjsKeys = await testing.generateTestKeys();
+  const cjsToken = await testing.signTestToken(cjsKeys.privateKey, "packed-consumer-addon", {
+    workspaceId: "workspace-cjs",
+  });
+  const cjsClaims = await new sdk.ClockifySignatureParser(
+    "packed-consumer-addon",
+    cjsKeys.publicKey,
+  ).parseClaims(cjsToken);
+  assert.equal(cjsClaims.workspaceId, "workspace-cjs");
+})().catch((error) => {
+  console.error(error);
+  process.exit(1);
+});
 `,
     "utf8",
   );
@@ -235,7 +260,7 @@ try {
   runCjsConsumer(prepareConsumer("cjs-consumer", "commonjs", tarball));
   runTypeScriptConsumer(prepareConsumer("ts-consumer", "module", tarball));
   console.log(
-    "verify:package-consumer OK - packed tarball imports in ESM and CJS consumers and type-checks in a TypeScript consumer.",
+    "verify:package-consumer OK - packed tarball imports in ESM and CJS consumers, signs/verifies test tokens, and type-checks in a TypeScript consumer.",
   );
 } finally {
   rmSync(workspace, { recursive: true, force: true });

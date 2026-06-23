@@ -14,6 +14,11 @@ describe("source-only distribution docs", () => {
       resolve(repoRoot, "docs", "release-readiness.md"),
       "utf8",
     );
+    const qualityGates = readFileSync(resolve(repoRoot, "docs", "quality-gates.md"), "utf8");
+    const dependencyStrategy = readFileSync(
+      resolve(packageRoot, "docs", "dependency-strategy.md"),
+      "utf8",
+    );
     const evidenceMap = readFileSync(
       resolve(packageRoot, "docs", "porting", "evidence-map.md"),
       "utf8",
@@ -39,6 +44,13 @@ describe("source-only distribution docs", () => {
       "npm publish --dry-run -w @apet97/clockify-addon-sdk --access public",
     );
     expect(releaseReadiness).toContain("Do not run a real npm publish");
+    expect(releaseReadiness).toContain("explicit npm-owner approval");
+    expect(releaseReadiness).toContain("npm view @apet97/clockify-addon-sdk version");
+    expect(qualityGates).toContain("npm run verify:public-api");
+    expect(qualityGates).toContain("public-api.snapshot.md");
+    expect(dependencyStrategy).toContain("`jose@6` is ESM-only");
+    expect(dependencyStrategy).toContain("npm run verify:package-consumer");
+    expect(dependencyStrategy).toContain("CommonJS support");
     expect(rootPackageJson.scripts["release:dry-run"]).toBe(
       "npm publish --dry-run -w @apet97/clockify-addon-sdk --access public",
     );

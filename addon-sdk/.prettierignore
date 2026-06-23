@@ -7,3 +7,4 @@ coverage
 ../MARKETPLACE_DOCS
 schemas/clockify-manifests
 src/clockify/generated
+public-api.snapshot.md
