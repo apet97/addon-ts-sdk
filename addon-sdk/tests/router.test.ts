@@ -35,6 +35,22 @@ describe("Router", () => {
     expect(response.body).toEqual(mockManifest);
   });
 
+  it("should not route parameter-like child paths by prefix", async () => {
+    const addon = new ClockifyAddon(mockManifest);
+    const handler = vi.fn(() => ({ status: 200, body: "matched" }));
+    addon.registerHandler("/hooks", "POST", handler);
+
+    const response = await addon.handle({
+      method: "POST",
+      path: "/hooks/abc-123",
+      headers: {},
+    });
+
+    expect(response.status).toBe(405);
+    expect(response.body).toBe("Method Not Allowed");
+    expect(handler).not.toHaveBeenCalled();
+  });
+
   it("should reject path registration with ending slash", () => {
     const addon = new ClockifyAddon(mockManifest);
     expect(() => {

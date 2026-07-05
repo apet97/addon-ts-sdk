@@ -4,6 +4,16 @@ Quick reference for Claude Code in this repo. [AGENTS.md](./AGENTS.md) holds the
 (layout, schemas, scope boundary, token/auth rules); this file keeps the non-negotiables, the gates,
 and the gotchas worth re-reading before you touch anything.
 
+## Current checkpoint (2026-07-05)
+
+- Node `http` and Fetch body limits both reject oversized declared `content-length` values before
+  routing; keep that preflight plus streamed-byte enforcement together.
+- Keep `@types/node` on `^22` while runtime support starts at Node 22. A Node 26 ambient-types bump
+  failed the repo contract and should stay closed unless the support floor changes.
+- The SDK-tooling Dependabot bump is acceptable only with the matching Prettier formatting fix.
+- Do not resurrect discarded commit `623fbdc` wholesale. Its benchmark/scaffold/fuzz/parity files
+  were reviewed and declined as too much maintenance surface for too little signal.
+
 ## What this is
 
 A TypeScript SDK for the server side of a Clockify add-on: typed manifest builders, a request

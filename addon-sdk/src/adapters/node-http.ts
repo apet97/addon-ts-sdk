@@ -9,6 +9,15 @@ import {
   resolveMaxBodyBytes,
 } from "./body-limit";
 
+function contentLengthExceedsLimit(
+  headers: IncomingMessage["headers"],
+  maxBodyBytes: number,
+): boolean {
+  const value = headers["content-length"];
+  const contentLength = Array.isArray(value) ? value[0] : value;
+  return contentLength !== undefined && Number(contentLength) > maxBodyBytes;
+}
+
 async function readBody(req: IncomingMessage, maxBodyBytes: number): Promise<Uint8Array> {
   return new Promise((resolve, reject) => {
     const chunks: Uint8Array[] = [];
@@ -35,7 +44,11 @@ export async function fromNodeRequest(
   options: BodyLimitOptions = {},
 ): Promise<AddonRequest> {
   const url = new URL(req.url || "", `http://${req.headers.host || "localhost"}`);
-  const rawBody = await readBody(req, resolveMaxBodyBytes(options));
+  const maxBodyBytes = resolveMaxBodyBytes(options);
+  if (contentLengthExceedsLimit(req.headers, maxBodyBytes)) {
+    throw new PayloadTooLargeError(maxBodyBytes);
+  }
+  const rawBody = await readBody(req, maxBodyBytes);
   let body: unknown = undefined;
   if (rawBody.length > 0) {
     try {

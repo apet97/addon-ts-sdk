@@ -20,9 +20,9 @@ consumer, audit, or live-schema checks.
    - **`npm run test:replay`** — focused local Clockify replay coverage for component auth-token,
      installed lifecycle, stored-token webhook verification, and negative token/workspace cases.
 5. **`npm run test:coverage`** — advisory Vitest V8 coverage over hand-written `src/**/*.ts`, with
-   generated Clockify models and declaration files excluded. The current baseline from the Task 2
-   tooling pass was 95.32% statements, 89.78% branches, 98% functions, and 96.39% lines; thresholds
-   should only be added below a measured baseline and with generated code excluded.
+   generated Clockify models and declaration files excluded. The 2026-07-05 baseline was 95.69%
+   statements, 90.57% branches, 98.03% functions, and 96.73% lines; thresholds should only be added
+   below a measured baseline and with generated code excluded.
 6. **`npm run lint`** — check-only ESLint over the package source, tests, scripts, examples, and docs
    where applicable.
 7. **`npm run format:check`** — check-only Prettier over the package. Vendored Marketplace docs,
@@ -60,6 +60,8 @@ Dependency freshness:
 
 - `.github/dependabot.yml` checks npm and GitHub Actions weekly. npm updates are grouped into
   SDK-tooling and SDK-runtime PRs so dependency review stays deliberate instead of noisy.
+- Keep `@types/node` aligned to the Node 22 runtime floor (`^22`) unless the package support policy
+  changes. Newer ambient Node majors are not routine maintenance bumps for this SDK.
 
 Makefile shortcuts:
 

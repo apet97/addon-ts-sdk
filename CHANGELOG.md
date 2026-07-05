@@ -4,6 +4,11 @@ All notable changes to this source-only SDK are recorded here.
 
 ## Unreleased
 
+- Added Node `http` adapter preflight rejection for requests whose declared `content-length`
+  exceeds `maxBodyBytes`, matching Fetch adapter body-limit behavior before routing.
+- Added router coverage and docs for exact path matching: child paths such as `/hooks/abc` do not
+  match a handler registered at `/hooks`.
+- Updated SDK dev tooling for the accepted ESLint, Prettier, and Vite Dependabot lane.
 - Added verified request wrapper helpers for component, lifecycle, installed lifecycle, and webhook
   handlers.
 - Added typed structured-setting helper creators for the common Clockify setting types.

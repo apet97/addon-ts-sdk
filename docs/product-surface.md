@@ -22,7 +22,8 @@ source-only for now and is not published to the npm registry.
 - Typed structured-setting helper creators that encode setting type/value pairing without replacing
   the generated schema builders.
 - Adapters for Node.js `http`, Express, and Fetch API. Node and Fetch enforce a default 1 MiB body
-  limit before dispatch; Express remains an optional peer with body limits owned by the host app.
+  limit before dispatch, including oversized declared `content-length` values and streamed bodies
+  that cross the byte limit; Express remains an optional peer with body limits owned by the host app.
 - Optional `onError(error, context)` reporting for handled router, Fetch, and Node adapter errors.
 - Source package documentation and vendored manifest schemas.
 

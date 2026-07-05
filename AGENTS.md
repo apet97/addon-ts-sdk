@@ -2,6 +2,19 @@
 
 Conventions for anyone (human or agent) working in this repository.
 
+## Current hardening checkpoint (2026-07-05)
+
+- Keep Node `http` and Fetch body-limit semantics aligned: declared `content-length` values above
+  `maxBodyBytes` must fail before routing, and streamed bodies must still fail once the byte counter
+  crosses the limit. Express body limits stay with the host app.
+- Runtime support starts at Node 22, so `@types/node` stays on `^22` unless the runtime support
+  contract changes. Do not accept Node 26 ambient types as a routine Dependabot bump.
+- The SDK-tooling Dependabot lane can move ESLint, Prettier, and Vite together, but rerun
+  `npm run format:check` after applying it because Prettier changes may require source wrapping.
+- Discarded commit `623fbdc` was reviewed during the July 2026 plan pass. Do not restore its
+  benchmark, scaffold, fuzz, or broad parity files wholesale; reintroduce only pieces that have
+  current-code proof and a clear maintenance payoff.
+
 ## Layout
 
 - `addon-sdk/` — the published package (`@apet97/clockify-addon-sdk`). All SDK code, schemas,

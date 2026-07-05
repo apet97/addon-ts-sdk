@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 import { ClockifyAddon, ClockifyManifest } from "../src";
 import {
   DEFAULT_MAX_BODY_BYTES,
+  PayloadTooLargeError,
   createExpressAddonHandler,
   fromNodeRequest,
   handleFetchRequest,
@@ -48,6 +49,32 @@ describe("Adapters", () => {
       ),
     ).rejects.toThrow(/positive integer/);
     expect(dispatched).toBe(false);
+  });
+
+  it("rejects Node HTTP requests with oversized content-length before body parsing", async () => {
+    const mockReq = new IncomingMessage(new Socket());
+    mockReq.headers = { host: "localhost", "content-length": "8" };
+    mockReq.url = "/webhook";
+    mockReq.method = "POST";
+
+    const promise = fromNodeRequest(mockReq, { maxBodyBytes: 4 });
+    mockReq.emit("end");
+
+    await expect(promise).rejects.toBeInstanceOf(PayloadTooLargeError);
+  });
+
+  it("rejects Node HTTP requests that stream past maxBodyBytes without content-length", async () => {
+    const mockReq = new IncomingMessage(new Socket());
+    mockReq.headers = { host: "localhost" };
+    mockReq.url = "/webhook";
+    mockReq.method = "POST";
+
+    const promise = fromNodeRequest(mockReq, { maxBodyBytes: 4 });
+    mockReq.emit("data", Buffer.from("123"));
+    mockReq.emit("data", Buffer.from("45"));
+    mockReq.emit("end");
+
+    await expect(promise).rejects.toBeInstanceOf(PayloadTooLargeError);
   });
 
   it("should serve /manifest via Fetch adapter", async () => {
@@ -259,6 +286,20 @@ describe("Adapters", () => {
 
     expect(headerSpy).toHaveBeenCalledWith("set-cookie", ["a=1", "b=2"]);
     expect(endSpy).toHaveBeenCalled();
+  });
+
+  it("sets JSON content-type when Node HTTP writes object bodies", () => {
+    const mockRes = new ServerResponse(new IncomingMessage(new Socket()));
+    const endSpy = vi.spyOn(mockRes, "end").mockImplementation(() => mockRes);
+    const headerSpy = vi.spyOn(mockRes, "setHeader").mockImplementation(() => mockRes);
+
+    writeNodeResponse(mockRes, {
+      status: 200,
+      body: { ok: true },
+    });
+
+    expect(headerSpy).toHaveBeenCalledWith("content-type", "application/json");
+    expect(endSpy).toHaveBeenCalledWith(JSON.stringify({ ok: true }));
   });
 
   it("should parse Node HTTP requests with JSON and text bodies via fromNodeRequest", async () => {

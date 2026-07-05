@@ -6,10 +6,7 @@ export type ClockifyLifecycleMatchedClaims = ClockifyAddonClaims & {
 };
 
 export type ClockifyLifecycleEventType =
-  | "INSTALLED"
-  | "STATUS_CHANGED"
-  | "SETTINGS_UPDATED"
-  | "DELETED";
+  "INSTALLED" | "STATUS_CHANGED" | "SETTINGS_UPDATED" | "DELETED";
 
 export type ClockifyLifecycleStatus = "ACTIVE" | "INACTIVE";
 

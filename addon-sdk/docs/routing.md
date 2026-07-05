@@ -18,6 +18,17 @@ addon.registerHandler("/invalid/", "GET", () => ({ status: 200 })); // Throws Va
 addon.registerHandler("invalid", "GET", () => ({ status: 200 })); // Throws ValidationException
 ```
 
+## Route Matching
+
+The core router matches exact `method + path` keys after trimming one trailing slash from the
+incoming request path. It does not support wildcard routes or parameterized path segments.
+
+- A request to `/hooks/abc-123` does not match a handler registered at `/hooks`.
+- A request to `/hooks/abc-123/` only trims the final slash; it still does not match `/hooks`.
+
+If you need variable path segments, route or normalize them in your host framework before calling
+the SDK handler, then dispatch to a concrete SDK path.
+
 ## Trailing Slash Trim at Dispatch
 
 Incoming requests have their trailing slash trimmed when executing route dispatch:
