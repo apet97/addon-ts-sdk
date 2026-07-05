@@ -4,6 +4,8 @@ All notable changes to this source-only SDK are recorded here.
 
 ## Unreleased
 
+- Added Express adapter coverage for array-valued query params and primitive response bodies.
+- Removed unreachable manifest-array fallback branches from Clockify add-on registration helpers.
 - Added Node `http` adapter preflight rejection for requests whose declared `content-length`
   exceeds `maxBodyBytes`, matching Fetch adapter body-limit behavior before routing.
 - Added router coverage and docs for exact path matching: child paths such as `/hooks/abc` do not

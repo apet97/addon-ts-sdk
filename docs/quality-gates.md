@@ -20,8 +20,8 @@ consumer, audit, or live-schema checks.
    - **`npm run test:replay`** — focused local Clockify replay coverage for component auth-token,
      installed lifecycle, stored-token webhook verification, and negative token/workspace cases.
 5. **`npm run test:coverage`** — advisory Vitest V8 coverage over hand-written `src/**/*.ts`, with
-   generated Clockify models and declaration files excluded. The 2026-07-05 baseline was 95.69%
-   statements, 90.57% branches, 98.03% functions, and 96.73% lines; thresholds should only be added
+   generated Clockify models and declaration files excluded. The 2026-07-05 baseline was 97.7%
+   statements, 93.18% branches, 99.01% functions, and 98.58% lines; thresholds should only be added
    below a measured baseline and with generated code excluded.
 6. **`npm run lint`** — check-only ESLint over the package source, tests, scripts, examples, and docs
    where applicable.

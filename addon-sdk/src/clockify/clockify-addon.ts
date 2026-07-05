@@ -22,10 +22,7 @@ export class ClockifyAddon<
 
   registerWebhook(webhook: ClockifyWebhook<M["schemaVersion"]>, handler: RequestHandler): void {
     this.registerHandler(webhook.path, Addon.HTTP_POST, handler);
-    const m = this.manifest as { webhooks?: ClockifyWebhook<M["schemaVersion"]>[] };
-    if (!m.webhooks) {
-      m.webhooks = [];
-    }
+    const m = this.manifest as unknown as { webhooks: ClockifyWebhook<M["schemaVersion"]>[] };
     m.webhooks.push(webhook);
   }
 
@@ -34,10 +31,9 @@ export class ClockifyAddon<
     handler: RequestHandler,
   ): void {
     this.registerHandler(event.path, Addon.HTTP_POST, handler);
-    const m = this.manifest as { lifecycle?: ClockifyLifecycleEvent<M["schemaVersion"]>[] };
-    if (!m.lifecycle) {
-      m.lifecycle = [];
-    }
+    const m = this.manifest as unknown as {
+      lifecycle: ClockifyLifecycleEvent<M["schemaVersion"]>[];
+    };
     m.lifecycle.push(event);
   }
 
@@ -46,10 +42,7 @@ export class ClockifyAddon<
     handler: RequestHandler,
   ): void {
     this.registerHandler(component.path, Addon.HTTP_GET, handler);
-    const m = this.manifest as { components?: ClockifyComponent<M["schemaVersion"]>[] };
-    if (!m.components) {
-      m.components = [];
-    }
+    const m = this.manifest as unknown as { components: ClockifyComponent<M["schemaVersion"]>[] };
     m.components.push(component);
   }
 

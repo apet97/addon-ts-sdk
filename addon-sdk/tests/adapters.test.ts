@@ -258,6 +258,40 @@ describe("Adapters", () => {
     expect(seen).toEqual(["/component", "abc", "def", "compact"]);
   });
 
+  it("preserves array-valued Express query params", async () => {
+    const addon = new ClockifyAddon(mockManifest);
+    const seen: string[] = [];
+    addon.registerHandler("/component", "GET", (request) => {
+      seen.push(...request.query.getAll("auth_token"));
+      seen.push(request.query.get("mode") ?? "");
+      return { status: 204 };
+    });
+    const handler = createExpressAddonHandler(addon);
+
+    const mockReq = {
+      method: "GET",
+      url: "/component",
+      path: "/component",
+      headers: {},
+      query: {
+        auth_token: ["abc", "def"],
+        mode: "compact",
+      },
+    };
+
+    const mockRes = {
+      status: vi.fn().mockReturnThis(),
+      set: vi.fn().mockReturnThis(),
+      json: vi.fn().mockReturnThis(),
+      send: vi.fn().mockReturnThis(),
+      end: vi.fn().mockReturnThis(),
+    };
+
+    await handler(mockReq, mockRes);
+
+    expect(seen).toEqual(["abc", "def", "compact"]);
+  });
+
   it("should serialize Node HTTP mock response properly", () => {
     const mockRes = new ServerResponse(new IncomingMessage(new Socket()));
     const writeSpy = vi.spyOn(mockRes, "end").mockImplementation(() => mockRes);
@@ -464,6 +498,37 @@ describe("Adapters", () => {
 
     expect(jsonSpy).not.toHaveBeenCalled();
     expect(sendSpy).toHaveBeenCalledWith(Buffer.from([1, 2, 3]));
+  });
+
+  it("sends primitive response bodies through the Express adapter", async () => {
+    const addon = new ClockifyAddon(mockManifest);
+    addon.registerHandler("/text", "GET", () => ({
+      status: 200,
+      body: "plain text",
+    }));
+    const handler = createExpressAddonHandler(addon);
+
+    const mockReq = {
+      method: "GET",
+      url: "/text",
+      path: "/text",
+      headers: {},
+      query: {},
+    };
+    const sendSpy = vi.fn().mockReturnThis();
+    const jsonSpy = vi.fn().mockReturnThis();
+    const mockRes = {
+      status: vi.fn().mockReturnThis(),
+      set: vi.fn().mockReturnThis(),
+      json: jsonSpy,
+      send: sendSpy,
+      end: vi.fn().mockReturnThis(),
+    };
+
+    await handler(mockReq, mockRes);
+
+    expect(jsonSpy).not.toHaveBeenCalled();
+    expect(sendSpy).toHaveBeenCalledWith("plain text");
   });
 
   it("passes array-valued response headers through the Express adapter", async () => {
