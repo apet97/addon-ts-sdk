@@ -2,17 +2,20 @@
   "name": "clockify-addon-ts-monorepo",
   "private": true,
   "workspaces": [
-    "addon-sdk"
+    "addon-sdk",
+    "create-clockify-addon"
   ],
   "scripts": {
     "type-check": "npm run type-check -w @apet97/clockify-addon-sdk",
     "verify:generated": "npm run verify:generated -w @apet97/clockify-addon-sdk",
+    "verify:marketplace-docs": "node scripts/verify-marketplace-docs.mjs",
     "verify:schema-live": "npm run verify:schema-live -w @apet97/clockify-addon-sdk",
     "build": "npm run build -w @apet97/clockify-addon-sdk",
     "verify:public-api": "npm run verify:public-api -w @apet97/clockify-addon-sdk",
     "verify:dist": "npm run verify:dist -w @apet97/clockify-addon-sdk",
     "verify:package-lint": "npm run verify:package-lint -w @apet97/clockify-addon-sdk",
     "verify:package-consumer": "npm run verify:package-consumer -w @apet97/clockify-addon-sdk",
+    "verify:scaffolds": "node create-clockify-addon/scripts/verify-scaffolds.mjs",
     "dev:clockify-local": "npm run dev:clockify-local -w @apet97/clockify-addon-sdk",
     "test:replay": "npm run test:replay -w @apet97/clockify-addon-sdk",
     "verify:fast": "npm run verify:fast -w @apet97/clockify-addon-sdk",
@@ -20,12 +23,12 @@
     "test:coverage": "npm run test:coverage -w @apet97/clockify-addon-sdk",
     "lint": "npm run lint -w @apet97/clockify-addon-sdk",
     "format:check": "npm run format:check -w @apet97/clockify-addon-sdk",
-    "pack:dry-run": "npm pack --dry-run -w @apet97/clockify-addon-sdk",
-    "release:dry-run": "npm publish --dry-run -w @apet97/clockify-addon-sdk --access public",
+    "pack:dry-run": "npm pack --dry-run -w @apet97/clockify-addon-sdk && npm pack --dry-run -w create-clockify-addon",
+    "release:dry-run": "npm publish --dry-run -w @apet97/clockify-addon-sdk --access public && npm publish --dry-run -w create-clockify-addon --access public",
     "release:verify": "npm run ci:verify && npm run verify:schema-live && npm run release:dry-run",
     "verify:deps": "npm ls --workspaces --depth=0",
     "audit:prod": "npm audit --omit=dev --json",
     "audit:all": "npm audit --json",
-    "ci:verify": "npm run verify:deps && npm run type-check && npm run verify:generated && npm run test && npm run lint && npm run format:check && npm run build && npm run verify:public-api && npm run verify:dist && npm run pack:dry-run && npm run verify:package-lint && npm run verify:package-consumer && npm run audit:prod && npm run audit:all"
+    "ci:verify": "npm run verify:deps && npm run type-check && npm run verify:generated && npm run verify:marketplace-docs && npm run test:coverage && npm run lint && npm run format:check && npm run build && npm run verify:public-api && npm run verify:dist && npm run pack:dry-run && npm run verify:package-lint && npm run verify:package-consumer && npm run verify:scaffolds && npm run audit:prod && npm run audit:all"
   }
 }

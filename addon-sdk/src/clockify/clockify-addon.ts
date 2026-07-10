@@ -2,6 +2,7 @@ import { Addon, AddonOptions } from "../shared/addon";
 import { RequestHandler } from "../shared/handler";
 import { ClockifyManifest, ClockifySchemaVersion } from "./clockify-manifest";
 import { ClockifyWebhook, ClockifyLifecycleEvent, ClockifyComponent } from "./clockify-models";
+import { assertClockifyManifest } from "./clockify-manifest-validation";
 
 /**
  * A Clockify add-on server.
@@ -51,4 +52,12 @@ export class ClockifyAddon<
     const m = this.manifest as { settings?: string };
     m.settings = path;
   }
+}
+
+/** Validates a manifest before creating a Clockify add-on server runtime. */
+export function createValidatedClockifyAddon<
+  M extends { readonly schemaVersion: ClockifySchemaVersion },
+>(manifest: M, manifestPath?: string, options?: AddonOptions): ClockifyAddon<M> {
+  assertClockifyManifest(manifest);
+  return new ClockifyAddon(manifest, manifestPath, options);
 }

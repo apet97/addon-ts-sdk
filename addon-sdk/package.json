@@ -59,6 +59,26 @@
         "default": "./dist/cjs/clockify/index.js"
       }
     },
+    "./client": {
+      "import": {
+        "types": "./dist/esm/client/index.d.ts",
+        "default": "./dist/esm/client/index.js"
+      },
+      "require": {
+        "types": "./dist/cjs/client/index.d.cts",
+        "default": "./dist/cjs/client/index.js"
+      }
+    },
+    "./ui": {
+      "import": {
+        "types": "./dist/esm/ui/index.d.ts",
+        "default": "./dist/esm/ui/index.js"
+      },
+      "require": {
+        "types": "./dist/cjs/ui/index.d.cts",
+        "default": "./dist/cjs/ui/index.js"
+      }
+    },
     "./adapters": {
       "import": {
         "types": "./dist/esm/adapters/index.d.ts",
@@ -67,6 +87,36 @@
       "require": {
         "types": "./dist/cjs/adapters/index.d.cts",
         "default": "./dist/cjs/adapters/index.js"
+      }
+    },
+    "./adapters/fetch": {
+      "import": {
+        "types": "./dist/esm/adapters/fetch.d.ts",
+        "default": "./dist/esm/adapters/fetch.js"
+      },
+      "require": {
+        "types": "./dist/cjs/adapters/fetch.d.cts",
+        "default": "./dist/cjs/adapters/fetch.js"
+      }
+    },
+    "./adapters/node": {
+      "import": {
+        "types": "./dist/esm/adapters/node-http.d.ts",
+        "default": "./dist/esm/adapters/node-http.js"
+      },
+      "require": {
+        "types": "./dist/cjs/adapters/node-http.d.cts",
+        "default": "./dist/cjs/adapters/node-http.js"
+      }
+    },
+    "./adapters/express": {
+      "import": {
+        "types": "./dist/esm/adapters/express.d.ts",
+        "default": "./dist/esm/adapters/express.js"
+      },
+      "require": {
+        "types": "./dist/cjs/adapters/express.d.cts",
+        "default": "./dist/cjs/adapters/express.js"
       }
     },
     "./testing": {
@@ -103,6 +153,8 @@
     "prepack": "npm run type-check && npm run verify:generated && npm run test && npm run lint && npm run format:check && npm run build && npm run verify:public-api && npm run verify:dist"
   },
   "dependencies": {
+    "ajv": "^8.20.0",
+    "ajv-draft-04": "^1.0.0",
     "jose": "^6.2.3"
   },
   "peerDependencies": {

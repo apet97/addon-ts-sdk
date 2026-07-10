@@ -9,6 +9,12 @@ export default defineConfig({
       reporter: ["text", "json-summary"],
       include: ["src/**/*.ts"],
       exclude: ["src/clockify/generated/**", "src/**/*.d.ts"],
+      thresholds: {
+        statements: 97,
+        branches: 92,
+        functions: 98,
+        lines: 98,
+      },
     },
     typecheck: {
       checker: "tsc",

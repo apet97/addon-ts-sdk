@@ -34,7 +34,7 @@ describe("Parity Checks", () => {
     }).toThrowError("Handler has already been registered.");
   });
 
-  it("should return strict 405 Method Not Allowed for unmatched paths or methods", async () => {
+  it("should distinguish unmatched paths from unsupported methods", async () => {
     const addon = new ClockifyAddon(getCleanManifest());
 
     // Unregistered path
@@ -43,8 +43,8 @@ describe("Parity Checks", () => {
       path: "/non-existent",
       headers: {},
     });
-    expect(resPath.status).toBe(405);
-    expect(resPath.body).toBe("Method Not Allowed");
+    expect(resPath.status).toBe(404);
+    expect(resPath.body).toBe("Not Found");
 
     // Unregistered method
     const resMethod = await addon.handle({
@@ -122,6 +122,6 @@ describe("Parity Checks", () => {
       path: "/endpoint//",
       headers: {},
     });
-    expect(resDouble.status).toBe(405);
+    expect(resDouble.status).toBe(404);
   });
 });

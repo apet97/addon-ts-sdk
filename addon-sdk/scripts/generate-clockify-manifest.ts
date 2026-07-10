@@ -444,12 +444,30 @@ function main() {
     }
   }
 
+  const schemaEntries = schemas.map((schemaName) => {
+    const version = schemaName.replace(".json", "");
+    const schema = JSON.parse(fs.readFileSync(path.join(schemasDir, schemaName), "utf8"));
+    return `  ${JSON.stringify(version)}: ${JSON.stringify(schema)},`;
+  });
+  const schemaContent = [
+    "/** Draft-04 Clockify manifest schemas embedded for runtime-neutral validation. */",
+    'export type ClockifyEmbeddedManifestSchemas = Readonly<Record<"1.2" | "1.3" | "1.4" | "1.5", object>>;',
+    "/** Supported schemas keyed by the manifest's declared schema version. */",
+    "export const clockifyManifestSchemas: ClockifyEmbeddedManifestSchemas = {",
+    ...schemaEntries,
+    "} as const;",
+    "",
+  ].join("\n");
+  fs.writeFileSync(path.join(outDir, "manifest-schemas.ts"), schemaContent, "utf8");
+  console.log("Generated generated/manifest-schemas.ts");
+
   // Generate index.ts for the generated folder
   let indexContent = "";
   for (const schemaName of schemas) {
     const ver = schemaName.replace(".json", "").replace(".", "_");
     indexContent += `export * as v${ver} from "./v${ver}";\n`;
   }
+  indexContent += `export { clockifyManifestSchemas } from "./manifest-schemas";\n`;
   fs.writeFileSync(path.join(outDir, "index.ts"), indexContent, "utf-8");
   console.log(`Generated generated/index.ts`);
 }

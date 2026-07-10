@@ -50,7 +50,7 @@ import {
   isClockifyAdminRole,
   verifyClockifyComponentRequest,
 } from "@apet97/clockify-addon-sdk";
-import { createNodeHttpAddonServer } from "@apet97/clockify-addon-sdk/adapters";
+import { createNodeHttpAddonServer } from "@apet97/clockify-addon-sdk/adapters/node";
 
 // 1. Build the manifest using the versioned builder
 const manifest = ClockifyManifest.v1_4Builder()
@@ -122,7 +122,7 @@ instance outside the request callback and pass each incoming request through the
 ```typescript
 import { Hono } from "hono";
 import { ClockifyAddon, ClockifyManifest } from "@apet97/clockify-addon-sdk";
-import { handleFetchRequest } from "@apet97/clockify-addon-sdk/adapters";
+import { handleFetchRequest } from "@apet97/clockify-addon-sdk/adapters/fetch";
 
 const manifest = ClockifyManifest.v1_5Builder()
   .key("edge-addon")
@@ -154,6 +154,18 @@ const token = await signTestToken(privateKey, "my-addon-key", { workspaceId: "w-
 
 const claims = await new ClockifySignatureParser("my-addon-key", publicKey).parseClaims(token);
 ```
+
+## Complete toolkit
+
+- `validateClockifyManifest()` validates runtime objects against the embedded draft-04 schemas.
+- `createClockifyHtmlResponse()` and `createClockifyJsonResponse()` apply the browser response
+  security baseline.
+- `ClockifyAddonClient` provides claim-driven token exchange and structured-settings transport.
+- Installation-store encryption and webhook idempotency leases cover server credential workflows.
+- `@apet97/clockify-addon-sdk/ui` provides exact-origin iframe messaging, theme, language and date
+  helpers.
+- `create-clockify-addon` scaffolds Node or Worker projects that fail closed until production origin,
+  parent-origin, persistence and webhook processing are configured.
 
 ## Local Clockify replay
 

@@ -29,6 +29,7 @@ export interface ClockifyWebhookVerificationOptions {
 export interface ClockifyTokenVerificationOptions {
   expectedWorkspaceId?: string;
   expectedAddonId?: string;
+  requireExpiration?: boolean;
 }
 
 export type ClockifyRequestVerificationFailureReason =
@@ -50,6 +51,7 @@ export type ClockifyTokenVerificationFailureReason =
   | "ambiguous-token"
   | "missing-token"
   | "invalid-token"
+  | "missing-expiration"
   | "workspace-id-mismatch"
   | "addon-id-mismatch";
 

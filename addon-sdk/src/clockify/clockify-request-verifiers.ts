@@ -88,7 +88,6 @@ export async function verifyClockifyRequest(
   if (contextMismatch) {
     return { ok: false, reason: contextMismatch };
   }
-
   const eventHeader = options.eventHeader ?? ClockifyHeaders.WEBHOOK_EVENT_TYPE;
   const event = getSingleClockifyHeader(request.headers, eventHeader, "ambiguous-event-type");
 
@@ -179,6 +178,9 @@ export async function verifyClockifyToken(
   if (contextMismatch) {
     return { ok: false, reason: contextMismatch };
   }
+  if (options.requireExpiration && !Number.isFinite(claims.exp)) {
+    return { ok: false, reason: "missing-expiration" };
+  }
 
   return { ok: true, claims };
 }
@@ -193,7 +195,10 @@ export async function verifyClockifyComponentRequest(
     return token;
   }
 
-  return verifyClockifyToken(parser, token.value, options);
+  return verifyClockifyToken(parser, token.value, {
+    ...options,
+    requireExpiration: options.requireExpiration ?? true,
+  });
 }
 
 export async function verifyClockifyLifecycleRequest(
@@ -210,5 +215,8 @@ export async function verifyClockifyLifecycleRequest(
     return token;
   }
 
-  return verifyClockifyToken(parser, token.value, options);
+  return verifyClockifyToken(parser, token.value, {
+    ...options,
+    requireExpiration: options.requireExpiration ?? true,
+  });
 }

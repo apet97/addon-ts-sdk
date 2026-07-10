@@ -6,6 +6,7 @@ import {
   BodyLimitOptions,
   PayloadTooLargeError,
   isPayloadTooLargeError,
+  parseContentLength,
   resolveMaxBodyBytes,
 } from "./body-limit";
 
@@ -15,7 +16,7 @@ function contentLengthExceedsLimit(
 ): boolean {
   const value = headers["content-length"];
   const contentLength = Array.isArray(value) ? value[0] : value;
-  return contentLength !== undefined && Number(contentLength) > maxBodyBytes;
+  return (parseContentLength(contentLength) ?? 0) > maxBodyBytes;
 }
 
 async function readBody(req: IncomingMessage, maxBodyBytes: number): Promise<Uint8Array> {

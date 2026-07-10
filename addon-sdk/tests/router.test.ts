@@ -46,8 +46,8 @@ describe("Router", () => {
       headers: {},
     });
 
-    expect(response.status).toBe(405);
-    expect(response.body).toBe("Method Not Allowed");
+    expect(response.status).toBe(404);
+    expect(response.body).toBe("Not Found");
     expect(handler).not.toHaveBeenCalled();
   });
 
@@ -95,6 +95,19 @@ describe("Router", () => {
 
     expect(response.status).toBe(405);
     expect(response.body).toBe("Method Not Allowed");
+    expect(response.headers?.allow).toBe("GET, HEAD, OPTIONS");
+  });
+
+  it("supports HEAD and OPTIONS without invoking a GET body twice", async () => {
+    const addon = new ClockifyAddon(mockManifest);
+    const head = await addon.handle({ method: "HEAD", path: "/manifest", headers: {} });
+    expect(head.status).toBe(200);
+    expect(head.body).toBeUndefined();
+    expect(head.headers?.["content-type"]).toBe("application/json");
+
+    const options = await addon.handle({ method: "OPTIONS", path: "/manifest", headers: {} });
+    expect(options.status).toBe(204);
+    expect(options.headers?.allow).toBe("GET, HEAD, OPTIONS");
   });
 
   it("should return 500 on handler exceptions without logging by default", async () => {

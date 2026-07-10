@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 import { ClockifyAddon, ClockifyManifest } from "../src";
 import {
   DEFAULT_MAX_BODY_BYTES,
+  InvalidContentLengthError,
   PayloadTooLargeError,
   createExpressAddonHandler,
   fromNodeRequest,
@@ -26,6 +27,9 @@ describe("Adapters", () => {
     expect(resolveMaxBodyBytes({ maxBodyBytes: 2 })).toBe(2);
     expect(() => resolveMaxBodyBytes({ maxBodyBytes: 0 })).toThrow(/positive integer/);
     expect(() => resolveMaxBodyBytes({ maxBodyBytes: Number.POSITIVE_INFINITY })).toThrow(
+      /positive integer/,
+    );
+    expect(() => resolveMaxBodyBytes({ maxBodyBytes: Number.MAX_SAFE_INTEGER + 1 })).toThrow(
       /positive integer/,
     );
   });
@@ -61,6 +65,25 @@ describe("Adapters", () => {
     mockReq.emit("end");
 
     await expect(promise).rejects.toBeInstanceOf(PayloadTooLargeError);
+  });
+
+  it("rejects malformed or negative declared content lengths", async () => {
+    for (const contentLength of ["not-a-number", "-1", "1.5"]) {
+      const mockReq = new IncomingMessage(new Socket());
+      mockReq.headers = { host: "localhost", "content-length": contentLength };
+      mockReq.url = "/webhook";
+      mockReq.method = "POST";
+      const promise = fromNodeRequest(mockReq);
+      mockReq.emit("end");
+      await expect(promise).rejects.toBeInstanceOf(InvalidContentLengthError);
+    }
+    const huge = new IncomingMessage(new Socket());
+    huge.headers = { host: "localhost", "content-length": String(Number.MAX_SAFE_INTEGER + 1) };
+    huge.url = "/webhook";
+    huge.method = "POST";
+    const hugePromise = fromNodeRequest(huge);
+    huge.emit("end");
+    await expect(hugePromise).rejects.toBeInstanceOf(InvalidContentLengthError);
   });
 
   it("rejects Node HTTP requests that stream past maxBodyBytes without content-length", async () => {
@@ -194,6 +217,22 @@ describe("Adapters", () => {
     expect(response.status).toBe(413);
     expect(await response.text()).toBe("Payload Too Large");
     expect(dispatched).toBe(false);
+  });
+
+  it("returns 400 for a malformed Fetch content-length without dispatching", async () => {
+    const addon = new ClockifyAddon(mockManifest);
+    const handler = vi.fn(() => ({ status: 204 }));
+    addon.registerHandler("/webhook", "POST", handler);
+    const response = await handleFetchRequest(
+      addon,
+      new Request("https://example.com/webhook", {
+        method: "POST",
+        headers: { "content-length": "invalid" },
+        body: "{}",
+      }),
+    );
+    expect(response.status).toBe(400);
+    expect(handler).not.toHaveBeenCalled();
   });
 
   it("should handle Express handler flow", async () => {

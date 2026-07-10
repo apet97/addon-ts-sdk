@@ -1,17 +1,23 @@
 # API Reference
 
 This page maps the public entry points exported by `@apet97/clockify-addon-sdk`. The package is a
-server runtime SDK for Clockify add-ons; it does not include a Clockify REST client, token exchange
-client, persistence layer, UI event framework, or custom manifest validator.
+layered SDK for Clockify add-ons. It includes Marketplace token/settings transport, storage
+contracts, secure UI messaging, and runtime manifest validation without duplicating the separate
+Clockify entity REST SDK.
 
 ## Entry Points
 
-| Import path                           | Purpose                                                                 |
-| ------------------------------------- | ----------------------------------------------------------------------- |
-| `@apet97/clockify-addon-sdk`          | Root surface: shared request/response types, Clockify helpers, adapters |
-| `@apet97/clockify-addon-sdk/clockify` | Clockify-only builders, models, lifecycle types, and verification       |
-| `@apet97/clockify-addon-sdk/adapters` | Node `http`, Express-like, Fetch, and body-limit adapter helpers        |
-| `@apet97/clockify-addon-sdk/testing`  | RS256 test-key and token-signing helpers                                |
+| Import path                                   | Purpose                                                                |
+| --------------------------------------------- | ---------------------------------------------------------------------- |
+| `@apet97/clockify-addon-sdk`                  | Runtime-neutral request/response, Clockify, validation and client APIs |
+| `@apet97/clockify-addon-sdk/clockify`         | Clockify-only builders, models, lifecycle types, and verification      |
+| `@apet97/clockify-addon-sdk/adapters`         | Node `http`, Express-like, Fetch, and body-limit adapter helpers       |
+| `@apet97/clockify-addon-sdk/adapters/node`    | Node `http` adapter only                                               |
+| `@apet97/clockify-addon-sdk/adapters/express` | Structurally typed Express adapter                                     |
+| `@apet97/clockify-addon-sdk/adapters/fetch`   | Fetch/Worker adapter only                                              |
+| `@apet97/clockify-addon-sdk/client`           | Add-on token exchange, settings, and authenticated transport           |
+| `@apet97/clockify-addon-sdk/ui`               | Exact-origin browser bridge and preference helpers                     |
+| `@apet97/clockify-addon-sdk/testing`          | RS256 test-key and token-signing helpers                               |
 
 ## Core Runtime
 
@@ -90,3 +96,18 @@ client, persistence layer, UI event framework, or custom manifest validator.
 - `generateTestKeys()` creates an RS256 key pair for tests.
 - `signTestToken(privateKey, addonKey, claims?, expiresIn?)` signs add-on JWTs that exercise the same
   verification path as Clockify-signed requests.
+
+## Validation, Security, Storage, and Client
+
+- `validateClockifyManifest()` and `assertClockifyManifest()` use the embedded draft-04 schema named
+  by `schemaVersion`.
+- `buildClockifySecurityHeaders()`, `createClockifyHtmlResponse()`, and
+  `createClockifyJsonResponse()` supply no-store browser response defaults.
+- `resolveClockifyPublicOrigin()` requires configured HTTPS except for explicit localhost opt-in.
+- `ClockifyInstallationStore`, `InMemoryClockifyInstallationStore`, and
+  `wrapClockifyInstallationStoreWithEncryption()` cover generation-aware credential persistence.
+- `ClockifyIdempotencyLeaseStore` and `runClockifyIdempotentWebhook()` define owner-specific webhook
+  processing.
+- `ClockifyAddonClient` uses `X-Addon-Token`, encoded path segments, abort/timeout handling,
+  safe-read retries, and mutation replay only after confirmed HTTP 429.
+- `/ui` exports `createClockifyBridge()`, preference application, and locale-aware date formatting.

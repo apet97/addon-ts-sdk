@@ -62,6 +62,36 @@ async function validToken(extraClaims: Record<string, unknown> = {}) {
 }
 
 describe("Marketplace request verification helpers", () => {
+  it("rejects empty add-on keys before token verification", () => {
+    expect(() => new ClockifySignatureParser(" ", keys.publicKey)).toThrow(/add-on key/i);
+  });
+
+  it("requires expiration on component and lifecycle tokens", async () => {
+    const token = await new SignJWT({
+      type: "addon",
+      workspaceId: WORKSPACE_ID,
+      addonId: ADDON_ID,
+    })
+      .setProtectedHeader({ alg: "RS256" })
+      .setIssuer("clockify")
+      .setSubject(ADDON_KEY)
+      .sign(keys.privateKey);
+
+    await expect(
+      verifyClockifyComponentRequest(
+        parser(),
+        componentRequest(new URLSearchParams({ [ClockifyQueryParams.AUTH_TOKEN]: token })),
+      ),
+    ).resolves.toEqual({ ok: false, reason: "missing-expiration" });
+
+    await expect(
+      verifyClockifyLifecycleRequest(
+        parser(),
+        request({ [ClockifyHeaders.LIFECYCLE_TOKEN]: token }),
+      ),
+    ).resolves.toEqual({ ok: false, reason: "missing-expiration" });
+  });
+
   it("exports documented wire names and reads headers case-insensitively", () => {
     const headers = {
       "Clockify-Signature": ["jwt-1", "jwt-2"],

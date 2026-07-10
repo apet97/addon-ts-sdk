@@ -2,7 +2,18 @@
 
 Conventions for anyone (human or agent) working in this repository.
 
-## Current hardening checkpoint (2026-07-05)
+## Current hardening checkpoint (2026-07-11)
+
+- The root SDK entrypoint is runtime-neutral. Import Node, Express, and Fetch integration from the
+  granular adapter subpaths; never reintroduce `node:*` through the root.
+- Browser-facing responses use the SDK security helpers. Production public origins require explicit
+  HTTPS configuration, and the UI bridge requires an exact parent origin and source.
+- Component and lifecycle JWTs require expiration. Webhook signatures may be non-expiring but still
+  require RS256, issuer/type/subject, event, installation context, and stored-token checks.
+- Installation credentials, including nested webhook copies, are encrypted at rest. Stale lifecycle
+  generations must not delete newer installations; webhook leases remain owner-specific.
+- Outbound mutations replay only a confirmed 429. Safe reads may retry transient failures; caller
+  aborts are terminal.
 
 - Keep Node `http` and Fetch body-limit semantics aligned: declared `content-length` values above
   `maxBodyBytes` must fail before routing, and streamed bodies must still fail once the byte counter
@@ -19,6 +30,8 @@ Conventions for anyone (human or agent) working in this repository.
 
 - `addon-sdk/` — the published package (`@apet97/clockify-addon-sdk`). All SDK code, schemas,
   examples, and tests live here. Run package commands from this directory.
+- `create-clockify-addon/` — the creator package. Its Node and Worker projects must install and
+  type-check against the packed SDK, not workspace source.
 - Root npm scripts proxy the package gates through npm workspaces; use `npm run ci:verify` from the
   repo root for the full local/CI verification chain.
 
@@ -40,10 +53,9 @@ Conventions for anyone (human or agent) working in this repository.
 - Builder step order follows each schema's `required` array (matching the upstream processor).
   Required array fields keep Java-parity empty-array defaults but must still throw at runtime when
   their setter was never called.
-- Marketplace docs coverage is intentionally small and runtime-focused: request verification helpers,
-  lifecycle payload guards, token/header constants, and environment/region claim extraction. Do not
-  add a REST client, token exchange client, UI/window-event framework, persistence layer, or custom
-  manifest validator unless explicitly requested.
+- Marketplace coverage is tracked in `docs/marketplace-coverage.md`. The SDK owns add-on-specific
+  token/settings transport, storage contracts, secure UI messaging, and schema validation. The
+  separate `clockify-ts-sdk` owns entity-specific REST APIs, CLI, and MCP behavior.
 - Clockify-signed tokens are verified as `RS256` JWTs with `iss=clockify`, `type=addon`, and
   `sub=<manifest key>`. Webhooks should use `verifyClockifyWebhookRequest()` with
   `expectedEventType`; lifecycle routes should use `X-Addon-Lifecycle-Token`; Clockify API calls use
@@ -52,6 +64,8 @@ Conventions for anyone (human or agent) working in this repository.
   build and installed CJS consumer smoke stay clean.
 - Do not hardcode Clockify API/report/location/screenshot hosts. Use verified token claims such as
   `backendUrl`, `reportsUrl`, `locationsUrl`, and `screenshotsUrl`.
+- Encode every caller-provided URL path segment. Use `X-Addon-Token`, never `Authorization`, and do
+  not log outbound query strings or credentials.
 - Node `http` and Fetch adapters enforce `DEFAULT_MAX_BODY_BYTES` (`1_048_576`) before dispatch and
   return 413 for oversized bodies. Invalid `maxBodyBytes` values should throw configuration errors.
   Express body limits are configured by the host app, not the SDK.
@@ -63,23 +77,24 @@ Conventions for anyone (human or agent) working in this repository.
 
 ## Gates
 
-| Command                                    | Checks                                                                                                                                                                                                                |
-| ------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `npm run ci:verify`                        | Canonical root gate: workspace dependency tree, type-check, generated drift, tests, lint, format check, build, public API snapshot, dist import smoke, pack dry-run, package lint, installed-consumer smoke, and audits. |
-| `npm run verify:deps`                      | Confirms the npm workspace dependency tree resolves at depth 0 before the heavier package gates.                                                                                                                      |
-| `npm run type-check`                       | `src`, generator, examples, and the type-state probes. A weakened builder must fail this.                                                                                                                             |
-| `npm run verify:generated`                 | Checks schema provenance, generates to a temporary directory, compares against committed generated files, and leaves tracked files untouched.                                                                         |
-| `npm run test`                             | vitest suite.                                                                                                                                                                                                         |
-| `npm run test:coverage`                    | Advisory Vitest V8 coverage report over hand-written `src/**/*.ts`, excluding generated Clockify models. Do not add arbitrary thresholds without first recording and justifying the baseline.                       |
-| `npm run lint`                             | Check-only ESLint over the package.                                                                                                                                                                                   |
-| `npm run format:check`                     | Check-only Prettier over the package.                                                                                                                                                                                 |
-| `npm run build`                            | ESM + CJS output.                                                                                                                                                                                                     |
-| `npm run verify:public-api`                | Compares built ESM declaration surfaces for root, `/clockify`, `/adapters`, and `/testing` against `addon-sdk/public-api.snapshot.md`.                                                                                |
-| `npm run verify:dist`                      | Imports the **built** ESM and CJS and boots the quick-start. A green `build` alone does not prove the package imports.                                                                                                |
-| `npm run pack:dry-run`                     | Tarball contents (`dist` + `docs` + `schemas/clockify-manifests` + `LICENSE` + `README`).                                                                                                                             |
-| `npm run verify:package-lint`              | Packs the already-built package with scripts ignored, then runs `publint --strict` and Are The Types Wrong with the Node16 profile. Node10 findings are intentionally outside this Node 22+ package's support policy. |
-| `npm run verify:package-consumer`          | Packs the already-built package with scripts ignored, installs it into temporary runtime ESM/CJS and TypeScript ESM/CJS consumers, imports public subpaths, signs/verifies test tokens, type-checks declarations, and serves `/manifest`. |
-| `npm run audit:prod` / `npm run audit:all` | Production and full dependency audits; both should report 0 vulnerabilities.                                                                                                                                          |
+| Command                                    | Checks                                                                                                                                                                                                                                                |
+| ------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `npm run ci:verify`                        | Canonical root gate: workspace dependency tree, type-check, generated drift, thresholded coverage, lint, format check, build, public API snapshot, dist import smoke, pack dry-run, package lint, installed-consumer and scaffold smokes, and audits. |
+| `npm run verify:deps`                      | Confirms the npm workspace dependency tree resolves at depth 0 before the heavier package gates.                                                                                                                                                      |
+| `npm run type-check`                       | `src`, generator, examples, and the type-state probes. A weakened builder must fail this.                                                                                                                                                             |
+| `npm run verify:generated`                 | Checks schema provenance, generates to a temporary directory, compares against committed generated files, and leaves tracked files untouched.                                                                                                         |
+| `npm run test`                             | vitest suite.                                                                                                                                                                                                                                         |
+| `npm run test:coverage`                    | Enforced Vitest V8 coverage over handwritten `src/**/*.ts`, excluding generated models: 97% statements, 92% branches, 98% functions, and 98% lines.                                                                                                   |
+| `npm run lint`                             | Check-only ESLint over the package.                                                                                                                                                                                                                   |
+| `npm run format:check`                     | Check-only Prettier over the package.                                                                                                                                                                                                                 |
+| `npm run build`                            | ESM + CJS output.                                                                                                                                                                                                                                     |
+| `npm run verify:public-api`                | Compares built declaration surfaces for root, Clockify, adapters, client, UI, and testing entrypoints against `addon-sdk/public-api.snapshot.md`.                                                                                                     |
+| `npm run verify:dist`                      | Imports the **built** ESM and CJS and boots the quick-start. A green `build` alone does not prove the package imports.                                                                                                                                |
+| `npm run pack:dry-run`                     | Tarball contents (`dist` + `docs` + `schemas/clockify-manifests` + `LICENSE` + `README`).                                                                                                                                                             |
+| `npm run verify:package-lint`              | Packs the already-built package with scripts ignored, then runs `publint --strict` and Are The Types Wrong with the Node16 profile. Node10 findings are intentionally outside this Node 22+ package's support policy.                                 |
+| `npm run verify:package-consumer`          | Packs the already-built package with scripts ignored, installs it into temporary runtime ESM/CJS and TypeScript ESM/CJS consumers, imports public subpaths, signs/verifies test tokens, type-checks declarations, and serves `/manifest`.             |
+| `npm run verify:scaffolds`                 | Packs the SDK, generates Node and Worker all-feature projects, installs them, and type-checks both.                                                                                                                                                   |
+| `npm run audit:prod` / `npm run audit:all` | Production and full dependency audits; both should report 0 vulnerabilities.                                                                                                                                                                          |
 
 GitHub Actions runs `npm run ci:verify` on Node 22.x and 24.x for pushes to `main`, pull requests,
 and manual dispatches. A separate scheduled/manual `Live Schema Drift` workflow runs

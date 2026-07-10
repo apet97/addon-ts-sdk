@@ -42,11 +42,11 @@ describe("Node HTTP server boot (integration)", () => {
     expect(body.key).toBe("k");
   });
 
-  it("returns 405 for an unknown route over the wire", async () => {
+  it("returns 404 for an unknown route over the wire", async () => {
     const addon = new ClockifyAddon(base());
     const port = await listen(addon);
     const res = await fetch(`http://127.0.0.1:${port}/nope`);
-    expect(res.status).toBe(405);
+    expect(res.status).toBe(404);
   });
 
   it("dispatches a POST webhook handler over the wire", async () => {

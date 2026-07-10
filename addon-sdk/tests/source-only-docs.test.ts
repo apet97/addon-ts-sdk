@@ -53,7 +53,7 @@ describe("source-only distribution docs", () => {
     expect(dependencyStrategy).toContain("npm run verify:package-consumer");
     expect(dependencyStrategy).toContain("CommonJS support");
     expect(rootPackageJson.scripts["release:dry-run"]).toBe(
-      "npm publish --dry-run -w @apet97/clockify-addon-sdk --access public",
+      "npm publish --dry-run -w @apet97/clockify-addon-sdk --access public && npm publish --dry-run -w create-clockify-addon --access public",
     );
     expect(rootPackageJson.scripts["release:verify"]).toBe(
       "npm run ci:verify && npm run verify:schema-live && npm run release:dry-run",

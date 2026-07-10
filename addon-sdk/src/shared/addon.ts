@@ -102,7 +102,22 @@ export abstract class Addon<M> {
       const method = request.method.toUpperCase();
       const key = `${method}:${path}`;
 
-      const handler = this.requestHandlers.get(key);
+      const allowedMethods = Array.from(this.requestHandlers.keys())
+        .filter((registered) => registered.slice(registered.indexOf(":") + 1) === path)
+        .map((registered) => registered.slice(0, registered.indexOf(":")));
+      if (allowedMethods.length === 0) return { status: 404, body: "Not Found" };
+
+      const allow = Array.from(
+        new Set([
+          ...allowedMethods,
+          ...(allowedMethods.includes(Addon.HTTP_GET) ? ["HEAD"] : []),
+          "OPTIONS",
+        ]),
+      ).join(", ");
+      if (method === "OPTIONS") return { status: 204, headers: { allow } };
+
+      const headRequest = method === "HEAD" && allowedMethods.includes(Addon.HTTP_GET);
+      const handler = this.requestHandlers.get(headRequest ? `${Addon.HTTP_GET}:${path}` : key);
       if (handler) {
         // Run filter chain
         const dispatch = async (i: number, req: AddonRequest): Promise<AddonResponse> => {
@@ -119,11 +134,13 @@ export abstract class Addon<M> {
           }
           return await handler(req);
         };
-        return await dispatch(0, request);
+        const response = await dispatch(0, request);
+        return headRequest ? { ...response, body: undefined } : response;
       }
 
       return {
         status: 405,
+        headers: { allow },
         body: "Method Not Allowed",
       };
     } catch (e) {

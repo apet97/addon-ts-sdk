@@ -22,6 +22,7 @@ export interface ClockifyAddonClaims {
   type: "addon";
   iss: "clockify";
   sub: string;
+  exp?: number;
   backendUrl?: string;
   ptoUrl?: string;
   reportsUrl?: string;
@@ -42,6 +43,9 @@ export class ClockifySignatureParser {
   private resolvedKey: ClockifyCryptoKey | null = null;
 
   constructor(addonKey: string, publicKey: ClockifyPublicKeyInput) {
+    if (addonKey.trim() === "") {
+      throw new Error("Clockify add-on key must not be empty.");
+    }
     this.addonKey = addonKey;
     this.publicKey = publicKey;
   }

@@ -16,13 +16,11 @@ consumer, audit, or live-schema checks.
 3. **`npm run verify:generated`** — verifies schema provenance, generates fresh output in a temporary
    directory, compares it with committed `src/clockify/generated/**`, and removes the temporary files
    before exit.
-4. **`npm run test`** — the full `vitest` suite.
+4. **`npm run test:coverage`** — the full `vitest` suite plus enforced handwritten-code floors of
+   97% statements, 92% branches, 98% functions, and 98% lines.
    - **`npm run test:replay`** — focused local Clockify replay coverage for component auth-token,
      installed lifecycle, stored-token webhook verification, and negative token/workspace cases.
-5. **`npm run test:coverage`** — advisory Vitest V8 coverage over hand-written `src/**/*.ts`, with
-   generated Clockify models and declaration files excluded. The 2026-07-05 baseline was 97.7%
-   statements, 93.18% branches, 99.01% functions, and 98.58% lines; thresholds should only be added
-   below a measured baseline and with generated code excluded.
+5. **`npm run test`** — a focused non-coverage unit-test shortcut for local development.
 6. **`npm run lint`** — check-only ESLint over the package source, tests, scripts, examples, and docs
    where applicable.
 7. **`npm run format:check`** — check-only Prettier over the package. Vendored Marketplace docs,
@@ -33,8 +31,8 @@ consumer, audit, or live-schema checks.
    `addon-sdk/public-api.snapshot.md`. Intentional public API changes must run
    `npm run build && npm run verify:public-api -- --update` and include the snapshot diff.
 10. **`npm run verify:dist`** — imports the **built** ESM and CJS and boots the README quick-start; a
-   green `build` alone does not prove the package imports.
-11. **`npm run pack:dry-run`** — confirms the tarball contents (`dist` + `docs` + vendored
+    green `build` alone does not prove the package imports.
+11. **`npm run pack:dry-run`** — confirms both SDK and creator tarball contents (`dist` + `docs` + vendored
     `schemas/clockify-manifests` + `LICENSE` + `README`).
 12. **`npm run verify:package-lint`** — packs the already-built package with `--ignore-scripts`,
     then runs `publint --strict` and Are The Types Wrong with the Node16 profile against the packed
@@ -44,7 +42,9 @@ consumer, audit, or live-schema checks.
     the root and subpath entry points, checks `generated.v1_5`, type-checks declarations without
     requiring Express types, signs/verifies JWTs through `jose@6` dynamic imports, and boots a
     `/manifest` server smoke from the installed package.
-14. **`npm audit --omit=dev --json` and `npm audit --json`** — production and full dependency audit;
+14. **`npm run verify:scaffolds`** — packs the SDK, generates Node and Worker all-feature projects,
+    installs them in temporary directories, and type-checks them against the tarball.
+15. **`npm audit --omit=dev --json` and `npm audit --json`** — production and full dependency audit;
     both should report 0 vulnerabilities.
 
 Manual freshness check:

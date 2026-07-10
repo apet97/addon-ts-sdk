@@ -1,11 +1,16 @@
 import { Addon, AddonErrorReporter, reportAddonError } from "../shared/addon";
 import { AddonRequest } from "../shared/request";
 import { AddonResponse, isJsonBody } from "../shared/response";
-import { BodyLimitOptions, PayloadTooLargeError, resolveMaxBodyBytes } from "./body-limit";
+import {
+  BodyLimitOptions,
+  PayloadTooLargeError,
+  parseContentLength,
+  resolveMaxBodyBytes,
+} from "./body-limit";
 
 async function readFetchBody(request: Request, maxBodyBytes: number): Promise<Uint8Array> {
   const contentLength = request.headers.get("content-length");
-  if (contentLength !== null && Number(contentLength) > maxBodyBytes) {
+  if ((parseContentLength(contentLength) ?? 0) > maxBodyBytes) {
     throw new PayloadTooLargeError(maxBodyBytes);
   }
 

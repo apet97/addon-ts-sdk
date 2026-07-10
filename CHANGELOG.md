@@ -4,6 +4,15 @@ All notable changes to this source-only SDK are recorded here.
 
 ## Unreleased
 
+- Made the root entrypoint runtime-neutral and added granular Node, Express, Fetch, client, and UI
+  subpaths.
+- Added draft-04 manifest validation, hardened browser responses, fail-closed public origins,
+  encrypted generation-aware installation storage, webhook idempotency leases, and stricter token
+  profiles.
+- Added Marketplace-specific add-on API transport and an exact-origin iframe bridge.
+- Added `create-clockify-addon` with packed SDK Node/Worker scaffold verification and Marketplace
+  coverage documentation.
+
 - Added Express adapter coverage for array-valued query params and primitive response bodies.
 - Removed unreachable manifest-array fallback branches from Clockify add-on registration helpers.
 - Added Node `http` adapter preflight rejection for requests whose declared `content-length`

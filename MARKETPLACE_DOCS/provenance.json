@@ -1,0 +1,18 @@
+{
+  "capturedAt": "2026-07-11",
+  "documents": {
+    "01-introduction.md": "943eb38240bbc898fc928348ca39c936344dc7909f1547c3b115f7ae4d182c4f",
+    "02-quick-start.md": "0293131aff4a9790b3aa5b071033649e6f0824f0aa7a5f781d61bb35428ce232",
+    "03-lifecycle.md": "61990cd188de3a4d2816667766e635a6d9329035e46673ade69a23499f58fc4a",
+    "04-ui-components.md": "96a74d53c82d9b3bbb6814b5ea9cf87a938ba52cce8e39923e13ac30e31466e4",
+    "05-webhooks.md": "5cd4dc02cd75cef6781306df0048a8c23072ce59e84d1ab91d12283960c31abe",
+    "06-structured-settings.md": "2b294430334cd7f71f51a363a6fe99b5eefb6c702db951c36e57ba4bf1eaf0f6",
+    "07-developer-account.md": "b15a5541863fe9a09dc3712e7274d72b88cbc33a28d3fd6f418d430425365366",
+    "08-authentication-and-authorization.md": "a2e6f71026c75d3305ff1f2dffbf548713a3573dba69c4ef5d2cb0ee977f680f",
+    "09-environments-and-regions.md": "d0ba75b3e8e76b4907ff7507de50aacac754ca87fa04ea43147211a2e110dd6c",
+    "10-window-events.md": "b9ae6d53e940fb18c7080876068964b5cbea404d6c14c5679bcd043dc111fc29",
+    "11-development-checklist.md": "a0f7a6c2ad19f33c1e3dbe103a11715aa0aa014cc21ba034c184fe1450d3313e",
+    "12-publishing-and-guidelines.md": "5e1bf8b9bd5eed146bbc983a472415c914861f14d56eb05e3806150ad853e7c0",
+    "13-private-addon-deployment.md": "8823b2442f904b23e44540e263ae71ecdbd1cd13c21c572f1c9f45148ed9d1c1"
+  }
+}

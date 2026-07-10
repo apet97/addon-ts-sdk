@@ -14,7 +14,7 @@ export * from "./shared/response.js";
 export * from "./shared/handler.js";
 export * from "./shared/errors.js";
 export * from "./clockify/index.js";
-export * from "./adapters/index.js";
+export * from "./client/index.js";
 export * as testing from "./testing/index.js";
 ```
 
@@ -112,6 +112,11 @@ export * from "./clockify-request-verification.js";
 export * from "./clockify-lifecycle.js";
 export * from "./clockify-models.js";
 export * from "./clockify-settings.js";
+export * from "./clockify-manifest-validation.js";
+export * from "./clockify-security.js";
+export * from "./clockify-public-origin.js";
+export * from "./clockify-installation-store.js";
+export * from "./clockify-webhook-idempotency.js";
 export * as generated from "./generated/index.js";
 ```
 
@@ -141,6 +146,10 @@ export declare class ClockifyAddon<M extends {
     registerComponent(component: ClockifyComponent<M["schemaVersion"]>, handler: RequestHandler): void;
     registerCustomSettings(path: string, handler: RequestHandler): void;
 }
+/** Validates a manifest before creating a Clockify add-on server runtime. */
+export declare function createValidatedClockifyAddon<M extends {
+    readonly schemaVersion: ClockifySchemaVersion;
+}>(manifest: M, manifestPath?: string, options?: AddonOptions): ClockifyAddon<M>;
 ```
 
 ### clockify/clockify-manifest.d.ts
@@ -198,6 +207,7 @@ export interface ClockifyAddonClaims {
     type: "addon";
     iss: "clockify";
     sub: string;
+    exp?: number;
     backendUrl?: string;
     ptoUrl?: string;
     reportsUrl?: string;
@@ -297,10 +307,11 @@ export interface ClockifyWebhookVerificationOptions {
 export interface ClockifyTokenVerificationOptions {
     expectedWorkspaceId?: string;
     expectedAddonId?: string;
+    requireExpiration?: boolean;
 }
 export type ClockifyRequestVerificationFailureReason = "missing-signature" | "ambiguous-signature" | "invalid-signature" | "missing-event-type" | "ambiguous-event-type" | "event-type-mismatch" | "workspace-id-mismatch" | "addon-id-mismatch";
 export type ClockifyWebhookVerificationFailureReason = ClockifyRequestVerificationFailureReason | "missing-expected-event-type" | "webhook-token-mismatch";
-export type ClockifyTokenVerificationFailureReason = "ambiguous-token" | "missing-token" | "invalid-token" | "workspace-id-mismatch" | "addon-id-mismatch";
+export type ClockifyTokenVerificationFailureReason = "ambiguous-token" | "missing-token" | "invalid-token" | "missing-expiration" | "workspace-id-mismatch" | "addon-id-mismatch";
 export type ClockifyRequestVerificationResult = {
     ok: true;
     claims: ClockifyAddonClaims;
@@ -635,6 +646,158 @@ export declare function createClockifyUserDropdownMultipleSetting(input: Clockif
 export {};
 ```
 
+### clockify/clockify-manifest-validation.d.ts
+
+```ts
+import type { ClockifyManifest, ClockifySchemaVersion } from "./clockify-manifest.js";
+/** A normalized manifest-validation issue suitable for logs and developer tooling. */
+export interface ClockifyManifestValidationIssue {
+    readonly instancePath: string;
+    readonly schemaPath: string;
+    readonly keyword: string;
+    readonly message: string;
+}
+/** The non-throwing result returned by {@link validateClockifyManifest}. */
+export type ClockifyManifestValidationResult = {
+    readonly ok: true;
+    readonly value: ClockifyManifest<ClockifySchemaVersion>;
+} | {
+    readonly ok: false;
+    readonly issues: readonly ClockifyManifestValidationIssue[];
+};
+/** Error thrown when a manifest does not satisfy its declared Clockify schema. */
+export declare class ClockifyManifestValidationError extends Error {
+    readonly issues: readonly ClockifyManifestValidationIssue[];
+    constructor(issues: readonly ClockifyManifestValidationIssue[]);
+}
+/** Validates an unknown value against the schema named by its `schemaVersion` field. */
+export declare function validateClockifyManifest(value: unknown): ClockifyManifestValidationResult;
+/** Asserts that a value is a valid supported Clockify manifest. */
+export declare function assertClockifyManifest(value: unknown): asserts value is ClockifyManifest<ClockifySchemaVersion>;
+```
+
+### clockify/clockify-security.d.ts
+
+```ts
+import type { AddonResponse } from "../shared/response.js";
+/** Options for the SDK's browser-facing response security baseline. */
+export interface ClockifySecurityHeaderOptions {
+    readonly frameAncestors?: readonly string[];
+    readonly contentSecurityPolicy?: Readonly<Record<string, readonly string[]>>;
+}
+/** Builds the secure default headers for Clockify iframe HTML and browser-facing JSON. */
+export declare function buildClockifySecurityHeaders(options?: ClockifySecurityHeaderOptions): Record<string, string>;
+/** Creates a no-store HTML response with the SDK security baseline. */
+export declare function createClockifyHtmlResponse(body: string, options?: ClockifySecurityHeaderOptions & {
+    readonly status?: number;
+}): AddonResponse;
+/** Creates a no-store JSON response with MIME-sniffing and referrer protections. */
+export declare function createClockifyJsonResponse(body: object | null, options?: {
+    readonly status?: number;
+}): AddonResponse;
+```
+
+### clockify/clockify-public-origin.d.ts
+
+```ts
+/** Inputs accepted by the fail-closed public-origin resolver. */
+export interface ClockifyPublicOriginOptions {
+    readonly publicBaseUrl?: string;
+    readonly requestUrl?: string;
+    readonly allowLocalRequestOrigin?: boolean;
+}
+/** Resolves the public origin used in manifests and browser security policies. */
+export declare function resolveClockifyPublicOrigin(options: ClockifyPublicOriginOptions): string;
+```
+
+### clockify/clockify-installation-store.d.ts
+
+```ts
+import type { ClockifyLifecycleWebhookToken } from "./clockify-lifecycle.js";
+import type { ClockifyCryptoKey } from "./clockify-crypto-key.js";
+/** Web Crypto AES-GCM key accepted without requiring consumer DOM library declarations. */
+export type ClockifyAesGcmKey = Extract<ClockifyCryptoKey, {
+    readonly algorithm: unknown;
+    readonly usages: readonly string[];
+}>;
+/** Persisted server-side context for one Clockify add-on installation. */
+export interface ClockifyInstallationContext {
+    readonly workspaceId: string;
+    readonly addonId: string;
+    readonly addonUserId: string;
+    readonly asUser: string;
+    readonly apiUrl: string;
+    readonly authToken: string;
+    readonly installedAt: number;
+    readonly webhooks?: readonly ClockifyLifecycleWebhookToken[];
+}
+/** Generation-aware input used to delete one installation. */
+export interface ClockifyInstallationDeleteInput {
+    readonly workspaceId: string;
+    readonly addonId: string;
+    readonly installedAt?: number;
+}
+/** Result of an installation deletion attempt. */
+export type ClockifyInstallationDeleteResult = "deleted" | "missing" | "stale";
+/** Minimal persistence contract required by the lifecycle helpers. */
+export interface ClockifyInstallationStore {
+    load(workspaceId: string, addonId: string): Promise<ClockifyInstallationContext | null>;
+    save(context: ClockifyInstallationContext): Promise<void>;
+    delete(input: ClockifyInstallationDeleteInput): Promise<ClockifyInstallationDeleteResult>;
+}
+/** In-memory installation store intended for tests and single-process development. */
+export declare class InMemoryClockifyInstallationStore implements ClockifyInstallationStore {
+    private readonly records;
+    load(workspaceId: string, addonId: string): Promise<ClockifyInstallationContext | null>;
+    save(context: ClockifyInstallationContext): Promise<void>;
+    delete(input: ClockifyInstallationDeleteInput): Promise<ClockifyInstallationDeleteResult>;
+}
+/** Reversible token codec used by encrypted installation-store wrappers. */
+export interface ClockifyTokenCodec {
+    encode(token: string): Promise<string>;
+    decode(encoded: string): Promise<string>;
+}
+/** Creates an AES-256-GCM token codec backed exclusively by Web Crypto. */
+export declare function createClockifyAesGcmTokenCodec(key: ClockifyAesGcmKey): ClockifyTokenCodec;
+/** Wraps a store so installation and nested webhook credentials are encrypted at rest. */
+export declare function wrapClockifyInstallationStoreWithEncryption(store: ClockifyInstallationStore, codec: ClockifyTokenCodec): ClockifyInstallationStore;
+```
+
+### clockify/clockify-webhook-idempotency.d.ts
+
+```ts
+/** Distributed-capable ownership contract for webhook-processing leases. */
+export interface ClockifyIdempotencyLeaseStore {
+    claim(key: string, owner: string, leaseMs: number): Promise<boolean>;
+    complete(key: string, owner: string): Promise<boolean>;
+    release(key: string, owner: string): Promise<boolean>;
+}
+/** In-memory lease store for tests and single-process deployments. */
+export declare class InMemoryClockifyIdempotencyLeaseStore implements ClockifyIdempotencyLeaseStore {
+    private readonly leases;
+    private readonly now;
+    constructor(now?: () => number);
+    claim(key: string, owner: string, leaseMs: number): Promise<boolean>;
+    complete(key: string, owner: string): Promise<boolean>;
+    release(key: string, owner: string): Promise<boolean>;
+}
+/** Inputs identifying one webhook-processing lease. */
+export interface ClockifyIdempotentWebhookOptions {
+    readonly key: string;
+    readonly owner: string;
+    readonly leaseMs: number;
+}
+/** Result of an idempotent webhook execution attempt. */
+export type ClockifyIdempotentWebhookResult<T> = {
+    readonly status: "duplicate";
+} | {
+    readonly status: "completed";
+    readonly value: T;
+};
+/** Runs webhook work once, releasing ownership after throws or server-error responses. */
+export declare function runClockifyIdempotentWebhook<T>(store: ClockifyIdempotencyLeaseStore, options: ClockifyIdempotentWebhookOptions, work: () => Promise<T>): Promise<ClockifyIdempotentWebhookResult<T>>;
+```
+
 ### clockify/generated/index.d.ts
 
 ```ts
@@ -642,6 +805,7 @@ export * as v1_2 from "./v1_2.js";
 export * as v1_3 from "./v1_3.js";
 export * as v1_4 from "./v1_4.js";
 export * as v1_5 from "./v1_5.js";
+export { clockifyManifestSchemas } from "./manifest-schemas.js";
 ```
 
 ### clockify/generated/v1_2.d.ts
@@ -2632,77 +2796,60 @@ export declare namespace ClockifyManifest {
 export declare function ClockifyManifestBuilder(): ClockifyManifestBuilder_key;
 ```
 
-### adapters/index.d.ts
+### clockify/generated/manifest-schemas.d.ts
 
 ```ts
-export * from "./node-http.js";
-export * from "./express.js";
-export * from "./fetch.js";
-export * from "./body-limit.js";
+/** Draft-04 Clockify manifest schemas embedded for runtime-neutral validation. */
+export type ClockifyEmbeddedManifestSchemas = Readonly<Record<"1.2" | "1.3" | "1.4" | "1.5", object>>;
+/** Supported schemas keyed by the manifest's declared schema version. */
+export declare const clockifyManifestSchemas: ClockifyEmbeddedManifestSchemas;
 ```
 
-### adapters/node-http.d.ts
+### client/index.d.ts
 
 ```ts
-import { IncomingMessage, ServerResponse } from "node:http";
-import { Addon, AddonErrorReporter } from "../shared/addon.js";
-import { AddonRequest } from "../shared/request.js";
-import { AddonResponse } from "../shared/response.js";
-import { BodyLimitOptions } from "./body-limit.js";
-export declare function fromNodeRequest(req: IncomingMessage, options?: BodyLimitOptions): Promise<AddonRequest>;
-export declare function writeNodeResponse(res: ServerResponse, addonResponse: AddonResponse): void;
-export declare function createNodeHttpAddonServer(addon: Addon<unknown>, options?: BodyLimitOptions & {
-    readonly onError?: AddonErrorReporter;
-}): import("http").Server<typeof IncomingMessage, typeof ServerResponse>;
-```
-
-### adapters/express.d.ts
-
-```ts
-import { Addon } from "../shared/addon.js";
-export interface ExpressLikeRequest {
-    method?: string;
-    path?: string;
-    url?: string;
-    headers?: Record<string, string | string[] | undefined>;
-    query?: Record<string, unknown>;
-    body?: unknown;
-    rawBody?: Uint8Array;
+/** A structured settings value update accepted by Clockify's add-on endpoint. */
+export interface ClockifySettingUpdate {
+    readonly id: string;
+    readonly value: unknown;
 }
-export interface ExpressLikeResponse {
-    status(code: number): this;
-    set(headers: Record<string, string | readonly string[]>): this;
-    json(body: unknown): unknown;
-    send(body?: unknown): unknown;
-    end(): unknown;
+/** Construction options for {@link ClockifyAddonClient}. */
+export interface ClockifyAddonClientOptions {
+    readonly token: string;
+    readonly backendUrl: string;
+    readonly fetch?: typeof globalThis.fetch;
+    readonly signal?: AbortSignal;
+    readonly timeoutMs?: number;
+    readonly maxAttempts?: number;
+    readonly sleep?: (milliseconds: number) => Promise<void>;
 }
-export type ExpressLikeNextFunction = (error?: unknown) => void;
-export declare function createExpressAddonHandler(addon: Addon<unknown>): (req: ExpressLikeRequest, res: ExpressLikeResponse, next?: ExpressLikeNextFunction) => Promise<void>;
-```
-
-### adapters/fetch.d.ts
-
-```ts
-import { Addon, AddonErrorReporter } from "../shared/addon.js";
-import { BodyLimitOptions } from "./body-limit.js";
-export declare function handleFetchRequest(addon: Addon<unknown>, request: Request, options?: BodyLimitOptions & {
-    readonly onError?: AddonErrorReporter;
-}): Promise<Response>;
-```
-
-### adapters/body-limit.d.ts
-
-```ts
-export declare const DEFAULT_MAX_BODY_BYTES = 1048576;
-export interface BodyLimitOptions {
-    readonly maxBodyBytes?: number;
+/** HTTP failure returned by a Clockify add-on API call. */
+export declare class ClockifyAddonHttpError extends Error {
+    readonly status: number;
+    readonly responseBody: string;
+    constructor(status: number, responseBody: string);
 }
-export declare class PayloadTooLargeError extends Error {
-    readonly maxBodyBytes: number;
-    constructor(maxBodyBytes: number);
+/** Fetch-based client for Marketplace-specific add-on token, settings, and generic API calls. */
+export declare class ClockifyAddonClient {
+    private readonly token;
+    private readonly backendUrl;
+    private readonly fetch;
+    private readonly signal?;
+    private readonly timeoutMs;
+    private readonly maxAttempts;
+    private readonly sleep;
+    constructor(options: ClockifyAddonClientOptions);
+    private send;
+    private expectOk;
+    /** Exchanges an installation token for a user-scoped add-on token. */
+    exchangeUserToken(userId: string): Promise<string>;
+    /** Retrieves structured settings for one installation workspace. */
+    getSettings<T = unknown>(workspaceId: string): Promise<T>;
+    /** Updates structured settings for one installation workspace. */
+    updateSettings<T = unknown>(workspaceId: string, updates: readonly ClockifySettingUpdate[]): Promise<T>;
+    /** Performs an authenticated request using encoded, caller-supplied path segments. */
+    request(pathSegments: readonly string[], init?: RequestInit): Promise<Response>;
 }
-export declare function resolveMaxBodyBytes(options?: BodyLimitOptions): number;
-export declare function isPayloadTooLargeError(error: unknown): error is PayloadTooLargeError;
 ```
 
 ### testing/index.d.ts
@@ -2733,6 +2880,11 @@ export * from "./clockify-request-verification.js";
 export * from "./clockify-lifecycle.js";
 export * from "./clockify-models.js";
 export * from "./clockify-settings.js";
+export * from "./clockify-manifest-validation.js";
+export * from "./clockify-security.js";
+export * from "./clockify-public-origin.js";
+export * from "./clockify-installation-store.js";
+export * from "./clockify-webhook-idempotency.js";
 export * as generated from "./generated/index.js";
 ```
 
@@ -2762,6 +2914,10 @@ export declare class ClockifyAddon<M extends {
     registerComponent(component: ClockifyComponent<M["schemaVersion"]>, handler: RequestHandler): void;
     registerCustomSettings(path: string, handler: RequestHandler): void;
 }
+/** Validates a manifest before creating a Clockify add-on server runtime. */
+export declare function createValidatedClockifyAddon<M extends {
+    readonly schemaVersion: ClockifySchemaVersion;
+}>(manifest: M, manifestPath?: string, options?: AddonOptions): ClockifyAddon<M>;
 ```
 
 ### clockify/clockify-manifest.d.ts
@@ -2819,6 +2975,7 @@ export interface ClockifyAddonClaims {
     type: "addon";
     iss: "clockify";
     sub: string;
+    exp?: number;
     backendUrl?: string;
     ptoUrl?: string;
     reportsUrl?: string;
@@ -2918,10 +3075,11 @@ export interface ClockifyWebhookVerificationOptions {
 export interface ClockifyTokenVerificationOptions {
     expectedWorkspaceId?: string;
     expectedAddonId?: string;
+    requireExpiration?: boolean;
 }
 export type ClockifyRequestVerificationFailureReason = "missing-signature" | "ambiguous-signature" | "invalid-signature" | "missing-event-type" | "ambiguous-event-type" | "event-type-mismatch" | "workspace-id-mismatch" | "addon-id-mismatch";
 export type ClockifyWebhookVerificationFailureReason = ClockifyRequestVerificationFailureReason | "missing-expected-event-type" | "webhook-token-mismatch";
-export type ClockifyTokenVerificationFailureReason = "ambiguous-token" | "missing-token" | "invalid-token" | "workspace-id-mismatch" | "addon-id-mismatch";
+export type ClockifyTokenVerificationFailureReason = "ambiguous-token" | "missing-token" | "invalid-token" | "missing-expiration" | "workspace-id-mismatch" | "addon-id-mismatch";
 export type ClockifyRequestVerificationResult = {
     ok: true;
     claims: ClockifyAddonClaims;
@@ -3256,6 +3414,158 @@ export declare function createClockifyUserDropdownMultipleSetting(input: Clockif
 export {};
 ```
 
+### clockify/clockify-manifest-validation.d.ts
+
+```ts
+import type { ClockifyManifest, ClockifySchemaVersion } from "./clockify-manifest.js";
+/** A normalized manifest-validation issue suitable for logs and developer tooling. */
+export interface ClockifyManifestValidationIssue {
+    readonly instancePath: string;
+    readonly schemaPath: string;
+    readonly keyword: string;
+    readonly message: string;
+}
+/** The non-throwing result returned by {@link validateClockifyManifest}. */
+export type ClockifyManifestValidationResult = {
+    readonly ok: true;
+    readonly value: ClockifyManifest<ClockifySchemaVersion>;
+} | {
+    readonly ok: false;
+    readonly issues: readonly ClockifyManifestValidationIssue[];
+};
+/** Error thrown when a manifest does not satisfy its declared Clockify schema. */
+export declare class ClockifyManifestValidationError extends Error {
+    readonly issues: readonly ClockifyManifestValidationIssue[];
+    constructor(issues: readonly ClockifyManifestValidationIssue[]);
+}
+/** Validates an unknown value against the schema named by its `schemaVersion` field. */
+export declare function validateClockifyManifest(value: unknown): ClockifyManifestValidationResult;
+/** Asserts that a value is a valid supported Clockify manifest. */
+export declare function assertClockifyManifest(value: unknown): asserts value is ClockifyManifest<ClockifySchemaVersion>;
+```
+
+### clockify/clockify-security.d.ts
+
+```ts
+import type { AddonResponse } from "../shared/response.js";
+/** Options for the SDK's browser-facing response security baseline. */
+export interface ClockifySecurityHeaderOptions {
+    readonly frameAncestors?: readonly string[];
+    readonly contentSecurityPolicy?: Readonly<Record<string, readonly string[]>>;
+}
+/** Builds the secure default headers for Clockify iframe HTML and browser-facing JSON. */
+export declare function buildClockifySecurityHeaders(options?: ClockifySecurityHeaderOptions): Record<string, string>;
+/** Creates a no-store HTML response with the SDK security baseline. */
+export declare function createClockifyHtmlResponse(body: string, options?: ClockifySecurityHeaderOptions & {
+    readonly status?: number;
+}): AddonResponse;
+/** Creates a no-store JSON response with MIME-sniffing and referrer protections. */
+export declare function createClockifyJsonResponse(body: object | null, options?: {
+    readonly status?: number;
+}): AddonResponse;
+```
+
+### clockify/clockify-public-origin.d.ts
+
+```ts
+/** Inputs accepted by the fail-closed public-origin resolver. */
+export interface ClockifyPublicOriginOptions {
+    readonly publicBaseUrl?: string;
+    readonly requestUrl?: string;
+    readonly allowLocalRequestOrigin?: boolean;
+}
+/** Resolves the public origin used in manifests and browser security policies. */
+export declare function resolveClockifyPublicOrigin(options: ClockifyPublicOriginOptions): string;
+```
+
+### clockify/clockify-installation-store.d.ts
+
+```ts
+import type { ClockifyLifecycleWebhookToken } from "./clockify-lifecycle.js";
+import type { ClockifyCryptoKey } from "./clockify-crypto-key.js";
+/** Web Crypto AES-GCM key accepted without requiring consumer DOM library declarations. */
+export type ClockifyAesGcmKey = Extract<ClockifyCryptoKey, {
+    readonly algorithm: unknown;
+    readonly usages: readonly string[];
+}>;
+/** Persisted server-side context for one Clockify add-on installation. */
+export interface ClockifyInstallationContext {
+    readonly workspaceId: string;
+    readonly addonId: string;
+    readonly addonUserId: string;
+    readonly asUser: string;
+    readonly apiUrl: string;
+    readonly authToken: string;
+    readonly installedAt: number;
+    readonly webhooks?: readonly ClockifyLifecycleWebhookToken[];
+}
+/** Generation-aware input used to delete one installation. */
+export interface ClockifyInstallationDeleteInput {
+    readonly workspaceId: string;
+    readonly addonId: string;
+    readonly installedAt?: number;
+}
+/** Result of an installation deletion attempt. */
+export type ClockifyInstallationDeleteResult = "deleted" | "missing" | "stale";
+/** Minimal persistence contract required by the lifecycle helpers. */
+export interface ClockifyInstallationStore {
+    load(workspaceId: string, addonId: string): Promise<ClockifyInstallationContext | null>;
+    save(context: ClockifyInstallationContext): Promise<void>;
+    delete(input: ClockifyInstallationDeleteInput): Promise<ClockifyInstallationDeleteResult>;
+}
+/** In-memory installation store intended for tests and single-process development. */
+export declare class InMemoryClockifyInstallationStore implements ClockifyInstallationStore {
+    private readonly records;
+    load(workspaceId: string, addonId: string): Promise<ClockifyInstallationContext | null>;
+    save(context: ClockifyInstallationContext): Promise<void>;
+    delete(input: ClockifyInstallationDeleteInput): Promise<ClockifyInstallationDeleteResult>;
+}
+/** Reversible token codec used by encrypted installation-store wrappers. */
+export interface ClockifyTokenCodec {
+    encode(token: string): Promise<string>;
+    decode(encoded: string): Promise<string>;
+}
+/** Creates an AES-256-GCM token codec backed exclusively by Web Crypto. */
+export declare function createClockifyAesGcmTokenCodec(key: ClockifyAesGcmKey): ClockifyTokenCodec;
+/** Wraps a store so installation and nested webhook credentials are encrypted at rest. */
+export declare function wrapClockifyInstallationStoreWithEncryption(store: ClockifyInstallationStore, codec: ClockifyTokenCodec): ClockifyInstallationStore;
+```
+
+### clockify/clockify-webhook-idempotency.d.ts
+
+```ts
+/** Distributed-capable ownership contract for webhook-processing leases. */
+export interface ClockifyIdempotencyLeaseStore {
+    claim(key: string, owner: string, leaseMs: number): Promise<boolean>;
+    complete(key: string, owner: string): Promise<boolean>;
+    release(key: string, owner: string): Promise<boolean>;
+}
+/** In-memory lease store for tests and single-process deployments. */
+export declare class InMemoryClockifyIdempotencyLeaseStore implements ClockifyIdempotencyLeaseStore {
+    private readonly leases;
+    private readonly now;
+    constructor(now?: () => number);
+    claim(key: string, owner: string, leaseMs: number): Promise<boolean>;
+    complete(key: string, owner: string): Promise<boolean>;
+    release(key: string, owner: string): Promise<boolean>;
+}
+/** Inputs identifying one webhook-processing lease. */
+export interface ClockifyIdempotentWebhookOptions {
+    readonly key: string;
+    readonly owner: string;
+    readonly leaseMs: number;
+}
+/** Result of an idempotent webhook execution attempt. */
+export type ClockifyIdempotentWebhookResult<T> = {
+    readonly status: "duplicate";
+} | {
+    readonly status: "completed";
+    readonly value: T;
+};
+/** Runs webhook work once, releasing ownership after throws or server-error responses. */
+export declare function runClockifyIdempotentWebhook<T>(store: ClockifyIdempotencyLeaseStore, options: ClockifyIdempotentWebhookOptions, work: () => Promise<T>): Promise<ClockifyIdempotentWebhookResult<T>>;
+```
+
 ### clockify/generated/index.d.ts
 
 ```ts
@@ -3263,6 +3573,7 @@ export * as v1_2 from "./v1_2.js";
 export * as v1_3 from "./v1_3.js";
 export * as v1_4 from "./v1_4.js";
 export * as v1_5 from "./v1_5.js";
+export { clockifyManifestSchemas } from "./manifest-schemas.js";
 ```
 
 ### clockify/generated/v1_2.d.ts
@@ -5251,6 +5562,15 @@ export declare namespace ClockifyManifest {
     function builder(): ClockifyManifestBuilder_key;
 }
 export declare function ClockifyManifestBuilder(): ClockifyManifestBuilder_key;
+```
+
+### clockify/generated/manifest-schemas.d.ts
+
+```ts
+/** Draft-04 Clockify manifest schemas embedded for runtime-neutral validation. */
+export type ClockifyEmbeddedManifestSchemas = Readonly<Record<"1.2" | "1.3" | "1.4" | "1.5", object>>;
+/** Supported schemas keyed by the manifest's declared schema version. */
+export declare const clockifyManifestSchemas: ClockifyEmbeddedManifestSchemas;
 ```
 
 ## adapters
@@ -5324,8 +5644,175 @@ export declare class PayloadTooLargeError extends Error {
     readonly maxBodyBytes: number;
     constructor(maxBodyBytes: number);
 }
+/** Error raised when a declared request-body length is not a non-negative safe integer. */
+export declare class InvalidContentLengthError extends Error {
+    readonly value: string;
+    constructor(value: string);
+}
+/** Parses an optional Content-Length header without accepting ambiguous numeric forms. */
+export declare function parseContentLength(value: string | undefined | null): number | undefined;
 export declare function resolveMaxBodyBytes(options?: BodyLimitOptions): number;
 export declare function isPayloadTooLargeError(error: unknown): error is PayloadTooLargeError;
+```
+
+## fetch-adapter
+
+### adapters/fetch.d.ts
+
+```ts
+import { Addon, AddonErrorReporter } from "../shared/addon.js";
+import { BodyLimitOptions } from "./body-limit.js";
+export declare function handleFetchRequest(addon: Addon<unknown>, request: Request, options?: BodyLimitOptions & {
+    readonly onError?: AddonErrorReporter;
+}): Promise<Response>;
+```
+
+## node-adapter
+
+### adapters/node-http.d.ts
+
+```ts
+import { IncomingMessage, ServerResponse } from "node:http";
+import { Addon, AddonErrorReporter } from "../shared/addon.js";
+import { AddonRequest } from "../shared/request.js";
+import { AddonResponse } from "../shared/response.js";
+import { BodyLimitOptions } from "./body-limit.js";
+export declare function fromNodeRequest(req: IncomingMessage, options?: BodyLimitOptions): Promise<AddonRequest>;
+export declare function writeNodeResponse(res: ServerResponse, addonResponse: AddonResponse): void;
+export declare function createNodeHttpAddonServer(addon: Addon<unknown>, options?: BodyLimitOptions & {
+    readonly onError?: AddonErrorReporter;
+}): import("http").Server<typeof IncomingMessage, typeof ServerResponse>;
+```
+
+## express-adapter
+
+### adapters/express.d.ts
+
+```ts
+import { Addon } from "../shared/addon.js";
+export interface ExpressLikeRequest {
+    method?: string;
+    path?: string;
+    url?: string;
+    headers?: Record<string, string | string[] | undefined>;
+    query?: Record<string, unknown>;
+    body?: unknown;
+    rawBody?: Uint8Array;
+}
+export interface ExpressLikeResponse {
+    status(code: number): this;
+    set(headers: Record<string, string | readonly string[]>): this;
+    json(body: unknown): unknown;
+    send(body?: unknown): unknown;
+    end(): unknown;
+}
+export type ExpressLikeNextFunction = (error?: unknown) => void;
+export declare function createExpressAddonHandler(addon: Addon<unknown>): (req: ExpressLikeRequest, res: ExpressLikeResponse, next?: ExpressLikeNextFunction) => Promise<void>;
+```
+
+## client
+
+### client/index.d.ts
+
+```ts
+/** A structured settings value update accepted by Clockify's add-on endpoint. */
+export interface ClockifySettingUpdate {
+    readonly id: string;
+    readonly value: unknown;
+}
+/** Construction options for {@link ClockifyAddonClient}. */
+export interface ClockifyAddonClientOptions {
+    readonly token: string;
+    readonly backendUrl: string;
+    readonly fetch?: typeof globalThis.fetch;
+    readonly signal?: AbortSignal;
+    readonly timeoutMs?: number;
+    readonly maxAttempts?: number;
+    readonly sleep?: (milliseconds: number) => Promise<void>;
+}
+/** HTTP failure returned by a Clockify add-on API call. */
+export declare class ClockifyAddonHttpError extends Error {
+    readonly status: number;
+    readonly responseBody: string;
+    constructor(status: number, responseBody: string);
+}
+/** Fetch-based client for Marketplace-specific add-on token, settings, and generic API calls. */
+export declare class ClockifyAddonClient {
+    private readonly token;
+    private readonly backendUrl;
+    private readonly fetch;
+    private readonly signal?;
+    private readonly timeoutMs;
+    private readonly maxAttempts;
+    private readonly sleep;
+    constructor(options: ClockifyAddonClientOptions);
+    private send;
+    private expectOk;
+    /** Exchanges an installation token for a user-scoped add-on token. */
+    exchangeUserToken(userId: string): Promise<string>;
+    /** Retrieves structured settings for one installation workspace. */
+    getSettings<T = unknown>(workspaceId: string): Promise<T>;
+    /** Updates structured settings for one installation workspace. */
+    updateSettings<T = unknown>(workspaceId: string, updates: readonly ClockifySettingUpdate[]): Promise<T>;
+    /** Performs an authenticated request using encoded, caller-supplied path segments. */
+    request(pathSegments: readonly string[], init?: RequestInit): Promise<Response>;
+}
+```
+
+## ui
+
+### ui/index.d.ts
+
+```ts
+/** The supported message envelope sent by Clockify to an iframe component. */
+export interface ClockifyWindowMessage {
+    readonly title: string;
+    readonly body?: unknown;
+}
+/** Minimal browser window contract used by the UI bridge and test doubles. */
+export interface ClockifyBrowserWindow {
+    readonly parent: {
+        postMessage(message: string, targetOrigin: string): void;
+    };
+    addEventListener(name: "message", listener: (event: {
+        readonly origin: string;
+        readonly source: unknown;
+        readonly data: unknown;
+    }) => void): void;
+    removeEventListener(name: "message", listener: (event: {
+        readonly origin: string;
+        readonly source: unknown;
+        readonly data: unknown;
+    }) => void): void;
+}
+/** Options required to establish a fail-closed Clockify iframe bridge. */
+export interface CreateClockifyBridgeOptions {
+    readonly window: ClockifyBrowserWindow;
+    readonly parentOrigin: string;
+}
+/** Typed Clockify iframe messaging surface. */
+export interface ClockifyBridge {
+    subscribe(title: string, handler: (body: unknown) => void): () => void;
+    dispatch(action: string, payload?: unknown): void;
+    refreshAddonToken(): void;
+    preview(): void;
+    navigate(type: "tracker"): void;
+    showToast(type: "info" | "warning" | "success" | "error", message: string): void;
+    dispose(): void;
+}
+/** Creates a source- and origin-checked bridge for Clockify iframe events and actions. */
+export declare function createClockifyBridge(options: CreateClockifyBridgeOptions): ClockifyBridge;
+/** Minimal document-root contract used by theme and language helpers. */
+export interface ClockifyDocumentRoot {
+    readonly dataset: Record<string, string>;
+    lang: string;
+}
+/** Applies the verified Clockify user theme as a normalized data attribute. */
+export declare function applyClockifyTheme(theme: string | undefined, root: Pick<ClockifyDocumentRoot, "dataset">): void;
+/** Applies the verified Clockify user language to a document root. */
+export declare function applyClockifyLanguage(language: string | undefined, root: Pick<ClockifyDocumentRoot, "lang">): void;
+/** Formats a date using the user's locale while permitting explicit timezone policy. */
+export declare function formatClockifyDate(value: Date | number, locale: string, options?: Intl.DateTimeFormatOptions): string;
 ```
 
 ## testing

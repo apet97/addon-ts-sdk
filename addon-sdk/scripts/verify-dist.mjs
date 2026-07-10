@@ -30,6 +30,12 @@ const esm = await import(path.join(dist, "esm", "index.js")).catch((e) =>
 const esmAdapters = await import(path.join(dist, "esm", "adapters", "index.js")).catch((e) =>
   fail("ESM /adapters import threw: " + e.message),
 );
+const esmClient = await import(path.join(dist, "esm", "client", "index.js")).catch((e) =>
+  fail("ESM /client import threw: " + e.message),
+);
+const esmUi = await import(path.join(dist, "esm", "ui", "index.js")).catch((e) =>
+  fail("ESM /ui import threw: " + e.message),
+);
 for (const name of [
   "ClockifyAddon",
   "ClockifyManifest",
@@ -50,6 +56,8 @@ if (esm.ClockifyScope.PROJECT_READ !== "PROJECT_READ")
 expectFn("esm.createClockifyNumberSetting", esm.createClockifyNumberSetting);
 expectFn("esm.withClockifyVerifiedComponentRequest", esm.withClockifyVerifiedComponentRequest);
 expectFn("esm /adapters createNodeHttpAddonServer", esmAdapters.createNodeHttpAddonServer);
+expectFn("esm /client ClockifyAddonClient", esmClient.ClockifyAddonClient);
+expectFn("esm /ui createClockifyBridge", esmUi.createClockifyBridge);
 
 // All four subpath entry points (".", "./clockify", "./adapters", "./testing") must load as ESM.
 const esmClockify = await import(path.join(dist, "esm", "clockify", "index.js")).catch((e) =>
@@ -68,6 +76,8 @@ const cjs = require(path.join(dist, "cjs", "index.js"));
 const cjsAdapters = require(path.join(dist, "cjs", "adapters", "index.js"));
 const cjsClockify = require(path.join(dist, "cjs", "clockify", "index.js"));
 const cjsTesting = require(path.join(dist, "cjs", "testing", "index.js"));
+const cjsClient = require(path.join(dist, "cjs", "client", "index.js"));
+const cjsUi = require(path.join(dist, "cjs", "ui", "index.js"));
 for (const name of [
   "ClockifyAddon",
   "ClockifyManifest",
@@ -86,6 +96,8 @@ expectFn("cjs /adapters createNodeHttpAddonServer", cjsAdapters.createNodeHttpAd
 expectFn("cjs /clockify ClockifyAddon", cjsClockify.ClockifyAddon);
 expectFn("cjs /clockify createClockifyTextSetting", cjsClockify.createClockifyTextSetting);
 expectFn("cjs /testing generateTestKeys", cjsTesting.generateTestKeys);
+expectFn("cjs /client ClockifyAddonClient", cjsClient.ClockifyAddonClient);
+expectFn("cjs /ui createClockifyBridge", cjsUi.createClockifyBridge);
 
 // --- 3. The README quick-start must actually boot and serve /manifest (from the ESM build). ---
 const { ClockifyAddon, ClockifyManifest, ClockifyComponent, ClockifyScope } = esm;
@@ -129,7 +141,7 @@ try {
   if (comp.status !== 200) fail(`GET /component returned ${comp.status}`);
 
   const miss = await fetch(`http://127.0.0.1:${port}/nope`);
-  if (miss.status !== 405) fail(`GET /nope returned ${miss.status}, expected 405`);
+  if (miss.status !== 404) fail(`GET /nope returned ${miss.status}, expected 404`);
 } finally {
   await new Promise((resolve) => server.close(resolve));
 }

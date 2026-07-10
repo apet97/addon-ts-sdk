@@ -1,0 +1,85 @@
+import type { AddonResponse } from "../shared/response";
+
+/** Options for the SDK's browser-facing response security baseline. */
+export interface ClockifySecurityHeaderOptions {
+  readonly frameAncestors?: readonly string[];
+  readonly contentSecurityPolicy?: Readonly<Record<string, readonly string[]>>;
+}
+
+const FORBIDDEN_DIRECTIVE_VALUE = /[;,\r\n]/;
+const DIRECTIVE_NAME = /^[a-z][a-z0-9-]*$/;
+
+function assertDirectiveValue(value: string): void {
+  if (value.trim() === "" || FORBIDDEN_DIRECTIVE_VALUE.test(value)) {
+    throw new Error(`Invalid CSP directive value: ${JSON.stringify(value)}`);
+  }
+}
+
+function directive(name: string, values: readonly string[]): string {
+  if (!DIRECTIVE_NAME.test(name)) throw new Error(`Invalid CSP directive name: ${name}`);
+  values.forEach(assertDirectiveValue);
+  return `${name} ${values.join(" ")}`;
+}
+
+function assertFrameAncestor(value: string): void {
+  assertDirectiveValue(value);
+  if (value === "'none'" || value === "'self'") return;
+  const url = new URL(value);
+  const local =
+    url.hostname === "localhost" || url.hostname === "127.0.0.1" || url.hostname === "[::1]";
+  if (url.origin !== value) throw new Error("CSP frame ancestors must be origins without paths.");
+  if (url.protocol !== "https:" && !(local && url.protocol === "http:")) {
+    throw new Error("CSP frame ancestors must use HTTPS outside localhost.");
+  }
+}
+
+/** Builds the secure default headers for Clockify iframe HTML and browser-facing JSON. */
+export function buildClockifySecurityHeaders(
+  options: ClockifySecurityHeaderOptions = {},
+): Record<string, string> {
+  const frameAncestors = options.frameAncestors ?? ["'none'"];
+  frameAncestors.forEach(assertFrameAncestor);
+  const policies: Array<[string, readonly string[]]> = [
+    ["default-src", ["'none'"]],
+    ["base-uri", ["'none'"]],
+    ["form-action", ["'none'"]],
+    ["frame-ancestors", frameAncestors],
+    ...Object.entries(options.contentSecurityPolicy ?? {}),
+  ];
+  return {
+    "content-security-policy": policies.map(([name, values]) => directive(name, values)).join("; "),
+    "permissions-policy": "camera=(), microphone=(), geolocation=(), payment=(), usb=()",
+    "referrer-policy": "no-referrer",
+    "x-content-type-options": "nosniff",
+    "cache-control": "no-store",
+  };
+}
+
+/** Creates a no-store HTML response with the SDK security baseline. */
+export function createClockifyHtmlResponse(
+  body: string,
+  options: ClockifySecurityHeaderOptions & { readonly status?: number } = {},
+): AddonResponse {
+  return {
+    status: options.status ?? 200,
+    headers: {
+      ...buildClockifySecurityHeaders(options),
+      "content-type": "text/html; charset=utf-8",
+    },
+    body,
+  };
+}
+
+/** Creates a no-store JSON response with MIME-sniffing and referrer protections. */
+export function createClockifyJsonResponse(
+  body: object | null,
+  options: { readonly status?: number } = {},
+): AddonResponse {
+  const headers = buildClockifySecurityHeaders();
+  delete headers["content-security-policy"];
+  return {
+    status: options.status ?? 200,
+    headers: { ...headers, "content-type": "application/json; charset=utf-8" },
+    body,
+  };
+}

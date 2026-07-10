@@ -5,6 +5,11 @@ const REQUIRED_EXPORTS = [
   { label: "root", key: "." },
   { label: "clockify", key: "./clockify" },
   { label: "adapters", key: "./adapters" },
+  { label: "fetch-adapter", key: "./adapters/fetch", optional: true },
+  { label: "node-adapter", key: "./adapters/node", optional: true },
+  { label: "express-adapter", key: "./adapters/express", optional: true },
+  { label: "client", key: "./client", optional: true },
+  { label: "ui", key: "./ui", optional: true },
   { label: "testing", key: "./testing" },
 ];
 
@@ -55,7 +60,9 @@ function exportTypesSpecifier(packageJson, exportKey) {
 }
 
 function entrypointsFromPackageJson(packageJson, packageRoot) {
-  return REQUIRED_EXPORTS.map((entry) => ({
+  return REQUIRED_EXPORTS.filter(
+    (entry) => !entry.optional || packageJson.exports?.[entry.key] !== undefined,
+  ).map((entry) => ({
     label: entry.label,
     file: path.resolve(packageRoot, exportTypesSpecifier(packageJson, entry.key)),
   }));
