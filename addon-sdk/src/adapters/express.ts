@@ -1,6 +1,7 @@
 import { Addon } from "../shared/addon";
 import { AddonRequest } from "../shared/request";
 import { AddonResponse, isJsonBody } from "../shared/response";
+import { parseHttpRequestTarget } from "./request-target";
 
 export interface ExpressLikeRequest {
   method?: string;
@@ -45,7 +46,7 @@ export function createExpressAddonHandler(addon: Addon<unknown>) {
     next?: ExpressLikeNextFunction,
   ) {
     try {
-      const requestUrl = new URL(req.url || "", "http://localhost");
+      const requestUrl = parseHttpRequestTarget(req.url);
       const queryParams = queryParamsFromExpressRequest(req, requestUrl);
 
       const addonRequest: AddonRequest = {

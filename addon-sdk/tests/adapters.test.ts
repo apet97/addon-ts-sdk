@@ -340,6 +340,25 @@ describe("Adapters", () => {
     expect(seen).toEqual(["/component", "abc", "def", "compact"]);
   });
 
+  it("preserves leading slashes when Express-like req.path is unavailable", async () => {
+    const addon = new ClockifyAddon(mockManifest);
+    const route = vi.fn(() => ({ status: 204 }));
+    addon.registerHandler("/component", "GET", route);
+    const handler = createExpressAddonHandler(addon);
+    const mockRes = {
+      status: vi.fn().mockReturnThis(),
+      set: vi.fn().mockReturnThis(),
+      json: vi.fn().mockReturnThis(),
+      send: vi.fn().mockReturnThis(),
+      end: vi.fn().mockReturnThis(),
+    };
+
+    await handler({ method: "GET", url: "//other.example/component", headers: {} }, mockRes);
+
+    expect(mockRes.status).toHaveBeenCalledWith(404);
+    expect(route).not.toHaveBeenCalled();
+  });
+
   it("preserves array-valued Express query params", async () => {
     const addon = new ClockifyAddon(mockManifest);
     const seen: string[] = [];
