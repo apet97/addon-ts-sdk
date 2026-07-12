@@ -29,10 +29,11 @@ Quick reference for Claude Code and other contributors working in this repositor
 - CodeRabbit was unavailable for that pass. Local package, cycle, API-surface, security-boundary,
   and diff reviews were used; do not describe this as a CodeRabbit-reviewed release.
 
-- Keep Node `http` and Fetch body-limit semantics aligned: declared `content-length` values above
-  `maxBodyBytes` must fail before routing, and streamed bodies must still fail once the byte counter
-  crosses the limit. Malformed declared lengths return 400 without invoking `onError`. Express body
-  limits stay with the host app.
+- Keep Node `http` and Fetch body-limit semantics aligned on every HTTP method: declared
+  `content-length` values above `maxBodyBytes` must fail before routing, and streamed bodies must
+  still fail once the byte counter crosses the limit. Malformed declared lengths return 400 without
+  invoking `onError`. The Node adapter must preserve leading slashes in origin-form request targets;
+  `//host/path` is a path, not an alternate authority. Express body limits stay with the host app.
 - Runtime support starts at Node 22, so `@types/node` stays on `^22` unless the runtime support
   contract changes. Do not accept Node 26 ambient types as a routine Dependabot bump.
 - The SDK-tooling Dependabot lane can move ESLint, Prettier, and Vite together, but rerun
