@@ -71,7 +71,7 @@ describe("Parity Checks", () => {
     expect(res.body).toBe("Internal Server Error");
   });
 
-  it("should preserve mutation order and NOT mutate manifest if hook registration fails due to duplicate path", () => {
+  it("rejects conflicting same-path descriptors before mutating the manifest", () => {
     const manifest = getCleanManifest();
     const addon = new ClockifyAddon(manifest);
 
@@ -94,10 +94,10 @@ describe("Parity Checks", () => {
     addon.registerComponent(component1, () => ({ status: 200 }));
     expect(addon.getManifest().components?.length).toBe(1);
 
-    // This should fail to register route and throw before mutating manifest.components
+    // Descriptor conflicts are rejected before either the router or manifest can be mutated.
     expect(() => {
       addon.registerComponent(component2, () => ({ status: 200 }));
-    }).toThrowError("Handler has already been registered.");
+    }).toThrowError(/conflicting component/i);
 
     expect(addon.getManifest().components?.length).toBe(1);
     expect(addon.getManifest().components?.[0]).toEqual(component1);

@@ -39,6 +39,17 @@ describe("installation stores", () => {
     await expect(store.load("workspace-1", "addon-1")).resolves.toMatchObject({ installedAt: 200 });
   });
 
+  it("deletes unconditionally when the caller supplies no installation generation", async () => {
+    const store = new InMemoryClockifyInstallationStore();
+    await store.save(context(100));
+    await store.save(context(200, "new-secret"));
+
+    await expect(store.delete({ workspaceId: "workspace-1", addonId: "addon-1" })).resolves.toBe(
+      "deleted",
+    );
+    await expect(store.load("workspace-1", "addon-1")).resolves.toBeNull();
+  });
+
   it("distinguishes deleted and missing records", async () => {
     const store = new InMemoryClockifyInstallationStore();
     await expect(store.delete({ workspaceId: "workspace-1", addonId: "addon-1" })).resolves.toBe(

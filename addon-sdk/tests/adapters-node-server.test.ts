@@ -1,6 +1,6 @@
 import { describe, it, expect, afterEach, vi } from "vitest";
 import type { Server } from "node:http";
-import type { AddressInfo } from "node:net";
+import { connect, type AddressInfo } from "node:net";
 import { ClockifyAddon, ClockifyManifest, generated } from "../src";
 import { createNodeHttpAddonServer } from "../src/adapters";
 
@@ -29,6 +29,19 @@ describe("Node HTTP server boot (integration)", () => {
     server = createNodeHttpAddonServer(addon, options);
     return new Promise((resolve) => {
       server!.listen(0, () => resolve((server!.address() as AddressInfo).port));
+    });
+  }
+
+  function sendRawHttp(port: number, request: string): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const socket = connect({ host: "127.0.0.1", port }, () => socket.end(request));
+      let response = "";
+      socket.setEncoding("utf8");
+      socket.on("data", (chunk) => {
+        response += chunk;
+      });
+      socket.once("end", () => resolve(response));
+      socket.once("error", reject);
     });
   }
 
@@ -90,6 +103,30 @@ describe("Node HTTP server boot (integration)", () => {
     expect(res.headers.get("connection")).toBe("close");
     expect(await res.text()).toBe("Payload Too Large");
     expect(dispatched).toBe(false);
+  });
+
+  it("returns 400 without reporting malformed parser-accepted content lengths", async () => {
+    const onError = vi.fn();
+    const handle = vi.fn(() => ({ status: 204 }));
+    const addon = { handle } as unknown as ClockifyAddon;
+    const port = await listen(addon, { onError });
+
+    const response = await sendRawHttp(
+      port,
+      [
+        "POST /manifest HTTP/1.1",
+        "Host: localhost",
+        "Content-Length: 007",
+        "Connection: close",
+        "",
+        "1234567",
+      ].join("\r\n"),
+    );
+
+    expect(response).toMatch(/^HTTP\/1\.1 400 /);
+    expect(response).toContain("Bad Request");
+    expect(handle).not.toHaveBeenCalled();
+    expect(onError).not.toHaveBeenCalled();
   });
 
   it("throws configuration errors before creating a server with an invalid body limit", () => {

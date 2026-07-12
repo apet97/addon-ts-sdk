@@ -8,6 +8,21 @@ export interface ClockifySecurityHeaderOptions {
 
 const FORBIDDEN_DIRECTIVE_VALUE = /[;,\r\n]/;
 const DIRECTIVE_NAME = /^[a-z][a-z0-9-]*$/;
+const MANAGED_CSP_DIRECTIVES = new Set([
+  "default-src",
+  "base-uri",
+  "form-action",
+  "frame-ancestors",
+]);
+
+function browserSecurityHeaders(): Record<string, string> {
+  return {
+    "permissions-policy": "camera=(), microphone=(), geolocation=(), payment=(), usb=()",
+    "referrer-policy": "no-referrer",
+    "x-content-type-options": "nosniff",
+    "cache-control": "no-store",
+  };
+}
 
 function assertDirectiveValue(value: string): void {
   if (value.trim() === "" || FORBIDDEN_DIRECTIVE_VALUE.test(value)) {
@@ -39,19 +54,24 @@ export function buildClockifySecurityHeaders(
 ): Record<string, string> {
   const frameAncestors = options.frameAncestors ?? ["'none'"];
   frameAncestors.forEach(assertFrameAncestor);
+  const customPolicies = Object.entries(options.contentSecurityPolicy ?? {});
+  for (const [name] of customPolicies) {
+    if (MANAGED_CSP_DIRECTIVES.has(name)) {
+      throw new Error(
+        `Custom contentSecurityPolicy cannot override managed CSP directive ${name}.`,
+      );
+    }
+  }
   const policies: Array<[string, readonly string[]]> = [
     ["default-src", ["'none'"]],
     ["base-uri", ["'none'"]],
     ["form-action", ["'none'"]],
     ["frame-ancestors", frameAncestors],
-    ...Object.entries(options.contentSecurityPolicy ?? {}),
+    ...customPolicies,
   ];
   return {
     "content-security-policy": policies.map(([name, values]) => directive(name, values)).join("; "),
-    "permissions-policy": "camera=(), microphone=(), geolocation=(), payment=(), usb=()",
-    "referrer-policy": "no-referrer",
-    "x-content-type-options": "nosniff",
-    "cache-control": "no-store",
+    ...browserSecurityHeaders(),
   };
 }
 
@@ -75,11 +95,12 @@ export function createClockifyJsonResponse(
   body: object | null,
   options: { readonly status?: number } = {},
 ): AddonResponse {
-  const headers = buildClockifySecurityHeaders();
-  delete headers["content-security-policy"];
   return {
     status: options.status ?? 200,
-    headers: { ...headers, "content-type": "application/json; charset=utf-8" },
+    headers: {
+      ...browserSecurityHeaders(),
+      "content-type": "application/json; charset=utf-8",
+    },
     body,
   };
 }

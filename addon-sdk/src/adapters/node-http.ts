@@ -4,6 +4,7 @@ import { AddonRequest } from "../shared/request";
 import { AddonResponse, isJsonBody } from "../shared/response";
 import {
   BodyLimitOptions,
+  InvalidContentLengthError,
   PayloadTooLargeError,
   isPayloadTooLargeError,
   parseContentLength,
@@ -103,6 +104,14 @@ export function createNodeHttpAddonServer(
       const addonResponse = await addon.handle(addonRequest);
       writeNodeResponse(res, addonResponse);
     } catch (e) {
+      if (e instanceof InvalidContentLengthError) {
+        res.statusCode = 400;
+        res.setHeader("connection", "close");
+        res.end("Bad Request", () => {
+          req.destroy();
+        });
+        return;
+      }
       if (isPayloadTooLargeError(e)) {
         res.statusCode = 413;
         res.setHeader("connection", "close");

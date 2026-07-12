@@ -70,6 +70,17 @@ describe("runtime-neutral foundations", () => {
     ).toContain("img-src https://cdn.example");
   });
 
+  it.each(["default-src", "base-uri", "form-action", "frame-ancestors"])(
+    "rejects custom overrides of the SDK-managed %s directive",
+    (managedDirective) => {
+      expect(() =>
+        buildClockifySecurityHeaders({
+          contentSecurityPolicy: { [managedDirective]: ["'self'"] },
+        }),
+      ).toThrow(/managed CSP directive/i);
+    },
+  );
+
   it("creates no-store HTML and JSON responses", () => {
     const html = createClockifyHtmlResponse("<p>ok</p>", {
       frameAncestors: ["https://app.clockify.me"],
@@ -80,6 +91,7 @@ describe("runtime-neutral foundations", () => {
     const json = createClockifyJsonResponse({ ok: true });
     expect(json.headers?.["content-type"]).toBe("application/json; charset=utf-8");
     expect(json.headers?.["cache-control"]).toBe("no-store");
+    expect(json.headers?.["content-security-policy"]).toBeUndefined();
   });
 
   it("requires an explicit HTTPS public origin outside opted-in local development", () => {

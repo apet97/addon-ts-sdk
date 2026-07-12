@@ -731,7 +731,10 @@ export interface ClockifyInstallationContext {
     readonly installedAt: number;
     readonly webhooks?: readonly ClockifyLifecycleWebhookToken[];
 }
-/** Generation-aware input used to delete one installation. */
+/**
+ * Input used to delete one installation. Supplying `installedAt` enables the generation guard;
+ * omitting it requests unconditional deletion of the matching workspace/add-on record.
+ */
 export interface ClockifyInstallationDeleteInput {
     readonly workspaceId: string;
     readonly addonId: string;
@@ -3499,7 +3502,10 @@ export interface ClockifyInstallationContext {
     readonly installedAt: number;
     readonly webhooks?: readonly ClockifyLifecycleWebhookToken[];
 }
-/** Generation-aware input used to delete one installation. */
+/**
+ * Input used to delete one installation. Supplying `installedAt` enables the generation guard;
+ * omitting it requests unconditional deletion of the matching workspace/add-on record.
+ */
 export interface ClockifyInstallationDeleteInput {
     readonly workspaceId: string;
     readonly addonId: string;
