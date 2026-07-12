@@ -42,8 +42,12 @@ consumer, audit, or live-schema checks.
     the root and subpath entry points, checks `generated.v1_5`, type-checks declarations without
     requiring Express types, signs/verifies JWTs through `jose@6` dynamic imports, and boots a
     `/manifest` server smoke from the installed package.
-14. **`npm run verify:scaffolds`** — packs the SDK, generates Node and Worker all-feature projects,
-    installs them in temporary directories, and type-checks them against the tarball.
+14. **`npm run verify:scaffolds`** — packs the SDK and generates Node minimal, Node all-features,
+    Worker minimal, and Worker all-features projects. It installs and type-checks each project,
+    executes their runtime, requests `/manifest`, validates the response with the packed SDK, and
+    asserts exact component/lifecycle/webhook counts. It also probes 404 handling, unsigned
+    component rejection, and production configuration failure. This is runtime proof, not a source
+    grep or type-check proxy.
 15. **`npm audit --omit=dev --json` and `npm audit --json`** — production and full dependency audit;
     both should report 0 vulnerabilities.
 

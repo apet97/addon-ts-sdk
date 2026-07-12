@@ -12,28 +12,42 @@ function packageName(directory) {
 
 function commonSource(features) {
   const all = features === "all";
-  const extraImports = all
-    ? `  ClockifyLifecycleEvent,
-  ClockifyWebhook,
-  InMemoryClockifyInstallationStore,
-  withClockifyDeletedLifecycleRequest,
-  withClockifyInstalledLifecycleRequest,
-  withClockifyVerifiedWebhookRequest,
-`
-    : "";
+  const imports = [
+    "ClockifyComponent",
+    ...(all ? ["ClockifyLifecycleEvent"] : []),
+    "ClockifyManifest",
+    ...(all ? ["ClockifyWebhook", "InMemoryClockifyInstallationStore"] : []),
+    "createClockifyHtmlResponse",
+    "createClockifySignatureParser",
+    "createValidatedClockifyAddon",
+    "resolveClockifyPublicOrigin",
+    ...(all
+      ? [
+          "withClockifyDeletedLifecycleRequest",
+          "withClockifyInstalledLifecycleRequest",
+        ]
+      : []),
+    "withClockifyVerifiedComponentRequest",
+    ...(all ? ["withClockifyVerifiedWebhookRequest"] : []),
+  ];
   const extraDefinitions = all
-    ? `  const installed = ClockifyLifecycleEvent.v1_5Builder().path("/lifecycle/installed").onInstalled().build();
-  const deleted = ClockifyLifecycleEvent.v1_5Builder().path("/lifecycle/deleted").onDeleted().build();
-  const webhook = ClockifyWebhook.v1_5Builder().onNewTimeEntry().path("/webhooks/time-entry").build();
-`
-    : "";
-  const extraManifest = all
-    ? `    .lifecycle([installed, deleted])
-    .webhooks([webhook])
-`
+    ? `
+  const installed = ClockifyLifecycleEvent.v1_5Builder()
+    .path("/lifecycle/installed")
+    .onInstalled()
+    .build();
+  const deleted = ClockifyLifecycleEvent.v1_5Builder()
+    .path("/lifecycle/deleted")
+    .onDeleted()
+    .build();
+  const webhook = ClockifyWebhook.v1_5Builder()
+    .onNewTimeEntry()
+    .path("/webhooks/time-entry")
+    .build();`
     : "";
   const extraRegistrations = all
-    ? `  addon.registerLifecycleEvent(
+    ? `
+  addon.registerLifecycleEvent(
     installed,
     withClockifyInstalledLifecycleRequest(parser, async (_request, payload) => {
       if (environment.ALLOW_EPHEMERAL_STORAGE !== "true") {
@@ -49,7 +63,10 @@ function commonSource(features) {
       if (environment.ALLOW_EPHEMERAL_STORAGE !== "true") {
         return { status: 503, body: "Configure installation cleanup before enabling deletion." };
       }
-      await installations.delete({ workspaceId: payload.workspaceId, addonId: payload.addonId });
+      await installations.delete({
+        workspaceId: payload.workspaceId,
+        addonId: payload.addonId,
+      });
       return { status: 204 };
     }),
   );
@@ -62,7 +79,9 @@ function commonSource(features) {
         getExpectedWebhookAuthToken: async ({ workspaceId, addonId }) => {
           if (environment.ALLOW_EPHEMERAL_STORAGE !== "true") return undefined;
           const installation = await installations.load(workspaceId, addonId);
-          return installation?.webhooks?.find((entry) => entry.path.endsWith("/webhooks/time-entry"))?.authToken;
+          return installation?.webhooks?.find((entry) =>
+            entry.path.endsWith("/webhooks/time-entry"),
+          )?.authToken;
         },
       },
       async () => ({
@@ -72,21 +91,14 @@ function commonSource(features) {
           : { body: "Configure stored-token verification and background processing." }),
       }),
     ),
-  );
-`
+  );`
+    : "";
+  const installationStore = all
+    ? "\n\nconst installations = new InMemoryClockifyInstallationStore();"
     : "";
   return `import {
-  ClockifyComponent,
-  ClockifyManifest,
-${extraImports}  
-  createClockifyHtmlResponse,
-  createClockifySignatureParser,
-  createValidatedClockifyAddon,
-  resolveClockifyPublicOrigin,
-  withClockifyVerifiedComponentRequest,
-} from "@apet97/clockify-addon-sdk";
-
-${all ? "const installations = new InMemoryClockifyInstallationStore();" : ""}
+${imports.map((name) => `  ${name},`).join("\n")}
+} from "@apet97/clockify-addon-sdk";${installationStore}
 
 export interface AddonEnvironment {
   readonly PUBLIC_BASE_URL?: string;
@@ -106,15 +118,13 @@ export function createAddon(environment: AddonEnvironment, requestUrl?: string) 
     .allowEveryone()
     .path("/component")
     .label("Clockify Add-on")
-    .build();
-${extraDefinitions}  
+    .build();${extraDefinitions}
+
   const manifest = ClockifyManifest.v1_5Builder()
     .key("replace-with-your-unique-addon-key")
     .name("Clockify Add-on")
     .baseUrl(origin)
     .requireBasicPlan()
-${extraManifest}  
-    .components([component])
     .build();
   const addon = createValidatedClockifyAddon(manifest);
   const parser = createClockifySignatureParser(manifest.key);
@@ -122,34 +132,52 @@ ${extraManifest}
     component,
     withClockifyVerifiedComponentRequest(parser, async () => {
       const parentOrigin = environment.CLOCKIFY_PARENT_ORIGIN;
-      if (!parentOrigin) return { status: 503, body: "CLOCKIFY_PARENT_ORIGIN is not configured." };
-      return createClockifyHtmlResponse("<!doctype html><html><body><main>Clockify add-on ready.</main></body></html>", {
-        frameAncestors: [parentOrigin],
-      });
+      if (!parentOrigin) {
+        return { status: 503, body: "CLOCKIFY_PARENT_ORIGIN is not configured." };
+      }
+      return createClockifyHtmlResponse(
+        "<!doctype html><html><body><main>Clockify add-on ready.</main></body></html>",
+        { frameAncestors: [parentOrigin] },
+      );
     }),
-  );
-${extraRegistrations}  
+  );${extraRegistrations}
+
   return addon;
 }
 `;
 }
 
-function nodeSource(features) {
-  return `${commonSource(features)}
-import { createNodeHttpAddonServer } from "@apet97/clockify-addon-sdk/adapters/node";
+function nodeSource() {
+  return `import { pathToFileURL } from "node:url";
 
-process.loadEnvFile?.();
-const addon = createAddon(process.env);
-const port = Number(process.env.PORT ?? 8080);
-createNodeHttpAddonServer(addon).listen(port, () => {
-  console.log(\`Clockify add-on listening on http://localhost:\${port}\`);
-});
+import { createNodeHttpAddonServer } from "@apet97/clockify-addon-sdk/adapters/node";
+import { createAddon, type AddonEnvironment } from "./addon.js";
+
+export interface NodeAddonEnvironment extends AddonEnvironment {
+  readonly PORT?: string;
+}
+
+export function startNodeAddon(environment: NodeAddonEnvironment = process.env) {
+  const port = Number(environment.PORT ?? 8080);
+  const server = createNodeHttpAddonServer(createAddon(environment));
+  return server.listen(port, () => {
+    console.log(\`Clockify add-on listening on http://localhost:\${port}\`);
+  });
+}
+
+const isDirectExecution =
+  process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.argv[1]).href;
+
+if (isDirectExecution) {
+  process.loadEnvFile?.();
+  startNodeAddon(process.env);
+}
 `;
 }
 
-function workerSource(features) {
-  return `${commonSource(features)}
-import { handleFetchRequest } from "@apet97/clockify-addon-sdk/adapters/fetch";
+function workerSource() {
+  return `import { handleFetchRequest } from "@apet97/clockify-addon-sdk/adapters/fetch";
+import { createAddon, type AddonEnvironment } from "./addon.js";
 
 export default {
   fetch(request: Request, environment: AddonEnvironment): Promise<Response> {
@@ -188,6 +216,8 @@ function tsconfig(runtime) {
 export async function scaffoldClockifyAddon(options) {
   if (options.runtime !== "node" && options.runtime !== "worker")
     throw new Error("runtime must be node or worker");
+  if (options.features !== "all" && options.features !== "minimal")
+    throw new Error("features must be all or minimal");
   const directory = resolve(options.directory);
   try {
     if ((await readdir(directory)).length > 0)
@@ -225,14 +255,16 @@ export async function scaffoldClockifyAddon(options) {
       "PUBLIC_BASE_URL=https://your-addon.example\nCLOCKIFY_PARENT_ORIGIN=https://app.clockify.me\nALLOW_LOCAL_REQUEST_ORIGIN=false\nALLOW_EPHEMERAL_STORAGE=false\n",
     ),
     writeFile(
+      resolve(directory, "src", "addon.ts"),
+      commonSource(options.features),
+    ),
+    writeFile(
       resolve(directory, "src", "index.ts"),
-      options.runtime === "node"
-        ? nodeSource(options.features)
-        : workerSource(options.features),
+      options.runtime === "node" ? nodeSource() : workerSource(),
     ),
     writeFile(
       resolve(directory, "README.md"),
-      "# Clockify Add-on\n\nCopy `.env.example` to `.env`, replace the manifest key, and configure persistent encrypted storage before installation. Lifecycle and webhook routes intentionally return setup errors until that wiring exists.\n",
+      "# Clockify Add-on\n\nCopy `.env.example` to `.env`, replace the manifest key, and configure persistent encrypted storage before installation. Lifecycle and webhook routes intentionally return setup errors until that wiring exists.\n\nSet `CLOCKIFY_PARENT_ORIGIN` to the exact Clockify parent origin. Use `https://app.clockify.me` for the production app or `https://developer.clockify.me` for a developer workspace; do not broaden the iframe allowlist.\n",
     ),
   ]);
   return directory;

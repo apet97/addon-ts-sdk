@@ -9,6 +9,10 @@ describe("source-only distribution docs", () => {
   it("does not advertise npm registry install while the SDK is source-only", () => {
     const rootReadme = readFileSync(resolve(repoRoot, "README.md"), "utf8");
     const packageReadme = readFileSync(resolve(packageRoot, "README.md"), "utf8");
+    const creatorReadme = readFileSync(
+      resolve(repoRoot, "create-clockify-addon", "README.md"),
+      "utf8",
+    );
     const productSurface = readFileSync(resolve(repoRoot, "docs", "product-surface.md"), "utf8");
     const releaseReadiness = readFileSync(
       resolve(repoRoot, "docs", "release-readiness.md"),
@@ -27,6 +31,9 @@ describe("source-only distribution docs", () => {
     const packageJson = JSON.parse(readFileSync(resolve(packageRoot, "package.json"), "utf8"));
 
     expect(packageReadme).not.toContain("npm install @apet97/clockify-addon-sdk");
+    expect(creatorReadme).not.toMatch(/```bash\s+npm create clockify-addon/);
+    expect(creatorReadme).toContain("node ./create-clockify-addon/bin/create-clockify-addon.mjs");
+    expect(creatorReadme).toMatch(/only\s+after the creator package is actually published/);
     expect(packageReadme).not.toContain("git+https://github.com/apet97/addon-ts-sdk.git#main");
     expect(`${rootReadme}\n${packageReadme}\n${productSurface}\n${releaseReadiness}`).toContain(
       "source-only",
@@ -49,6 +56,9 @@ describe("source-only distribution docs", () => {
     expect(qualityGates).toContain("npm run verify:public-api");
     expect(qualityGates).toContain("npm run verify:package-lint");
     expect(qualityGates).toContain("public-api.snapshot.md");
+    expect(qualityGates).toContain("Node minimal");
+    expect(qualityGates).toContain("Worker all-features");
+    expect(qualityGates).toContain("executes their runtime");
     expect(dependencyStrategy).toContain("`jose@6` is ESM-only");
     expect(dependencyStrategy).toContain("npm run verify:package-consumer");
     expect(dependencyStrategy).toContain("CommonJS support");
