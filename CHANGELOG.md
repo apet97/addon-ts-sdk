@@ -1,8 +1,10 @@
 # Changelog
 
-All notable changes to this source-only SDK are recorded here.
+All notable changes to this SDK are recorded here.
 
-## Unreleased
+## 1.0.0 - 2026-07-12
+
+- Published `@apet97/clockify-addon-sdk` and `create-clockify-addon` as public npm packages.
 
 - Made the root entrypoint runtime-neutral and added granular Node, Express, Fetch, client, and UI
   subpaths.
@@ -24,9 +26,8 @@ All notable changes to this source-only SDK are recorded here.
   directives, and constructed JSON headers directly.
 - Documented that Clockify `DELETED` payloads carry no installation generation, so unqualified
   uninstall cleanup is unconditional even though the store supports caller-qualified guards.
-- Recorded the historical `bbaff21` production versus developer-workspace iframe-origin receipt and
-  the requirement to repeat authenticated install, component, webhook, and uninstall validation
-  after the current changes.
+- Recorded the final-SHA `e74e1f7` authenticated install, component, webhook, and uninstall receipt,
+  including exact developer-workspace iframe-origin enforcement and complete disposable cleanup.
 
 - Added Express adapter coverage for array-valued query params and primitive response bodies.
 - Added Clockify add-on registration coverage for schema-valid manifests whose optional descriptor
@@ -39,9 +40,7 @@ All notable changes to this source-only SDK are recorded here.
 - Added verified request wrapper helpers for component, lifecycle, installed lifecycle, and webhook
   handlers.
 - Added typed structured-setting helper creators for the common Clockify setting types.
-- Added dry-run release readiness documentation and package metadata checks.
-
-## 1.0.0 Release Candidate
+- Added release readiness documentation and package metadata checks.
 
 - Provides typed Clockify manifest builders for schema versions 1.2, 1.3, 1.4, and 1.5.
 - Provides a framework-neutral add-on router plus Node `http`, Express-like, and Fetch adapters.

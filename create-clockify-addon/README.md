@@ -3,10 +3,10 @@
 Scaffolds fail-closed Node or Fetch/Worker Clockify add-on projects using
 `@apet97/clockify-addon-sdk`.
 
-The creator and SDK are source-only today. From this repository checkout, run:
+Create a project from npm:
 
 ```bash
-node ./create-clockify-addon/bin/create-clockify-addon.mjs ./my-addon --runtime node --features all
+npm create clockify-addon@latest ./my-addon -- --runtime node --features all
 ```
 
 Both separated and equals forms are accepted. `--runtime` is `node` or `worker`; `--features` is
@@ -15,6 +15,10 @@ Worker projects start with `wrangler dev src/index.ts`, so Wrangler receives the
 entry point explicitly.
 
 The ESM-only package also exposes a typed programmatic API for tooling:
+
+```bash
+npm install create-clockify-addon
+```
 
 ```ts
 import { scaffoldClockifyAddon } from "create-clockify-addon";
@@ -26,10 +30,9 @@ await scaffoldClockifyAddon({
 });
 ```
 
-The generated dependency points at the future `^1.0.0` SDK release. Until that registry release
-exists, pack the SDK locally and replace the generated dependency with the tarball's absolute
-`file:` path before installing. `npm create clockify-addon` becomes the supported invocation only
-after the creator package is actually published.
+Generated projects depend on the published `^1.0.0` SDK release. For local creator development,
+run `node ./create-clockify-addon/bin/create-clockify-addon.mjs` from this repository checkout;
+repository verification replaces the generated dependency with the packed SDK under test.
 
 Repository verification packs both packages, imports this API from the installed creator tarball,
 generates all four runtime/feature combinations, and compiles both Worker entry points with

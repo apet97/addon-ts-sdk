@@ -4,6 +4,25 @@
   "description": "Create production-safe Node and Worker Clockify add-on projects",
   "type": "module",
   "license": "MIT",
+  "keywords": [
+    "clockify",
+    "addon",
+    "add-on",
+    "creator",
+    "scaffold",
+    "typescript"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "author": "apet97 <petkovic.aleksandar037@gmail.com>",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/apet97/addon-ts-sdk.git",
+    "directory": "create-clockify-addon"
+  },
+  "homepage": "https://github.com/apet97/addon-ts-sdk#readme",
+  "bugs": "https://github.com/apet97/addon-ts-sdk/issues",
   "types": "./src/index.d.ts",
   "bin": {
     "create-clockify-addon": "bin/create-clockify-addon.mjs"

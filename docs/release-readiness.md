@@ -1,12 +1,17 @@
 # Release Readiness
 
-This package remains source-only and is not published to the npm registry. Use this checklist only
-to prove that the package is ready for an intentional future release.
+## Published versions
 
-Do not run a real npm publish from this repository unless the project owner explicitly decides to
-release the package and gives explicit npm-owner approval for that exact publish attempt.
+The public npm releases are:
 
-## Dry-run checklist
+- `@apet97/clockify-addon-sdk@1.0.0`
+- `create-clockify-addon@1.0.0`
+
+Install the SDK with `npm install @apet97/clockify-addon-sdk` or create a project with
+`npm create clockify-addon@latest`. npm versions are immutable: every future release requires a
+version change and explicit npm-owner approval for that exact publish attempt.
+
+## Future release checklist
 
 Run these commands from the repository root:
 
@@ -17,9 +22,8 @@ npm run release:verify
 
 `npm run release:verify` runs the canonical `npm run ci:verify` gate, including the public API
 snapshot check, the manual `npm run verify:schema-live` freshness check, and the dry-run publish
-check. `verify:schema-live` depends on Clockify's live manifest schema endpoint, so keep it out of
-deterministic CI. The final publish step is a dry run only: it should print the package contents and
-registry checks without uploading anything.
+checks. `verify:schema-live` depends on Clockify's live manifest schema endpoint, so keep it out of
+deterministic CI. Dry runs print package contents and registry checks without uploading anything.
 
 The final dry-run publish commands remain separate for the SDK and creator packages:
 
@@ -28,44 +32,47 @@ npm publish --dry-run -w @apet97/clockify-addon-sdk --access public
 npm publish --dry-run -w create-clockify-addon --access public
 ```
 
-## Real publish boundary
+## Publish boundary
 
-Before a real first publish, confirm all of these are true:
+Before publishing a new version, confirm all of these are true:
 
 - The working tree is clean after `npm run release:verify`.
 - `addon-sdk/public-api.snapshot.md` matches the built declarations.
-- The package owner with npm publish rights has approved the exact package name, version, and
-  publish command.
+- `npm whoami` identifies the intended owner account, and that owner has given explicit npm-owner
+  approval for the exact package name, version, and publish command.
+- The new versions do not already exist in the npm registry.
 - The person publishing understands that the SDK supports ESM and CommonJS consumers while the
   creator's programmatic export is ESM-only.
 - A fresh authenticated developer-workspace pass has accepted the generated manifest and exercised
   installation, component authentication, webhook delivery, and uninstall cleanup before any
   Marketplace-readiness claim.
 
-Only after a real publish succeeds, smoke-test the registry artifact from a temporary consumer
-outside this repository:
+When both packages change, publish the SDK first because generated projects depend on it. Publish
+the creator only after the SDK upload succeeds. Do not retry a package whose publish already
+succeeded.
+
+After publishing, smoke-test both exact registry artifacts from a temporary consumer outside this
+repository:
 
 ```bash
-npm view @apet97/clockify-addon-sdk version
+npm view @apet97/clockify-addon-sdk@1.0.0 version
+npm view create-clockify-addon@1.0.0 version
 ```
 
-Then install the just-published version in a fresh ESM/CJS/TypeScript consumer and import the root,
-`/clockify`, `/adapters`, `/testing`, and schema JSON subpaths. Do not treat a dry-run publish as
-registry installation proof.
+Install the just-published SDK in fresh ESM/CJS/TypeScript consumers and import the root,
+`/clockify`, `/adapters`, `/testing`, and schema JSON subpaths. Install the creator, import its ESM
+API, run its help command, and generate a project that installs, type-checks, and executes. Do not
+treat a dry-run publish as registry installation proof.
 
-Only after `create-clockify-addon` is actually present in the registry should documentation promote
-`npm create clockify-addon`; until then, use the repository-local creator entrypoint.
+## Final-SHA manual checkpoint
 
-## Historical manual checkpoint
-
-On 2026-07-12, an authenticated Firefox developer-workspace pass at
-`bbaff21e494d5d92cd2da1e11d21938f61417d18` accepted a packed Node all-features scaffold, delivered
+On 2026-07-12, an authenticated Firefox developer-workspace pass at final runtime commit
+`e74e1f7c1b307791b485f0a25b10a0df0fe7e725` accepted a packed Node all-features scaffold, delivered
 the `INSTALLED` lifecycle and `NEW_TIME_ENTRY` webhook, rendered the signed component with the exact
-developer parent origin, and delivered `DELETED` during uninstall. The disposable entry,
-installation, tunnel, server, and temporary files were cleaned up. See
-`docs/marketplace-coverage.md` for the sanitized route/status receipt. This historical evidence
-predates the current request-target, registration, Worker-start, and packed-creator changes. Repeat
-the pass before any new Marketplace-readiness or release claim.
+developer parent origin, and delivered `DELETED` during uninstall. The disposable two-hour entry,
+installation, tunnel, server, proxy, and temporary files were removed. See
+`docs/marketplace-coverage.md` for the sanitized route/status receipt. This proves that exact
+runtime SHA, not future changes or a Marketplace submission.
 
 ## Expected package shape
 

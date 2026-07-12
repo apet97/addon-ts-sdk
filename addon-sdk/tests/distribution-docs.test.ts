@@ -1,12 +1,42 @@
-import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { describe, expect, it } from "vitest";
 
-describe("source-only distribution docs", () => {
+describe("published distribution docs", () => {
   const packageRoot = process.cwd();
   const repoRoot = resolve(packageRoot, "..");
 
-  it("does not advertise npm registry install while the SDK is source-only", () => {
+  it("ships complete npm release metadata for both packages", () => {
+    const packageJson = JSON.parse(readFileSync(resolve(packageRoot, "package.json"), "utf8"));
+    const creatorPackageJson = JSON.parse(
+      readFileSync(resolve(repoRoot, "create-clockify-addon", "package.json"), "utf8"),
+    );
+
+    expect(packageJson).toMatchObject({
+      name: "@apet97/clockify-addon-sdk",
+      version: "1.0.0",
+      publishConfig: { access: "public" },
+      repository: {
+        type: "git",
+        url: "git+https://github.com/apet97/addon-ts-sdk.git",
+        directory: "addon-sdk",
+      },
+    });
+    expect(creatorPackageJson).toMatchObject({
+      name: "create-clockify-addon",
+      version: "1.0.0",
+      publishConfig: { access: "public" },
+      repository: {
+        type: "git",
+        url: "git+https://github.com/apet97/addon-ts-sdk.git",
+        directory: "create-clockify-addon",
+      },
+      homepage: "https://github.com/apet97/addon-ts-sdk#readme",
+      bugs: "https://github.com/apet97/addon-ts-sdk/issues",
+    });
+  });
+
+  it("documents registry installation for both public packages", () => {
     const rootReadme = readFileSync(resolve(repoRoot, "README.md"), "utf8");
     const packageReadme = readFileSync(resolve(packageRoot, "README.md"), "utf8");
     const creatorReadme = readFileSync(
@@ -29,32 +59,40 @@ describe("source-only distribution docs", () => {
     );
     const rootPackageJson = JSON.parse(readFileSync(resolve(repoRoot, "package.json"), "utf8"));
     const packageJson = JSON.parse(readFileSync(resolve(packageRoot, "package.json"), "utf8"));
+    const creatorPackageJson = JSON.parse(
+      readFileSync(resolve(repoRoot, "create-clockify-addon", "package.json"), "utf8"),
+    );
 
-    expect(packageReadme).not.toContain("npm install @apet97/clockify-addon-sdk");
-    expect(creatorReadme).not.toMatch(/```bash\s+npm create clockify-addon/);
-    expect(creatorReadme).toContain("node ./create-clockify-addon/bin/create-clockify-addon.mjs");
-    expect(creatorReadme).toMatch(/only\s+after the creator package is actually published/);
-    expect(creatorReadme).toContain("wrangler dev src/index.ts");
-    expect(creatorReadme).toContain("typed programmatic API");
+    expect(rootReadme).toContain("npm install @apet97/clockify-addon-sdk");
+    expect(packageReadme).toContain("npm install @apet97/clockify-addon-sdk");
+    expect(rootReadme).toContain("npm create clockify-addon@latest");
+    expect(creatorReadme).toContain("npm create clockify-addon@latest");
+    expect(productSurface).toContain("published to the npm registry");
+    expect(releaseReadiness).toContain("Published versions");
+    expect(releaseReadiness).toContain("@apet97/clockify-addon-sdk@1.0.0");
+    expect(releaseReadiness).toContain("create-clockify-addon@1.0.0");
+
+    for (const document of [
+      rootReadme,
+      packageReadme,
+      creatorReadme,
+      productSurface,
+      releaseReadiness,
+    ]) {
+      expect(document).not.toContain("source-only");
+      expect(document).not.toContain("not published to the npm registry");
+    }
+
     expect(packageReadme).not.toContain("git+https://github.com/apet97/addon-ts-sdk.git#main");
-    expect(`${rootReadme}\n${packageReadme}\n${productSurface}\n${releaseReadiness}`).toContain(
-      "source-only",
-    );
     expect(packageReadme).toContain("npm pack --dry-run");
-    expect(packageReadme).toContain(
-      "npm install /absolute/path/to/apet97-clockify-addon-sdk-1.0.0.tgz",
-    );
     expect(packageReadme).toContain("## Fetch and edge runtimes");
     expect(packageReadme).toContain("Hono");
     expect(packageReadme).toContain("handleFetchRequest(addon, request)");
-    expect(productSurface).toContain("not published to the npm registry");
     expect(rootReadme).toContain("npm run release:verify");
     expect(releaseReadiness).toContain(
       "npm publish --dry-run -w @apet97/clockify-addon-sdk --access public",
     );
-    expect(releaseReadiness).toContain("Do not run a real npm publish");
     expect(releaseReadiness).toContain("explicit npm-owner approval");
-    expect(releaseReadiness).toContain("npm view @apet97/clockify-addon-sdk version");
     expect(qualityGates).toContain("npm run verify:public-api");
     expect(qualityGates).toContain("npm run verify:package-lint");
     expect(qualityGates).toContain("public-api.snapshot.md");
@@ -63,8 +101,8 @@ describe("source-only distribution docs", () => {
     expect(qualityGates).toContain("executes their runtime");
     expect(qualityGates).toContain("installs the creator tarball");
     expect(qualityGates).toContain("Wrangler dry-runs");
-    expect(releaseReadiness).toContain("Historical manual checkpoint");
-    expect(releaseReadiness).toContain("bbaff21e494d5d92cd2da1e11d21938f61417d18");
+    expect(releaseReadiness).toContain("Final-SHA manual checkpoint");
+    expect(releaseReadiness).toContain("e74e1f7c1b307791b485f0a25b10a0df0fe7e725");
     expect(dependencyStrategy).toContain("`jose@6` is ESM-only");
     expect(dependencyStrategy).toContain("npm run verify:package-consumer");
     expect(dependencyStrategy).toContain("CommonJS support");
@@ -74,8 +112,9 @@ describe("source-only distribution docs", () => {
     expect(rootPackageJson.scripts["release:verify"]).toBe(
       "npm run ci:verify && npm run verify:schema-live && npm run release:dry-run",
     );
-    expect(packageJson.devDependencies["@types/node"]).toMatch(/^\^22\./);
     expect(packageJson.sideEffects).toBe(false);
+    expect(creatorPackageJson.version).toBe("1.0.0");
+    expect(packageJson.devDependencies["@types/node"]).toMatch(/^\^22\./);
     expect(evidenceMap).toContain("clockify-request-verifiers.ts");
     expect(evidenceMap).toContain("clockify-request-handlers.ts");
     expect(evidenceMap).toContain("clockify-request-wire.ts");

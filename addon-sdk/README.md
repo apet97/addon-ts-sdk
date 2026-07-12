@@ -12,10 +12,17 @@ the Clockify REST API.
 
 ## Install
 
-This SDK is source-only for now and is not published to the npm registry. Use the repository as the
-source of truth until a release is intentionally published.
+Install the public package from npm:
 
-Supported source workflows:
+```bash
+npm install @apet97/clockify-addon-sdk
+```
+
+Node 22+. Ships ESM and CommonJS builds with type declarations.
+
+### Contributing or testing unreleased changes
+
+Use the repository checkout when contributing or testing a change that has not been released:
 
 ```bash
 # Clone the source repository.
@@ -27,7 +34,7 @@ npm ci
 npm run ci:verify
 npm pack --dry-run -w @apet97/clockify-addon-sdk
 
-# When another local project needs the package, create and install a tarball intentionally.
+# When another local project needs an unreleased package, create and install a tarball intentionally.
 cd addon-sdk
 npm pack
 npm install /absolute/path/to/apet97-clockify-addon-sdk-1.0.0.tgz
@@ -35,9 +42,7 @@ npm install /absolute/path/to/apet97-clockify-addon-sdk-1.0.0.tgz
 
 Do not use the repo-root Git URL as an npm package dependency: npm installs the private workspace
 root rather than this SDK package. Pack a tarball from `addon-sdk/` when another project needs to
-consume it.
-
-Node 22+. Ships ESM and CommonJS builds with type declarations.
+consume unreleased code.
 
 ## Quick start
 

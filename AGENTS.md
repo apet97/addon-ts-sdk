@@ -25,10 +25,13 @@ Conventions for anyone (human or agent) working in this repository.
   installed creator artifact, installs the packed SDK, executes and validates their exact runtime
   manifests, probes failure paths, and compiles Worker entry points with a Wrangler dry-run. This is
   not a substitute for a fresh authenticated Clockify developer-workspace pass before release.
-- A sanitized 2026-07-12 authenticated Firefox pass at `bbaff21` installed the packed Node all-features
-  scaffold, observed successful `INSTALLED`, `NEW_TIME_ENTRY`, component, and `DELETED` requests,
-  and confirmed exact-origin iframe enforcement in the developer workspace. That historical receipt
-  predates the current request and scaffold changes; rerun it before a release-readiness claim.
+- `@apet97/clockify-addon-sdk@1.0.0` and `create-clockify-addon@1.0.0` are public npm packages.
+  Consumers install with `npm install @apet97/clockify-addon-sdk` or scaffold with
+  `npm create clockify-addon@latest`.
+- A sanitized 2026-07-12 authenticated Firefox pass at final runtime commit `e74e1f7` installed the
+  packed Node all-features scaffold, observed successful manifest, `INSTALLED`, component,
+  `NEW_TIME_ENTRY`, and `DELETED` requests, and confirmed exact-origin iframe enforcement in the
+  developer workspace. It proves that SHA only; rerun the pass after relevant runtime changes.
 - CodeRabbit was unavailable for that pass. Local package, cycle, API-surface, security-boundary,
   and diff reviews were used; do not describe this as a CodeRabbit-reviewed release.
 
@@ -48,9 +51,9 @@ Conventions for anyone (human or agent) working in this repository.
 
 ## Layout
 
-- `addon-sdk/` — the publishable package workspace (`@apet97/clockify-addon-sdk`). All SDK code,
+- `addon-sdk/` — the published SDK package workspace (`@apet97/clockify-addon-sdk`). All SDK code,
   schemas, examples, and tests live here. Run package commands from this directory.
-- `create-clockify-addon/` — the ESM-only creator package with a typed programmatic export. Its
+- `create-clockify-addon/` — the published ESM-only creator package with a typed programmatic export. Its
   Node/Worker minimal/all projects must be generated through the packed creator, install the packed
   SDK, type-check, and execute without workspace-source imports.
 - Root npm scripts proxy the package gates through npm workspaces; use `npm run ci:verify` from the
@@ -127,8 +130,12 @@ generated Clockify models.
 
 ## Git / publish workflow
 
-- For direct `main` publishes, first run `npm run ci:verify`, then `git fetch origin`, confirm ancestry,
-  commit the branch, fast-forward `main`, and push `origin main`.
+- npm versions are immutable. Every future publish requires a version change, `npm run release:verify`,
+  a successful `npm whoami`, and explicit npm-owner approval for the exact packages and versions.
+- When both packages change, publish the SDK first. Publish the creator only after the SDK succeeds,
+  then smoke-test both exact versions from the public registry in a fresh temporary consumer.
+- For direct `main` publishes, run the full gate, fetch `origin`, confirm `origin/main` is an ancestor,
+  commit the branch, push `origin main` without force, and verify `origin/main...main` is `0 0`.
 - Do not open a PR when the user explicitly asks to push to `main`.
 - Do not push generated drift, a stale `dist/`, or a dry-run `.tgz` artifact.
 

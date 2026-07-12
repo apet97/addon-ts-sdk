@@ -1,7 +1,8 @@
 # Product Surface: @apet97/clockify-addon-sdk
 
 This package provides a layered TypeScript toolkit for CAKE.com Marketplace add-ons targeting
-Clockify. It is source-only for now and is not published to the npm registry.
+Clockify. Version 1.0.0 is published to the npm registry together with the
+`create-clockify-addon` creator.
 
 ## Scope
 
@@ -30,7 +31,7 @@ Clockify. It is source-only for now and is not published to the npm registry.
   leading slashes as path data; Express remains an optional peer with body limits owned by the host
   app.
 - Optional `onError(error, context)` reporting for handled router, Fetch, and Node adapter errors.
-- Source package documentation and vendored manifest schemas.
+- Package documentation and vendored manifest schemas.
 - Runtime draft-04 manifest validation, hardened HTML/JSON responses, SDK-owned CSP directives that
   cannot be overridden, and fail-closed public-origin resolution.
 - Encrypted installation-store contracts, caller-qualified generation deletion, and webhook
@@ -49,4 +50,4 @@ Clockify. It is source-only for now and is not published to the npm registry.
 - Full Clockify entity REST clients, database-specific drivers, hosted infrastructure, or Marketplace
   portal automation.
 - Pumble and Plaky add-on implementations.
-- Real npm or Marketplace publishing; release readiness is dry-run-only until explicitly decided.
+- Marketplace submission, hosted infrastructure, and developer-portal automation.
