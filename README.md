@@ -46,7 +46,7 @@ npm run release:preflight
 npm run verify:registry
 ```
 
-The current workspace remains at the published `1.0.0` versions, so `release:preflight` is expected
+The current workspace remains at the published `1.0.1` versions, so `release:preflight` is expected
 to fail until a future version bump. `release:verify` also ends in an expected immutable-version
 rejection at its `release:dry-run` step on this checkout. These registry-dependent commands are
 intentionally separate from deterministic `ci:verify`.

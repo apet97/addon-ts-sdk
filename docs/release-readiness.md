@@ -4,8 +4,8 @@
 
 The public npm releases are:
 
-- `@apet97/clockify-addon-sdk@1.0.0`
-- `create-clockify-addon@1.0.0`
+- `@apet97/clockify-addon-sdk@1.0.1`
+- `create-clockify-addon@1.0.1`
 
 Install the SDK with `npm install @apet97/clockify-addon-sdk` or create a project with
 `npm create clockify-addon@latest`. npm versions are immutable: every future release requires a
@@ -23,10 +23,10 @@ npm run release:verify
 
 `npm run release:preflight` reads both workspace package versions and fails unless those exact
 versions are absent from the configured npm registry. Because the current workspace versions are
-the already-published `1.0.0` releases, it is expected to fail until both package manifests are
+the already-published `1.0.1` releases, it is expected to fail until both package manifests are
 bumped for a future release.
 
-On this published `1.0.0` checkout, `release:verify` and `release:dry-run` are also expected to fail
+On this published `1.0.1` checkout, `release:verify` and `release:dry-run` are also expected to fail
 when npm reaches its immutable-version registry check. That rejection is correct. Use the preflight
 first so a missing version bump fails quickly, before the more expensive local release gates run.
 

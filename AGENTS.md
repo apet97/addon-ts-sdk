@@ -25,13 +25,13 @@ Conventions for anyone (human or agent) working in this repository.
   installed creator artifact, installs the packed SDK, executes and validates their exact runtime
   manifests, probes failure paths, and compiles Worker entry points with a Wrangler dry-run. This is
   not a substitute for a fresh authenticated Clockify developer-workspace pass before release.
-- `@apet97/clockify-addon-sdk@1.0.0` and `create-clockify-addon@1.0.0` are public npm packages.
+- `@apet97/clockify-addon-sdk@1.0.1` and `create-clockify-addon@1.0.1` are public npm packages.
   Consumers install with `npm install @apet97/clockify-addon-sdk` or scaffold with
   `npm create clockify-addon@latest`.
 - `release:preflight` and `verify:registry` read both workspace versions dynamically. The former
   fails unless exact versions are unpublished; the latter installs the exact published artifacts
   and executes a generated Node minimal project. Both depend on registry state and stay outside
-  deterministic `ci:verify` and `release:verify`. On the already-published `1.0.0` checkout,
+  deterministic `ci:verify` and `release:verify`. On the already-published `1.0.1` checkout,
   `release:verify` also ends in the expected immutable-version rejection from `release:dry-run`.
 - A sanitized 2026-07-12 authenticated Firefox pass at final runtime commit `e74e1f7` installed the
   packed Node all-features scaffold, observed successful manifest, `INSTALLED`, component,
@@ -123,7 +123,7 @@ Conventions for anyone (human or agent) working in this repository.
 | `npm run verify:package-lint`              | Packs both artifacts with scripts ignored, then runs `publint --strict` and Are The Types Wrong: Node16 for the dual-format SDK and `esm-only` for the creator. Node10 findings are outside the supported runtime policy.                             |
 | `npm run verify:package-consumer`          | Packs the already-built package with scripts ignored, installs it into temporary runtime ESM/CJS and TypeScript ESM/CJS consumers, imports public subpaths, signs/verifies test tokens, type-checks declarations, and serves `/manifest`.             |
 | `npm run verify:scaffolds`                 | Packs the creator and SDK; generates Node/Worker minimal/all through the installed creator; installs, type-checks, and executes each; validates manifests/counts and failure paths; dry-runs both Worker entry points with Wrangler.                  |
-| `npm run release:preflight`                | Manual network gate: fails unless both exact workspace versions are absent from the configured npm registry. The published `1.0.0` versions intentionally fail until a future version bump.                                                           |
+| `npm run release:preflight`                | Manual network gate: fails unless both exact workspace versions are absent from the configured npm registry. The published `1.0.1` versions intentionally fail until a future version bump.                                                           |
 | `npm run verify:registry`                  | Manual post-publish gate: installs both exact registry versions into a disposable consumer, checks ESM/CJS/TypeScript/creator entrypoints, and generates, type-checks, and executes a Node minimal project.                                           |
 | `npm run audit:prod` / `npm run audit:all` | Production and full dependency audits; both should report 0 vulnerabilities.                                                                                                                                                                          |
 
