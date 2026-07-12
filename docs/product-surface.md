@@ -13,7 +13,9 @@ Clockify. It is source-only for now and is not published to the npm registry.
   setters that default to `[]` for Java parity.
 - Core server routing (GET `/manifest`, path validators, 404/405 plus HEAD/OPTIONS semantics, quiet
   handled 500 responses, and single-use middleware `next()` dispatch).
-- Clockify Addon lifecycle, component, settings, and webhook registrations.
+- Clockify Addon lifecycle, component, settings, and webhook registrations. Registration safely
+  initializes schema-optional descriptor arrays only after a route binds, while identical
+  predeclared descriptors are reused and same-path conflicts leave the router and manifest intact.
 - RS256 JWT signature verification (`jose`) plus component, lifecycle, and strict webhook request
   helpers.
 - Verified handler wrappers for component, lifecycle, installed lifecycle, and webhook routes.
@@ -22,9 +24,11 @@ Clockify. It is source-only for now and is not published to the npm registry.
 - Typed structured-setting helper creators that encode setting type/value pairing without replacing
   the generated schema builders.
 - Adapters for Node.js `http`, Express, and Fetch API. Node and Fetch enforce a default 1 MiB body
-  limit before dispatch, including oversized declared `content-length` values and streamed bodies
-  that cross the byte limit. Malformed declared lengths return 400 without entering application
-  error reporting; Express remains an optional peer with body limits owned by the host app.
+  limit before dispatch on every HTTP method, including oversized declared `content-length` values
+  and streamed bodies that cross the byte limit. Malformed declared lengths return 400 without
+  entering application error reporting. Node and the Express structural fallback preserve repeated
+  leading slashes as path data; Express remains an optional peer with body limits owned by the host
+  app.
 - Optional `onError(error, context)` reporting for handled router, Fetch, and Node adapter errors.
 - Source package documentation and vendored manifest schemas.
 - Runtime draft-04 manifest validation, hardened HTML/JSON responses, SDK-owned CSP directives that
@@ -33,8 +37,10 @@ Clockify. It is source-only for now and is not published to the npm registry.
   idempotency leases. An unqualified delete is unconditional because Clockify's `DELETED` payload
   does not carry an installation generation.
 - Marketplace-specific add-on token exchange/settings transport and a secure iframe UI bridge.
-- A separate creator workspace whose Node/Worker minimal/all projects install the packed SDK,
-  type-check, execute their runtime, and serve schema-valid manifests with exact route counts.
+- A separate ESM-only creator workspace with a typed programmatic export. Its packed artifact
+  generates Node/Worker minimal/all projects that install the packed SDK, type-check, execute their
+  runtime, serve schema-valid manifests with exact route counts, and compile Worker entry points in
+  Wrangler dry-runs.
 
 ### Exclusions
 

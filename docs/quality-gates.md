@@ -2,7 +2,7 @@
 
 The root `npm run ci:verify` script is the canonical local and CI gate. It runs the package checks
 through npm workspaces, includes the package's `prepack` chain, and adds installed-package checks so
-the published tarball is always built and verified from a green tree.
+the publishable artifacts are always built and verified from a green tree.
 
 For day-to-day SDK hacking, use **`npm run verify:fast`** from the repo root. It runs type-check,
 generated drift, the local Clockify replay tests, build, and `verify:dist` without pack, package
@@ -27,27 +27,31 @@ consumer, audit, or live-schema checks.
    manifest schemas, generated Clockify models, build output, coverage, and tarballs are ignored.
 8. **`npm run build`** — emits the ESM and CJS outputs with type declarations.
 9. **`npm run verify:public-api`** — compares the built ESM declaration surface for the root,
-   `/clockify`, `/adapters`, and `/testing` entry points against
+   `/clockify`, `/adapters`, `/client`, `/ui`, and `/testing` entry points against
    `addon-sdk/public-api.snapshot.md`. Intentional public API changes must run
    `npm run build && npm run verify:public-api -- --update` and include the snapshot diff.
 10. **`npm run verify:dist`** — imports the **built** ESM and CJS and boots the README quick-start; a
     green `build` alone does not prove the package imports.
-11. **`npm run pack:dry-run`** — confirms both SDK and creator tarball contents (`dist` + `docs` + vendored
-    `schemas/clockify-manifests` + `LICENSE` + `README`).
-12. **`npm run verify:package-lint`** — packs the already-built package with `--ignore-scripts`,
-    then runs `publint --strict` and Are The Types Wrong with the Node16 profile against the packed
-    tarball. Node10 findings are not release blockers because this SDK supports Node 22+.
+11. **`npm run pack:dry-run`** — confirms the SDK tarball contains its built output, docs, vendored
+    schemas, license, and README, while the creator tarball contains its bin, typed source export,
+    license, and README.
+12. **`npm run verify:package-lint`** — packs both artifacts with `--ignore-scripts`, then runs
+    `publint --strict` and Are The Types Wrong against each tarball. The dual-format SDK uses the
+    Node16 profile; the ESM-only creator uses the `esm-only` profile. Node10 findings are not release
+    blockers because both packages support Node 22+.
 13. **`npm run verify:package-consumer`** — packs the already-built package with `--ignore-scripts`,
     installs that tarball into temporary runtime ESM/CJS and TypeScript ESM/CJS consumers, imports
     the root and subpath entry points, checks `generated.v1_5`, type-checks declarations without
     requiring Express types, signs/verifies JWTs through `jose@6` dynamic imports, and boots a
     `/manifest` server smoke from the installed package.
-14. **`npm run verify:scaffolds`** — packs the SDK and generates Node minimal, Node all-features,
-    Worker minimal, and Worker all-features projects. It installs and type-checks each project,
-    executes their runtime, requests `/manifest`, validates the response with the packed SDK, and
-    asserts exact component/lifecycle/webhook counts. It also probes 404 handling, unsigned
-    component rejection, and production configuration failure. This is runtime proof, not a source
-    grep or type-check proxy.
+14. **`npm run verify:scaffolds`** — packs both packages, installs the creator tarball into a
+    temporary runner, and generates Node minimal, Node all-features, Worker minimal, and
+    Worker all-features projects through that installed export. It installs and type-checks each
+    project. It executes their runtime, requests `/manifest`, validates the response with the packed
+    SDK, and asserts exact component/lifecycle/webhook counts. It also probes 404 handling, unsigned
+    component rejection, and production configuration failure, then bundles both Worker entry
+    points with Wrangler dry-runs. This is packed runtime proof, not a source grep or type-check
+    proxy.
 15. **`npm audit --omit=dev --json` and `npm audit --json`** — production and full dependency audit;
     both should report 0 vulnerabilities.
 

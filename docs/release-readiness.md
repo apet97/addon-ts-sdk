@@ -36,7 +36,8 @@ Before a real first publish, confirm all of these are true:
 - `addon-sdk/public-api.snapshot.md` matches the built declarations.
 - The package owner with npm publish rights has approved the exact package name, version, and
   publish command.
-- The person publishing understands that the package currently has both ESM and CommonJS consumers.
+- The person publishing understands that the SDK supports ESM and CommonJS consumers while the
+  creator's programmatic export is ESM-only.
 - A fresh authenticated developer-workspace pass has accepted the generated manifest and exercised
   installation, component authentication, webhook delivery, and uninstall cleanup before any
   Marketplace-readiness claim.
@@ -55,19 +56,20 @@ registry installation proof.
 Only after `create-clockify-addon` is actually present in the registry should documentation promote
 `npm create clockify-addon`; until then, use the repository-local creator entrypoint.
 
-## Latest manual checkpoint
+## Historical manual checkpoint
 
-On 2026-07-12, an authenticated Firefox developer-workspace pass accepted a packed Node
-all-features scaffold, delivered the `INSTALLED` lifecycle and `NEW_TIME_ENTRY` webhook, rendered
-the signed component with the exact developer parent origin, and delivered `DELETED` during
-uninstall. The disposable entry, installation, tunnel, server, and temporary files were cleaned up.
-See `docs/marketplace-coverage.md` for the sanitized route/status receipt. This evidence does not
-remove the requirement to repeat the pass after relevant behavior changes or immediately before a
-future Marketplace release.
+On 2026-07-12, an authenticated Firefox developer-workspace pass at
+`bbaff21e494d5d92cd2da1e11d21938f61417d18` accepted a packed Node all-features scaffold, delivered
+the `INSTALLED` lifecycle and `NEW_TIME_ENTRY` webhook, rendered the signed component with the exact
+developer parent origin, and delivered `DELETED` during uninstall. The disposable entry,
+installation, tunnel, server, and temporary files were cleaned up. See
+`docs/marketplace-coverage.md` for the sanitized route/status receipt. This historical evidence
+predates the current request-target, registration, Worker-start, and packed-creator changes. Repeat
+the pass before any new Marketplace-readiness or release claim.
 
 ## Expected package shape
 
-The dry-run package should include only:
+The SDK dry-run package should include only its npm-generated `package.json` plus:
 
 - `dist`
 - `docs`
@@ -75,5 +77,12 @@ The dry-run package should include only:
 - `LICENSE`
 - `README.md`
 
-The package should not include `node_modules`, `coverage`, temporary tarballs, workspace root files,
+The creator dry-run package should include only its npm-generated `package.json` plus:
+
+- `bin`
+- `src` (including the programmatic declaration)
+- `LICENSE`
+- `README.md`
+
+Neither package should include `node_modules`, `coverage`, temporary tarballs, workspace root files,
 or generated proof artifacts.

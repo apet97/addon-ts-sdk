@@ -34,6 +34,8 @@ describe("source-only distribution docs", () => {
     expect(creatorReadme).not.toMatch(/```bash\s+npm create clockify-addon/);
     expect(creatorReadme).toContain("node ./create-clockify-addon/bin/create-clockify-addon.mjs");
     expect(creatorReadme).toMatch(/only\s+after the creator package is actually published/);
+    expect(creatorReadme).toContain("wrangler dev src/index.ts");
+    expect(creatorReadme).toContain("typed programmatic API");
     expect(packageReadme).not.toContain("git+https://github.com/apet97/addon-ts-sdk.git#main");
     expect(`${rootReadme}\n${packageReadme}\n${productSurface}\n${releaseReadiness}`).toContain(
       "source-only",
@@ -59,6 +61,10 @@ describe("source-only distribution docs", () => {
     expect(qualityGates).toContain("Node minimal");
     expect(qualityGates).toContain("Worker all-features");
     expect(qualityGates).toContain("executes their runtime");
+    expect(qualityGates).toContain("installs the creator tarball");
+    expect(qualityGates).toContain("Wrangler dry-runs");
+    expect(releaseReadiness).toContain("Historical manual checkpoint");
+    expect(releaseReadiness).toContain("bbaff21e494d5d92cd2da1e11d21938f61417d18");
     expect(dependencyStrategy).toContain("`jose@6` is ESM-only");
     expect(dependencyStrategy).toContain("npm run verify:package-consumer");
     expect(dependencyStrategy).toContain("CommonJS support");

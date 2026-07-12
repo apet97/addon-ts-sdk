@@ -27,10 +27,12 @@ Worker entry points with Wrangler. Dependencies and SDK public APIs remain uncha
 ### Task 1: Preserve Node origin-form request targets
 
 **Files:**
+
 - Modify: `addon-sdk/tests/adapters-node-server.test.ts`
 - Modify: `addon-sdk/src/adapters/node-http.ts`
 
 **Interfaces:**
+
 - Consumes: `IncomingMessage.url`, `Addon.handle(AddonRequest)`.
 - Produces: unchanged `fromNodeRequest(req, options): Promise<AddonRequest>` behavior with a
   pathname that retains every leading slash.
@@ -80,7 +82,10 @@ Add this private helper above `fromNodeRequest`:
 ```ts
 function parseNodeRequestUrl(requestTarget: string | undefined): URL {
   const target = requestTarget || "";
-  return new URL(target.startsWith("/") ? `http://localhost${target}` : target, "http://localhost");
+  return new URL(
+    target.startsWith("/") ? `http://localhost${target}` : target,
+    "http://localhost",
+  );
 }
 ```
 
@@ -105,10 +110,12 @@ Expected: all Node server integration tests pass.
 ### Task 2: Validate Fetch declared lengths on every method
 
 **Files:**
+
 - Modify: `addon-sdk/tests/adapters.test.ts`
 - Modify: `addon-sdk/src/adapters/fetch.ts`
 
 **Interfaces:**
+
 - Consumes: `Request.headers`, `parseContentLength`, `maxBodyBytes`.
 - Produces: unchanged `handleFetchRequest(addon, request, options): Promise<Response>` API with
   method-independent declared-length validation.
@@ -235,10 +242,12 @@ git commit -m "Align Node and Fetch request handling"
 ### Task 3: Synchronize the adapter contract documentation
 
 **Files:**
+
 - Modify: `AGENTS.md`
 - Modify: `CLAUDE.md`
 
 **Interfaces:**
+
 - Consumes: the behavior proven by Tasks 1 and 2.
 - Produces: synchronized contributor contracts with no broader compatibility claim.
 
@@ -279,10 +288,12 @@ git commit -m "Document adapter request parity"
 ### Task 4: Register against valid manifests with absent arrays
 
 **Files:**
+
 - Modify: `addon-sdk/tests/clockify.test.ts`
 - Modify: `addon-sdk/src/clockify/clockify-addon.ts`
 
 **Interfaces:**
+
 - Consumes: schema-valid `ClockifyManifest<"1.4">` values whose optional descriptor arrays are
   absent.
 - Produces: unchanged `registerComponent`, `registerLifecycleEvent`, and `registerWebhook` methods
@@ -345,7 +356,13 @@ Change `registerManifestRoute` to accept `T[] | undefined` and return the array 
 
 ```ts
 function registerManifestRoute<T extends { readonly path: string }>(
-  addon: { registerHandler(path: string, method: string, handler: RequestHandler): void },
+  addon: {
+    registerHandler(
+      path: string,
+      method: string,
+      handler: RequestHandler,
+    ): void;
+  },
   kind: string,
   entries: T[] | undefined,
   descriptor: T,
@@ -353,7 +370,9 @@ function registerManifestRoute<T extends { readonly path: string }>(
   handler: RequestHandler,
 ): T[] {
   const manifestEntries = entries ?? [];
-  const existing = manifestEntries.find((entry) => entry.path === descriptor.path);
+  const existing = manifestEntries.find(
+    (entry) => entry.path === descriptor.path,
+  );
   if (existing && !descriptorsEqual(existing, descriptor)) {
     throw new IllegalArgumentException(
       `Conflicting ${kind} is already declared for path ${descriptor.path}.`,
@@ -387,12 +406,14 @@ git commit -m "Support manifests with optional descriptor arrays"
 ### Task 5: Share raw-target parsing with Express-like fallbacks
 
 **Files:**
+
 - Create: `addon-sdk/src/adapters/request-target.ts`
 - Modify: `addon-sdk/src/adapters/node-http.ts`
 - Modify: `addon-sdk/src/adapters/express.ts`
 - Modify: `addon-sdk/tests/adapters.test.ts`
 
 **Interfaces:**
+
 - Consumes: an optional raw HTTP request target.
 - Produces: internal `parseHttpRequestTarget(requestTarget): URL`, used only by Node and Express
   adapter implementation files.
@@ -441,7 +462,10 @@ Create `request-target.ts`:
 ```ts
 export function parseHttpRequestTarget(requestTarget: string | undefined): URL {
   const target = requestTarget || "";
-  return new URL(target.startsWith("/") ? `http://localhost${target}` : target, "http://localhost");
+  return new URL(
+    target.startsWith("/") ? `http://localhost${target}` : target,
+    "http://localhost",
+  );
 }
 ```
 
@@ -468,6 +492,7 @@ git commit -m "Preserve Express fallback request targets"
 ### Task 6: Make the packed creator typed, tested, and runnable
 
 **Files:**
+
 - Create: `create-clockify-addon/src/index.d.ts`
 - Modify: `create-clockify-addon/package.json`
 - Modify: `create-clockify-addon/src/index.mjs`
@@ -476,6 +501,7 @@ git commit -m "Preserve Express fallback request targets"
 - Modify: `addon-sdk/scripts/verify-package-lint.mjs`
 
 **Interfaces:**
+
 - Consumes: existing `scaffoldClockifyAddon(options)` ESM implementation.
 - Produces: `ScaffoldClockifyAddonOptions`, `ClockifyAddonRuntime`,
   `ClockifyAddonFeatureSet`, and the existing function declaration; Worker start scripts explicitly
@@ -488,7 +514,10 @@ In `creator.test.ts`, load the creator package manifest once and assert:
 ```ts
 it("ships a typed programmatic export and a real workspace test command", async () => {
   const packageJson = JSON.parse(
-    await readFile(resolve(import.meta.dirname, "../../create-clockify-addon/package.json"), "utf8"),
+    await readFile(
+      resolve(import.meta.dirname, "../../create-clockify-addon/package.json"),
+      "utf8",
+    ),
   );
   expect(packageJson.types).toBe("./src/index.d.ts");
   expect(packageJson.exports).toEqual({
@@ -528,7 +557,9 @@ export interface ScaffoldClockifyAddonOptions {
 }
 
 /** Creates a Clockify add-on project without overwriting existing files. */
-export function scaffoldClockifyAddon(options: ScaffoldClockifyAddonOptions): Promise<string>;
+export function scaffoldClockifyAddon(
+  options: ScaffoldClockifyAddonOptions,
+): Promise<string>;
 ```
 
 Set `package.json#types`, the conditional export, and the real workspace test command exactly as the
@@ -550,14 +581,15 @@ Execute that installed script for all four variants instead of importing workspa
 each Worker install/typecheck, run:
 
 ```bash
-npm exec -- wrangler deploy src/index.ts --dry-run
+npm exec -- wrangler deploy src/index.ts --name <variant-name> \
+  --compatibility-date 2026-07-12 --dry-run
 ```
 
 - [ ] **Step 5: Lint both packed artifacts**
 
 Refactor `verify-package-lint.mjs` to pack and run `publint --strict` plus Are The Types Wrong
-Node16 against both `addon-sdk/` and `create-clockify-addon/`. Keep the existing temporary cleanup
-and fail immediately if either artifact fails.
+against both artifacts. Use the Node16 profile for the dual-format SDK and the `esm-only` profile
+for the creator. Keep the existing temporary cleanup and fail immediately if either artifact fails.
 
 - [ ] **Step 6: Verify creator tests, direct workspace test, package lint, and scaffold gate**
 
@@ -586,6 +618,7 @@ git commit -m "Verify the packed creator runtime"
 ### Task 7: Correct current documentation claims
 
 **Files:**
+
 - Modify: `AGENTS.md`
 - Modify: `CLAUDE.md`
 - Modify: `CHANGELOG.md`
@@ -596,6 +629,7 @@ git commit -m "Verify the packed creator runtime"
 - Modify: `docs/release-readiness.md`
 
 **Interfaces:**
+
 - Consumes: behavior and gates completed in Tasks 4-6.
 - Produces: synchronized, source-only documentation that treats the prior live receipt as historical.
 
@@ -642,11 +676,13 @@ git commit -m "Correct creator readiness documentation"
 ### Task 8: Finish the non-security adversarial review
 
 **Files:**
+
 - Create outside repository: `/Users/15x/Downloads/addon-ts-sdk-nonsecurity-review-2026-07-12.md`
 
 **Interfaces:**
+
 - Consumes: the current branch SHA, packed SDK/creator artifacts, runtime probes, and gate output.
-- Produces: a read-only evidence report with two remediated findings and no security assessment.
+- Produces: a read-only evidence report with six remediated findings and no security assessment.
 
 - [ ] **Step 1: Review every required surface against current code**
 
@@ -670,12 +706,19 @@ Use these headings:
 # addon-ts-sdk Non-Security Adversarial Review — 2026-07-12
 
 ## Executive Verdict
+
 ## Baseline and Evidence
+
 ## Confirmed Findings Remediated During Review
+
 ## Remaining Confirmed Findings
+
 ## Rejected Hypotheses
+
 ## Coverage Gaps and Blind Spots
+
 ## Prioritized Remediation Order
+
 ## Final Repository State
 ```
 
@@ -690,9 +733,11 @@ including their red-green tests and fix commits. If nothing else survives invest
 ### Task 9: Run final proof and record project evidence
 
 **Files:**
+
 - Modify outside repository: `/Users/15x/Documents/Obsidian Vault/03 Projects/Clockify Add-on TypeScript SDK.md`
 
 **Interfaces:**
+
 - Consumes: completed branch and review report.
 - Produces: fresh command evidence, a clean committed worktree, and a sanitized project receipt.
 
