@@ -105,6 +105,10 @@ describe("published distribution docs", () => {
     expect(packageReadme).toContain("Hono");
     expect(packageReadme).toContain("handleFetchRequest(addon, request)");
     expect(rootReadme).toContain("npm run release:verify");
+    expect(rootReadme).toContain("npm run verify:registry");
+    expect(releaseReadiness).toContain("npm run release:preflight");
+    expect(releaseReadiness).toContain("npm run verify:registry");
+    expect(releaseReadiness).not.toContain("npm view @apet97/clockify-addon-sdk@1.0.0 version");
     expect(releaseReadiness).toContain(
       "npm publish --dry-run -w @apet97/clockify-addon-sdk --access public",
     );
@@ -117,6 +121,8 @@ describe("published distribution docs", () => {
     expect(qualityGates).toContain("executes their runtime");
     expect(qualityGates).toContain("installs the creator tarball");
     expect(qualityGates).toContain("Wrangler dry-runs");
+    expect(qualityGates).toContain("npm run release:preflight");
+    expect(qualityGates).toContain("npm run verify:registry");
     expect(releaseReadiness).toContain("Final-SHA manual checkpoint");
     expect(releaseReadiness).toContain("e74e1f7c1b307791b485f0a25b10a0df0fe7e725");
     expect(dependencyStrategy).toContain("`jose@6` is ESM-only");
@@ -125,6 +131,12 @@ describe("published distribution docs", () => {
     expect(rootPackageJson.scripts["release:dry-run"]).toBe(
       "npm publish --dry-run -w @apet97/clockify-addon-sdk --access public && npm publish --dry-run -w create-clockify-addon --access public",
     );
+    expect(rootPackageJson.scripts["release:preflight"]).toBe("node scripts/release-preflight.mjs");
+    expect(rootPackageJson.scripts["verify:registry"]).toBe(
+      "node scripts/verify-registry-consumer.mjs",
+    );
+    expect(rootPackageJson.scripts["ci:verify"]).not.toContain("release:preflight");
+    expect(rootPackageJson.scripts["ci:verify"]).not.toContain("verify:registry");
     expect(rootPackageJson.scripts["release:verify"]).toBe(
       "npm run ci:verify && npm run verify:schema-live && npm run release:dry-run",
     );

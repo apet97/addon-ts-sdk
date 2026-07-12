@@ -64,6 +64,21 @@ Manual freshness check:
   Monday schedule and on manual dispatch; failures should be triaged as possible upstream schema
   drift or network outages, not as deterministic SDK regressions.
 
+Manual registry boundary checks:
+
+- **`npm run release:preflight`** — reads the SDK and creator versions from their workspace
+  manifests and fails unless both exact versions are absent from the configured npm registry. The
+  current `1.0.0` workspace versions are already published, so this command intentionally fails until
+  the manifests are bumped for a future release.
+- **`npm run verify:registry`** — requires both exact workspace versions to exist in the configured
+  registry, installs them into a disposable consumer, exercises ESM/CommonJS/TypeScript imports and
+  the installed creator CLI, then generates, installs, type-checks, and executes a Node minimal
+  project with manifest-count and failure-path assertions.
+
+Both commands depend on registry state and therefore remain outside `ci:verify`, `release:verify`,
+and normal pull-request CI. Run the preflight immediately before a future publish and the registry
+consumer verification immediately after it.
+
 Dependency freshness:
 
 - `.github/dependabot.yml` checks npm and GitHub Actions weekly. npm updates are grouped into

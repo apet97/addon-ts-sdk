@@ -38,4 +38,16 @@ npm run release:verify
 This runs the canonical `ci:verify` gate, the manual live schema freshness check, and both dry-run
 publish checks. The repository remains the source of truth for development and unreleased changes.
 
+For a future release, bump both package manifests and confirm the exact versions are unused before
+publishing. After publishing, install and execute those exact registry artifacts:
+
+```bash
+npm run release:preflight
+npm run verify:registry
+```
+
+The current workspace remains at the published `1.0.0` versions, so `release:preflight` is expected
+to fail until a future version bump. These registry-dependent commands are intentionally separate
+from deterministic `ci:verify` and `release:verify`.
+
 Independent, unofficial project — not affiliated with, endorsed by, or supported by Clockify or CAKE.com.

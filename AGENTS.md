@@ -28,6 +28,10 @@ Conventions for anyone (human or agent) working in this repository.
 - `@apet97/clockify-addon-sdk@1.0.0` and `create-clockify-addon@1.0.0` are public npm packages.
   Consumers install with `npm install @apet97/clockify-addon-sdk` or scaffold with
   `npm create clockify-addon@latest`.
+- `release:preflight` and `verify:registry` read both workspace versions dynamically. The former
+  fails unless exact versions are unpublished; the latter installs the exact published artifacts
+  and executes a generated Node minimal project. Both depend on registry state and stay outside
+  deterministic `ci:verify` and `release:verify`.
 - A sanitized 2026-07-12 authenticated Firefox pass at final runtime commit `e74e1f7` installed the
   packed Node all-features scaffold, observed successful manifest, `INSTALLED`, component,
   `NEW_TIME_ENTRY`, and `DELETED` requests, and confirmed exact-origin iframe enforcement in the
@@ -118,6 +122,8 @@ Conventions for anyone (human or agent) working in this repository.
 | `npm run verify:package-lint`              | Packs both artifacts with scripts ignored, then runs `publint --strict` and Are The Types Wrong: Node16 for the dual-format SDK and `esm-only` for the creator. Node10 findings are outside the supported runtime policy.                             |
 | `npm run verify:package-consumer`          | Packs the already-built package with scripts ignored, installs it into temporary runtime ESM/CJS and TypeScript ESM/CJS consumers, imports public subpaths, signs/verifies test tokens, type-checks declarations, and serves `/manifest`.             |
 | `npm run verify:scaffolds`                 | Packs the creator and SDK; generates Node/Worker minimal/all through the installed creator; installs, type-checks, and executes each; validates manifests/counts and failure paths; dry-runs both Worker entry points with Wrangler.                  |
+| `npm run release:preflight`                | Manual network gate: fails unless both exact workspace versions are absent from the configured npm registry. The published `1.0.0` versions intentionally fail until a future version bump.                                                           |
+| `npm run verify:registry`                  | Manual post-publish gate: installs both exact registry versions into a disposable consumer, checks ESM/CJS/TypeScript/creator entrypoints, and generates, type-checks, and executes a Node minimal project.                                           |
 | `npm run audit:prod` / `npm run audit:all` | Production and full dependency audits; both should report 0 vulnerabilities.                                                                                                                                                                          |
 
 GitHub Actions runs `npm run ci:verify` on Node 22.x and 24.x for pushes to `main` and `codex/**`,
@@ -130,10 +136,12 @@ generated Clockify models.
 
 ## Git / publish workflow
 
-- npm versions are immutable. Every future publish requires a version change, `npm run release:verify`,
-  a successful `npm whoami`, and explicit npm-owner approval for the exact packages and versions.
+- npm versions are immutable. Every future publish requires a version change, a successful
+  `npm run release:preflight`, `npm run release:verify`, a successful `npm whoami`, and explicit
+  npm-owner approval for the exact packages and versions.
 - When both packages change, publish the SDK first. Publish the creator only after the SDK succeeds,
-  then smoke-test both exact versions from the public registry in a fresh temporary consumer.
+  then run `npm run verify:registry` to smoke-test both exact versions from the public registry in a
+  fresh temporary consumer.
 - For direct `main` publishes, run the full gate, fetch `origin`, confirm `origin/main` is an ancestor,
   commit the branch, push `origin main` without force, and verify `origin/main...main` is `0 0`.
 - Do not open a PR when the user explicitly asks to push to `main`.

@@ -17,13 +17,21 @@ Run these commands from the repository root:
 
 ```bash
 npm ci
+npm run release:preflight
 npm run release:verify
 ```
+
+`npm run release:preflight` reads both workspace package versions and fails unless those exact
+versions are absent from the configured npm registry. Because the current workspace versions are
+the already-published `1.0.0` releases, it is expected to fail until both package manifests are
+bumped for a future release.
 
 `npm run release:verify` runs the canonical `npm run ci:verify` gate, including the public API
 snapshot check, the manual `npm run verify:schema-live` freshness check, and the dry-run publish
 checks. `verify:schema-live` depends on Clockify's live manifest schema endpoint, so keep it out of
 deterministic CI. Dry runs print package contents and registry checks without uploading anything.
+The version-aware preflight is also network-dependent and remains a separate manual release-boundary
+command rather than part of `ci:verify` or `release:verify`.
 
 The final dry-run publish commands remain separate for the SDK and creator packages:
 
@@ -55,14 +63,17 @@ After publishing, smoke-test both exact registry artifacts from a temporary cons
 repository:
 
 ```bash
-npm view @apet97/clockify-addon-sdk@1.0.0 version
-npm view create-clockify-addon@1.0.0 version
+npm run verify:registry
 ```
 
-Install the just-published SDK in fresh ESM/CJS/TypeScript consumers and import the root,
-`/clockify`, `/adapters`, `/testing`, and schema JSON subpaths. Install the creator, import its ESM
-API, run its help command, and generate a project that installs, type-checks, and executes. Do not
-treat a dry-run publish as registry installation proof.
+`verify:registry` reads the exact versions from both workspace manifests, requires both to exist in
+the configured registry, and installs those exact versions in a disposable consumer. It exercises
+SDK ESM, CommonJS, and TypeScript imports; imports the creator API; runs the installed creator's help
+command; then uses the version-pinned canonical `npm create` flow to generate a Node minimal project.
+The generated project must resolve the exact SDK version, type-check, serve a schema-valid manifest
+with one component and no lifecycle/webhook descriptors, return 404 for an unknown path, reject an
+unsigned component request, and fail closed without a public origin. The command always removes its
+temporary files. Do not treat a dry-run publish as registry installation proof.
 
 ## Final-SHA manual checkpoint
 

@@ -5,6 +5,7 @@ All notable changes to this SDK are recorded here.
 ## Unreleased
 
 - Correct post-publication security, architecture, and migration guidance.
+- Add version-aware npm release preflight and exact-registry consumer verification.
 
 ## 1.0.0 - 2026-07-12
 
