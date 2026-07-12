@@ -108,6 +108,9 @@ describe("published distribution docs", () => {
     expect(rootReadme).toContain("npm run verify:registry");
     expect(releaseReadiness).toContain("npm run release:preflight");
     expect(releaseReadiness).toContain("npm run verify:registry");
+    expect(releaseReadiness).toContain(
+      "`release:verify` and `release:dry-run` are also expected to fail",
+    );
     expect(releaseReadiness).not.toContain("npm view @apet97/clockify-addon-sdk@1.0.0 version");
     expect(releaseReadiness).toContain(
       "npm publish --dry-run -w @apet97/clockify-addon-sdk --access public",

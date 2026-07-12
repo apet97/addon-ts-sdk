@@ -29,7 +29,7 @@ Primary repo gate from the root:
 npm run ci:verify
 ```
 
-Release readiness check from the root:
+Future-release readiness check from the root, after bumping the package versions:
 
 ```bash
 npm run release:verify
@@ -47,7 +47,8 @@ npm run verify:registry
 ```
 
 The current workspace remains at the published `1.0.0` versions, so `release:preflight` is expected
-to fail until a future version bump. These registry-dependent commands are intentionally separate
-from deterministic `ci:verify` and `release:verify`.
+to fail until a future version bump. `release:verify` also ends in an expected immutable-version
+rejection at its `release:dry-run` step on this checkout. These registry-dependent commands are
+intentionally separate from deterministic `ci:verify`.
 
 Independent, unofficial project — not affiliated with, endorsed by, or supported by Clockify or CAKE.com.

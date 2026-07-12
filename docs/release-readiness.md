@@ -26,6 +26,10 @@ versions are absent from the configured npm registry. Because the current worksp
 the already-published `1.0.0` releases, it is expected to fail until both package manifests are
 bumped for a future release.
 
+On this published `1.0.0` checkout, `release:verify` and `release:dry-run` are also expected to fail
+when npm reaches its immutable-version registry check. That rejection is correct. Use the preflight
+first so a missing version bump fails quickly, before the more expensive local release gates run.
+
 `npm run release:verify` runs the canonical `npm run ci:verify` gate, including the public API
 snapshot check, the manual `npm run verify:schema-live` freshness check, and the dry-run publish
 checks. `verify:schema-live` depends on Clockify's live manifest schema endpoint, so keep it out of

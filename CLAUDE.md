@@ -31,7 +31,8 @@ Quick reference for Claude Code and other contributors working in this repositor
 - `release:preflight` and `verify:registry` read both workspace versions dynamically. The former
   fails unless exact versions are unpublished; the latter installs the exact published artifacts
   and executes a generated Node minimal project. Both depend on registry state and stay outside
-  deterministic `ci:verify` and `release:verify`.
+  deterministic `ci:verify` and `release:verify`. On the already-published `1.0.0` checkout,
+  `release:verify` also ends in the expected immutable-version rejection from `release:dry-run`.
 - A sanitized 2026-07-12 authenticated Firefox pass at final runtime commit `e74e1f7` installed the
   packed Node all-features scaffold, observed successful manifest, `INSTALLED`, component,
   `NEW_TIME_ENTRY`, and `DELETED` requests, and confirmed exact-origin iframe enforcement in the

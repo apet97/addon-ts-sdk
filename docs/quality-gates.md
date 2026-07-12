@@ -77,7 +77,9 @@ Manual registry boundary checks:
 
 Both commands depend on registry state and therefore remain outside `ci:verify`, `release:verify`,
 and normal pull-request CI. Run the preflight immediately before a future publish and the registry
-consumer verification immediately after it.
+consumer verification immediately after it. Because `release:verify` ends with `release:dry-run`,
+both also reject this checkout's already-published `1.0.0` versions; run them as future-release gates
+only after a version bump.
 
 Dependency freshness:
 
