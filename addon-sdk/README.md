@@ -162,6 +162,8 @@ const claims = await new ClockifySignatureParser("my-addon-key", publicKey).pars
   security baseline.
 - `ClockifyAddonClient` provides claim-driven token exchange and structured-settings transport.
 - Installation-store encryption and webhook idempotency leases cover server credential workflows.
+  Generation-aware deletion applies only when the caller supplies `installedAt`; the documented
+  Clockify `DELETED` payload has no generation, so unqualified cleanup is unconditional.
 - `@apet97/clockify-addon-sdk/ui` provides exact-origin iframe messaging, theme, language and date
   helpers.
 - `create-clockify-addon` scaffolds Node or Worker projects that fail closed until production origin,

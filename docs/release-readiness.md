@@ -21,10 +21,11 @@ check. `verify:schema-live` depends on Clockify's live manifest schema endpoint,
 deterministic CI. The final publish step is a dry run only: it should print the package contents and
 registry checks without uploading anything.
 
-The final dry-run publish command remains:
+The final dry-run publish commands remain separate for the SDK and creator packages:
 
 ```bash
 npm publish --dry-run -w @apet97/clockify-addon-sdk --access public
+npm publish --dry-run -w create-clockify-addon --access public
 ```
 
 ## Real publish boundary
@@ -36,6 +37,9 @@ Before a real first publish, confirm all of these are true:
 - The package owner with npm publish rights has approved the exact package name, version, and
   publish command.
 - The person publishing understands that the package currently has both ESM and CommonJS consumers.
+- A fresh authenticated developer-workspace pass has accepted the generated manifest and exercised
+  installation, component authentication, webhook delivery, and uninstall cleanup before any
+  Marketplace-readiness claim.
 
 Only after a real publish succeeds, smoke-test the registry artifact from a temporary consumer
 outside this repository:
@@ -47,6 +51,19 @@ npm view @apet97/clockify-addon-sdk version
 Then install the just-published version in a fresh ESM/CJS/TypeScript consumer and import the root,
 `/clockify`, `/adapters`, `/testing`, and schema JSON subpaths. Do not treat a dry-run publish as
 registry installation proof.
+
+Only after `create-clockify-addon` is actually present in the registry should documentation promote
+`npm create clockify-addon`; until then, use the repository-local creator entrypoint.
+
+## Latest manual checkpoint
+
+On 2026-07-12, an authenticated Firefox developer-workspace pass accepted a packed Node
+all-features scaffold, delivered the `INSTALLED` lifecycle and `NEW_TIME_ENTRY` webhook, rendered
+the signed component with the exact developer parent origin, and delivered `DELETED` during
+uninstall. The disposable entry, installation, tunnel, server, and temporary files were cleaned up.
+See `docs/marketplace-coverage.md` for the sanitized route/status receipt. This evidence does not
+remove the requirement to repeat the pass after relevant behavior changes or immediately before a
+future Marketplace release.
 
 ## Expected package shape
 

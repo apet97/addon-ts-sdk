@@ -7,11 +7,21 @@ All notable changes to this source-only SDK are recorded here.
 - Made the root entrypoint runtime-neutral and added granular Node, Express, Fetch, client, and UI
   subpaths.
 - Added draft-04 manifest validation, hardened browser responses, fail-closed public origins,
-  encrypted generation-aware installation storage, webhook idempotency leases, and stricter token
-  profiles.
+  encrypted installation storage with caller-qualified generation deletes, webhook idempotency
+  leases, and stricter token profiles.
 - Added Marketplace-specific add-on API transport and an exact-origin iframe bridge.
 - Added `create-clockify-addon` with packed SDK Node/Worker scaffold verification and Marketplace
   coverage documentation.
+- Prevented duplicate manifest descriptors by making registrations reuse identical predeclared
+  entries and reject conflicting same-path declarations before router mutation.
+- Added strict creator parsing for Node/Worker and minimal/all variants, split import-safe add-on
+  construction from runtime bootstraps, and made the packed scaffold gate execute all four variants.
+- Aligned malformed Node `Content-Length` handling with Fetch at HTTP 400 without error reporting,
+  rejected custom overrides of SDK-managed CSP directives, and constructed JSON headers directly.
+- Documented that Clockify `DELETED` payloads carry no installation generation, so unqualified
+  uninstall cleanup is unconditional even though the store supports caller-qualified guards.
+- Documented exact production versus developer-workspace iframe parent origins after a disposable
+  authenticated install, component, webhook, and uninstall validation completed successfully.
 
 - Added Express adapter coverage for array-valued query params and primitive response bodies.
 - Removed unreachable manifest-array fallback branches from Clockify add-on registration helpers.

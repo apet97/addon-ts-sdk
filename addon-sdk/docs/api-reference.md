@@ -105,7 +105,9 @@ Clockify entity REST SDK.
   `createClockifyJsonResponse()` supply no-store browser response defaults.
 - `resolveClockifyPublicOrigin()` requires configured HTTPS except for explicit localhost opt-in.
 - `ClockifyInstallationStore`, `InMemoryClockifyInstallationStore`, and
-  `wrapClockifyInstallationStoreWithEncryption()` cover generation-aware credential persistence.
+  `wrapClockifyInstallationStoreWithEncryption()` cover encrypted credential persistence. Passing
+  `installedAt` to `delete()` enables the generation guard; omitting it requests unconditional
+  deletion. Clockify's documented `DELETED` payload does not itself provide that generation.
 - `ClockifyIdempotencyLeaseStore` and `runClockifyIdempotentWebhook()` define owner-specific webhook
   processing.
 - `ClockifyAddonClient` uses `X-Addon-Token`, encoded path segments, abort/timeout handling,

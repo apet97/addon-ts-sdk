@@ -2,7 +2,7 @@
 
 Quick reference for Claude Code and other contributors working in this repository.
 
-## Current hardening checkpoint (2026-07-11)
+## Current hardening checkpoint (2026-07-12)
 
 - The root SDK entrypoint is runtime-neutral. Import Node, Express, and Fetch integration from the
   granular adapter subpaths; never reintroduce `node:*` through the root.
@@ -10,22 +10,29 @@ Quick reference for Claude Code and other contributors working in this repositor
   HTTPS configuration, and the UI bridge requires an exact parent origin and source.
 - Component and lifecycle JWTs require expiration. Webhook signatures may be non-expiring but still
   require RS256, issuer/type/subject, event, installation context, and stored-token checks.
-- Installation credentials, including nested webhook copies, are encrypted at rest. Stale lifecycle
-  generations must not delete newer installations; webhook leases remain owner-specific.
+- Installation credentials, including nested webhook copies, are encrypted at rest. The store's
+  generation guard applies only when a delete caller supplies `installedAt`. Clockify's `DELETED`
+  payload has no generation, so the generated unqualified uninstall cleanup is unconditional.
 - Outbound mutations replay only a confirmed 429. Safe reads may retry transient failures; caller
   aborts are terminal.
 - Draft-04 manifest validation covers vendored schema versions 1.2-1.5. The creator package emits
-  fail-closed Node and Worker projects; ephemeral installation storage is local-development-only.
-- The 2026-07-11 production-readiness pass completed 232 tests, thresholded coverage, installed
-  ESM/CJS consumer checks, both packed-package dry runs, Node/Worker scaffold type-checks, zero
-  dependency advisories, and Node 22/24 GitHub Actions. This is not a substitute for a fresh
-  authenticated Clockify developer-workspace pass before Marketplace release.
+  fail-closed Node and Worker projects in minimal and all-feature modes; ephemeral installation
+  storage is local-development-only.
+- `verify:scaffolds` installs the packed SDK into all four runtime/feature variants, executes their
+  runtime manifests, validates exact descriptor counts, and probes 404, component-auth failure, and
+  production configuration failure. This is not a substitute for a fresh authenticated Clockify
+  developer-workspace pass before Marketplace release.
+- A sanitized 2026-07-12 authenticated Firefox pass installed the packed Node all-features
+  scaffold, observed successful `INSTALLED`, `NEW_TIME_ENTRY`, component, and `DELETED` requests,
+  and confirmed exact-origin iframe enforcement in the developer workspace. That receipt applies
+  to this checkpoint only; rerun it after relevant manifest, request, scaffold, or security changes.
 - CodeRabbit was unavailable for that pass. Local package, cycle, API-surface, security-boundary,
   and diff reviews were used; do not describe this as a CodeRabbit-reviewed release.
 
 - Keep Node `http` and Fetch body-limit semantics aligned: declared `content-length` values above
   `maxBodyBytes` must fail before routing, and streamed bodies must still fail once the byte counter
-  crosses the limit. Express body limits stay with the host app.
+  crosses the limit. Malformed declared lengths return 400 without invoking `onError`. Express body
+  limits stay with the host app.
 - Runtime support starts at Node 22, so `@types/node` stays on `^22` unless the runtime support
   contract changes. Do not accept Node 26 ambient types as a routine Dependabot bump.
 - The SDK-tooling Dependabot lane can move ESLint, Prettier, and Vite together, but rerun
@@ -38,8 +45,8 @@ Quick reference for Claude Code and other contributors working in this repositor
 
 - `addon-sdk/` — the published package (`@apet97/clockify-addon-sdk`). All SDK code, schemas,
   examples, and tests live here. Run package commands from this directory.
-- `create-clockify-addon/` — the creator package. Its Node and Worker projects must install and
-  type-check against the packed SDK, not workspace source.
+- `create-clockify-addon/` — the creator package. Its Node/Worker minimal/all projects must install,
+  type-check, and execute against the packed SDK, not workspace source.
 - Root npm scripts proxy the package gates through npm workspaces; use `npm run ci:verify` from the
   repo root for the full local/CI verification chain.
 
@@ -98,10 +105,10 @@ Quick reference for Claude Code and other contributors working in this repositor
 | `npm run build`                            | ESM + CJS output.                                                                                                                                                                                                                                     |
 | `npm run verify:public-api`                | Compares built declaration surfaces for root, Clockify, adapters, client, UI, and testing entrypoints against `addon-sdk/public-api.snapshot.md`.                                                                                                     |
 | `npm run verify:dist`                      | Imports the **built** ESM and CJS and boots the quick-start. A green `build` alone does not prove the package imports.                                                                                                                                |
-| `npm run pack:dry-run`                     | SDK tarball contents (`dist` + `docs` + schemas + license/readme) and the separate creator tarball (`bin` + `src` + license/readme).                                                                                                                   |
+| `npm run pack:dry-run`                     | SDK tarball contents (`dist` + `docs` + schemas + license/readme) and the separate creator tarball (`bin` + `src` + license/readme).                                                                                                                  |
 | `npm run verify:package-lint`              | Packs the already-built package with scripts ignored, then runs `publint --strict` and Are The Types Wrong with the Node16 profile. Node10 findings are intentionally outside this Node 22+ package's support policy.                                 |
 | `npm run verify:package-consumer`          | Packs the already-built package with scripts ignored, installs it into temporary runtime ESM/CJS and TypeScript ESM/CJS consumers, imports public subpaths, signs/verifies test tokens, type-checks declarations, and serves `/manifest`.             |
-| `npm run verify:scaffolds`                 | Packs the SDK, generates Node and Worker all-feature projects, installs them, and type-checks both.                                                                                                                                                   |
+| `npm run verify:scaffolds`                 | Packs the SDK; installs, type-checks, and executes Node/Worker minimal/all projects; validates `/manifest` and exact descriptor counts; probes 404, component auth failure, and fail-closed production configuration.                                 |
 | `npm run audit:prod` / `npm run audit:all` | Production and full dependency audits; both should report 0 vulnerabilities.                                                                                                                                                                          |
 
 GitHub Actions runs `npm run ci:verify` on Node 22.x and 24.x for pushes to `main` and `codex/**`,

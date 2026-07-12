@@ -23,14 +23,18 @@ Clockify. It is source-only for now and is not published to the npm registry.
   the generated schema builders.
 - Adapters for Node.js `http`, Express, and Fetch API. Node and Fetch enforce a default 1 MiB body
   limit before dispatch, including oversized declared `content-length` values and streamed bodies
-  that cross the byte limit; Express remains an optional peer with body limits owned by the host app.
+  that cross the byte limit. Malformed declared lengths return 400 without entering application
+  error reporting; Express remains an optional peer with body limits owned by the host app.
 - Optional `onError(error, context)` reporting for handled router, Fetch, and Node adapter errors.
 - Source package documentation and vendored manifest schemas.
-- Runtime draft-04 manifest validation, hardened HTML/JSON responses, and fail-closed public-origin
-  resolution.
-- Encrypted installation-store contracts, generation-aware deletion, and webhook idempotency leases.
+- Runtime draft-04 manifest validation, hardened HTML/JSON responses, SDK-owned CSP directives that
+  cannot be overridden, and fail-closed public-origin resolution.
+- Encrypted installation-store contracts, caller-qualified generation deletion, and webhook
+  idempotency leases. An unqualified delete is unconditional because Clockify's `DELETED` payload
+  does not carry an installation generation.
 - Marketplace-specific add-on token exchange/settings transport and a secure iframe UI bridge.
-- A separate creator workspace that produces packed-SDK-verified Node and Worker projects.
+- A separate creator workspace whose Node/Worker minimal/all projects install the packed SDK,
+  type-check, execute their runtime, and serve schema-valid manifests with exact route counts.
 
 ### Exclusions
 
