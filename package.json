@@ -15,6 +15,7 @@
     "verify:dist": "npm run verify:dist -w @apet97/clockify-addon-sdk",
     "verify:package-lint": "npm run verify:package-lint -w @apet97/clockify-addon-sdk",
     "verify:package-consumer": "npm run verify:package-consumer -w @apet97/clockify-addon-sdk",
+    "verify:registry": "node scripts/verify-registry-consumer.mjs",
     "verify:scaffolds": "node create-clockify-addon/scripts/verify-scaffolds.mjs",
     "dev:clockify-local": "npm run dev:clockify-local -w @apet97/clockify-addon-sdk",
     "test:replay": "npm run test:replay -w @apet97/clockify-addon-sdk",

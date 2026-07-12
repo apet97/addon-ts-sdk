@@ -9,6 +9,7 @@ const execFileAsync = promisify(execFile);
 const packageRoot = process.cwd();
 const repoRoot = resolve(packageRoot, "..");
 const scriptPath = resolve(repoRoot, "scripts", "release-preflight.mjs");
+const registryVerifierPath = resolve(repoRoot, "scripts", "verify-registry-consumer.mjs");
 const rootPackageJson = JSON.parse(readFileSync(resolve(repoRoot, "package.json"), "utf8"));
 const sdkPackageJson = JSON.parse(
   readFileSync(resolve(repoRoot, "addon-sdk", "package.json"), "utf8"),
@@ -57,6 +58,15 @@ function packageName(requestUrl: string | undefined): string {
 }
 
 describe("release registry verification", () => {
+  it("wires exact-registry consumer verification outside deterministic gates", () => {
+    expect(existsSync(registryVerifierPath)).toBe(true);
+    expect(rootPackageJson.scripts["verify:registry"]).toBe(
+      "node scripts/verify-registry-consumer.mjs",
+    );
+    expect(rootPackageJson.scripts["ci:verify"]).not.toContain("verify:registry");
+    expect(rootPackageJson.scripts["release:verify"]).not.toContain("verify:registry");
+  });
+
   it("wires a manual version-aware preflight outside deterministic gates", async () => {
     expect(existsSync(scriptPath)).toBe(true);
     expect(rootPackageJson.scripts["release:preflight"]).toBe("node scripts/release-preflight.mjs");
