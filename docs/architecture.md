@@ -5,7 +5,7 @@
 - The root and `/clockify` entrypoints contain manifests, routing, verification, security,
   lifecycle/storage primitives and the Fetch-based add-on client.
 - `/adapters/node`, `/adapters/express`, and `/adapters/fetch` isolate host integration. The legacy
-  `/adapters` aggregate remains available for source users but is Node-oriented.
+  `/adapters` aggregate remains available for package consumers but is Node-oriented.
 - `/client` contains Marketplace-specific token exchange, settings and generic authenticated
   transport. Entity-specific Clockify REST APIs remain in the separate `clockify-ts-sdk` project.
 - `/ui` is browser-only and fails closed unless the exact Clockify parent origin is supplied.

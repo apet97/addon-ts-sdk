@@ -1,7 +1,7 @@
-# Pre-release API Migration
+# 1.0 API Migration
 
-The package has not been published to npm, so this branch performs the one permitted API cleanup
-before the first release: Node-only adapters are no longer re-exported from the root.
+Before the public `1.0.0` release, Node-only adapters stopped being re-exported from the root so
+browser and Worker consumers could import the runtime-neutral entrypoint.
 
 ```ts
 // Before: root or aggregate adapter import

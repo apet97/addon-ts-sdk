@@ -2,6 +2,10 @@
 
 All notable changes to this SDK are recorded here.
 
+## Unreleased
+
+- Correct post-publication security, architecture, and migration guidance.
+
 ## 1.0.0 - 2026-07-12
 
 - Published `@apet97/clockify-addon-sdk` and `create-clockify-addon` as public npm packages.

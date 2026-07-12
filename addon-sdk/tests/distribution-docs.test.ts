@@ -48,6 +48,12 @@ describe("published distribution docs", () => {
       resolve(repoRoot, "docs", "release-readiness.md"),
       "utf8",
     );
+    const securityPolicy = readFileSync(resolve(repoRoot, "SECURITY.md"), "utf8");
+    const architecture = readFileSync(resolve(repoRoot, "docs", "architecture.md"), "utf8");
+    const preReleaseMigration = readFileSync(
+      resolve(repoRoot, "docs", "pre-release-migration.md"),
+      "utf8",
+    );
     const qualityGates = readFileSync(resolve(repoRoot, "docs", "quality-gates.md"), "utf8");
     const dependencyStrategy = readFileSync(
       resolve(packageRoot, "docs", "dependency-strategy.md"),
@@ -78,11 +84,21 @@ describe("published distribution docs", () => {
       creatorReadme,
       productSurface,
       releaseReadiness,
+      securityPolicy,
+      architecture,
+      preReleaseMigration,
     ]) {
       expect(document).not.toContain("source-only");
       expect(document).not.toContain("not published to the npm registry");
+      expect(document).not.toContain("not been published to npm");
+      expect(document).not.toContain("no published npm version");
     }
 
+    expect(securityPolicy).toContain("current npm `latest` release");
+    expect(preReleaseMigration).toContain("Before the public `1.0.0` release");
+    expect(architecture).toMatch(
+      /legacy\s+`\/adapters` aggregate remains available for package consumers/,
+    );
     expect(packageReadme).not.toContain("git+https://github.com/apet97/addon-ts-sdk.git#main");
     expect(packageReadme).toContain("npm pack --dry-run");
     expect(packageReadme).toContain("## Fetch and edge runtimes");
