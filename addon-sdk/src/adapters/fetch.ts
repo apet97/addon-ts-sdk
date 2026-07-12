@@ -9,11 +9,6 @@ import {
 } from "./body-limit";
 
 async function readFetchBody(request: Request, maxBodyBytes: number): Promise<Uint8Array> {
-  const contentLength = request.headers.get("content-length");
-  if ((parseContentLength(contentLength) ?? 0) > maxBodyBytes) {
-    throw new PayloadTooLargeError(maxBodyBytes);
-  }
-
   const clone = request.clone();
   if (!clone.body) return new Uint8Array();
 
@@ -59,9 +54,13 @@ export async function handleFetchRequest(
     let rawBody: Uint8Array | undefined = undefined;
     let body: unknown = undefined;
 
-    // Clone or check request body presence
-    if (request.body && request.method !== "GET" && request.method !== "HEAD") {
-      try {
+    try {
+      const contentLength = request.headers.get("content-length");
+      if ((parseContentLength(contentLength) ?? 0) > maxBodyBytes) {
+        throw new PayloadTooLargeError(maxBodyBytes);
+      }
+
+      if (request.body && request.method !== "GET" && request.method !== "HEAD") {
         rawBody = await readFetchBody(request, maxBodyBytes);
         if (rawBody.length > 0) {
           const text = new TextDecoder().decode(rawBody);
@@ -71,12 +70,12 @@ export async function handleFetchRequest(
             body = text;
           }
         }
-      } catch (e) {
-        if (e instanceof PayloadTooLargeError) {
-          return new Response("Payload Too Large", { status: 413 });
-        }
-        return new Response("Bad Request", { status: 400 });
       }
+    } catch (e) {
+      if (e instanceof PayloadTooLargeError) {
+        return new Response("Payload Too Large", { status: 413 });
+      }
+      return new Response("Bad Request", { status: 400 });
     }
 
     const headers: Record<string, string> = {};

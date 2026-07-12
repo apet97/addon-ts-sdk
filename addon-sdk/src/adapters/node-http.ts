@@ -41,11 +41,16 @@ async function readBody(req: IncomingMessage, maxBodyBytes: number): Promise<Uin
   });
 }
 
+function parseNodeRequestUrl(requestTarget: string | undefined): URL {
+  const target = requestTarget || "";
+  return new URL(target.startsWith("/") ? `http://localhost${target}` : target, "http://localhost");
+}
+
 export async function fromNodeRequest(
   req: IncomingMessage,
   options: BodyLimitOptions = {},
 ): Promise<AddonRequest> {
-  const url = new URL(req.url || "", `http://${req.headers.host || "localhost"}`);
+  const url = parseNodeRequestUrl(req.url);
   const maxBodyBytes = resolveMaxBodyBytes(options);
   if (contentLengthExceedsLimit(req.headers, maxBodyBytes)) {
     throw new PayloadTooLargeError(maxBodyBytes);

@@ -219,6 +219,49 @@ describe("Adapters", () => {
     expect(dispatched).toBe(false);
   });
 
+  it.each(["GET", "HEAD"])(
+    "returns 413 for an oversized declared length on %s without dispatching or reporting",
+    async (method) => {
+      const onError = vi.fn();
+      const addon = new ClockifyAddon(mockManifest);
+      const handler = vi.fn(() => ({ status: 204 }));
+      addon.registerHandler("/component", "GET", handler);
+
+      const response = await handleFetchRequest(
+        addon,
+        new Request("https://example.com/component", {
+          method,
+          headers: { "content-length": "5" },
+        }),
+        { maxBodyBytes: 4, onError },
+      );
+
+      expect(response.status).toBe(413);
+      expect(handler).not.toHaveBeenCalled();
+      expect(onError).not.toHaveBeenCalled();
+    },
+  );
+
+  it("returns 400 for a malformed declared length on GET without dispatching or reporting", async () => {
+    const onError = vi.fn();
+    const addon = new ClockifyAddon(mockManifest);
+    const handler = vi.fn(() => ({ status: 204 }));
+    addon.registerHandler("/component", "GET", handler);
+
+    const response = await handleFetchRequest(
+      addon,
+      new Request("https://example.com/component", {
+        method: "GET",
+        headers: { "content-length": "007" },
+      }),
+      { onError },
+    );
+
+    expect(response.status).toBe(400);
+    expect(handler).not.toHaveBeenCalled();
+    expect(onError).not.toHaveBeenCalled();
+  });
+
   it("returns 400 for a malformed Fetch content-length without dispatching", async () => {
     const addon = new ClockifyAddon(mockManifest);
     const handler = vi.fn(() => ({ status: 204 }));

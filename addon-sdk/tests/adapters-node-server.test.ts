@@ -62,6 +62,27 @@ describe("Node HTTP server boot (integration)", () => {
     expect(res.status).toBe(404);
   });
 
+  it("does not reinterpret a double-slash request target as a different authority", async () => {
+    const addon = new ClockifyAddon(base());
+    const handler = vi.fn(() => ({ status: 204 }));
+    addon.registerHandler("/component", "GET", handler);
+    const port = await listen(addon);
+
+    const response = await sendRawHttp(
+      port,
+      [
+        "GET //other.example/component HTTP/1.1",
+        "Host: localhost",
+        "Connection: close",
+        "",
+        "",
+      ].join("\r\n"),
+    );
+
+    expect(response).toMatch(/^HTTP\/1\.1 404 /);
+    expect(handler).not.toHaveBeenCalled();
+  });
+
   it("dispatches a POST webhook handler over the wire", async () => {
     const addon = new ClockifyAddon(base());
     const webhook = generated.v1_4
