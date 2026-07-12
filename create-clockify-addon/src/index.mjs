@@ -234,7 +234,10 @@ export async function scaffoldClockifyAddon(options) {
     type: "module",
     scripts: {
       typecheck: "tsc --noEmit",
-      start: options.runtime === "node" ? "tsx src/index.ts" : "wrangler dev",
+      start:
+        options.runtime === "node"
+          ? "tsx src/index.ts"
+          : "wrangler dev src/index.ts",
     },
     dependencies: { "@apet97/clockify-addon-sdk": sdkSpec },
     devDependencies: {

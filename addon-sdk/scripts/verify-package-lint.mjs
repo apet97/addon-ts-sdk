@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 
 const require = createRequire(import.meta.url);
 const packageRoot = fileURLToPath(new URL("..", import.meta.url));
+const creatorRoot = join(packageRoot, "..", "create-clockify-addon");
 const workspace = mkdtempSync(join(tmpdir(), "clockify-addon-sdk-package-lint-"));
 const attwPackageJson = require.resolve("@arethetypeswrong/cli/package.json");
 const publintBin = join(dirname(require.resolve("publint")), "cli.js");
@@ -21,19 +22,22 @@ function run(command, args, options = {}) {
 }
 
 try {
-  const output = run(
-    "npm",
-    ["pack", "--ignore-scripts", "--pack-destination", workspace, "--json"],
-    { stdio: "pipe" },
-  );
-  const [{ filename }] = JSON.parse(output);
-  const tarball = join(workspace, filename);
+  for (const { root, profile } of [
+    { root: packageRoot, profile: "node16" },
+    { root: creatorRoot, profile: "esm-only" },
+  ]) {
+    const output = run(
+      "npm",
+      ["pack", "--ignore-scripts", "--pack-destination", workspace, "--json"],
+      { cwd: root, stdio: "pipe" },
+    );
+    const [{ filename }] = JSON.parse(output);
+    const tarball = join(workspace, filename);
 
-  run(process.execPath, [publintBin, "run", tarball, "--strict"]);
-  run(process.execPath, [attwBin, tarball, "--profile", "node16"]);
-  console.log(
-    "verify:package-lint OK - publint and Are The Types Wrong pass for the packed tarball.",
-  );
+    run(process.execPath, [publintBin, "run", tarball, "--strict"]);
+    run(process.execPath, [attwBin, tarball, "--profile", profile]);
+  }
+  console.log("verify:package-lint OK - both packed packages pass publint and type resolution.");
 } finally {
   rmSync(workspace, { recursive: true, force: true });
 }

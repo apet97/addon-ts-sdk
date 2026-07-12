@@ -1,10 +1,8 @@
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-
-import { scaffoldClockifyAddon } from "../src/index.mjs";
 
 const root = fileURLToPath(new URL("../..", import.meta.url));
 const tsxCli = fileURLToPath(import.meta.resolve("tsx/cli"));
@@ -15,6 +13,53 @@ const variants = [
   { name: "worker-minimal", runtime: "worker", features: "minimal" },
   { name: "worker-all", runtime: "worker", features: "all" },
 ];
+
+function packWorkspace(workspace) {
+  const output = execFileSync(
+    "npm",
+    [
+      "pack",
+      "--ignore-scripts",
+      "--pack-destination",
+      temp,
+      "--json",
+      "-w",
+      workspace,
+    ],
+    { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "inherit"] },
+  );
+  const [{ filename } = {}] = JSON.parse(output);
+  if (!filename)
+    throw new Error(`Packed ${workspace} tarball was not created.`);
+  return join(temp, filename);
+}
+
+function installPackedCreator(tarball) {
+  const directory = join(temp, "creator-runner");
+  mkdirSync(directory, { recursive: true });
+  writeFileSync(
+    join(directory, "package.json"),
+    JSON.stringify({ private: true, type: "module" }, null, 2) + "\n",
+  );
+  execFileSync(
+    "npm",
+    ["install", "--ignore-scripts", "--no-audit", "--no-fund", tarball],
+    {
+      cwd: directory,
+      stdio: "inherit",
+    },
+  );
+  const script = join(directory, "create-project.mjs");
+  writeFileSync(
+    script,
+    `import { scaffoldClockifyAddon } from "create-clockify-addon";
+
+const [directory, runtime, features, sdkSpec] = process.argv.slice(2);
+await scaffoldClockifyAddon({ directory, runtime, features, sdkSpec });
+`,
+  );
+  return script;
+}
 
 function runtimeProbeSource({ runtime, features }) {
   const expectedLifecycle = features === "all" ? 2 : 0;
@@ -79,38 +124,53 @@ ${runtimeProbe}
 }
 
 try {
-  execFileSync(
-    "npm",
-    [
-      "pack",
-      "--ignore-scripts",
-      "--pack-destination",
-      temp,
-      "-w",
-      "@apet97/clockify-addon-sdk",
-    ],
-    { cwd: root, stdio: "inherit" },
-  );
-  const tarballName = readdirSync(temp).find((name) => name.endsWith(".tgz"));
-  if (!tarballName) throw new Error("Packed SDK tarball was not created.");
-  const tarball = join(temp, tarballName);
+  const tarball = packWorkspace("@apet97/clockify-addon-sdk");
+  const creatorTarball = packWorkspace("create-clockify-addon");
+  const creatorRunner = installPackedCreator(creatorTarball);
 
   for (const variant of variants) {
     const directory = join(temp, variant.name);
-    await scaffoldClockifyAddon({
+    execFileSync(process.execPath, [
+      creatorRunner,
       directory,
-      runtime: variant.runtime,
-      features: variant.features,
-      sdkSpec: `file:${tarball}`,
-    });
-    execFileSync("npm", ["install", "--ignore-scripts", "--no-audit", "--no-fund"], {
-      cwd: directory,
-      stdio: "inherit",
-    });
+      variant.runtime,
+      variant.features,
+      `file:${tarball}`,
+    ]);
+    execFileSync(
+      "npm",
+      ["install", "--ignore-scripts", "--no-audit", "--no-fund"],
+      {
+        cwd: directory,
+        stdio: "inherit",
+      },
+    );
     execFileSync("npm", ["run", "typecheck"], {
       cwd: directory,
       stdio: "inherit",
     });
+    if (variant.runtime === "worker") {
+      execFileSync(
+        "npm",
+        [
+          "exec",
+          "--",
+          "wrangler",
+          "deploy",
+          "src/index.ts",
+          "--name",
+          variant.name,
+          "--compatibility-date",
+          "2026-07-12",
+          "--dry-run",
+        ],
+        {
+          cwd: directory,
+          env: { ...process.env, WRANGLER_SEND_METRICS: "false" },
+          stdio: "inherit",
+        },
+      );
+    }
     const probe = join(directory, "verify-runtime.mjs");
     writeFileSync(probe, runtimeProbeSource(variant));
     execFileSync(process.execPath, [tsxCli, probe], {
@@ -120,7 +180,7 @@ try {
   }
 
   console.log(
-    "verify:scaffolds OK - packed SDK executes Node and Worker minimal/all projects with valid manifests and fail-closed routes.",
+    "verify:scaffolds OK - packed creator and SDK execute Node/Worker minimal/all projects with valid manifests, Worker dry-runs, and fail-closed routes.",
   );
 } finally {
   rmSync(temp, { recursive: true, force: true });

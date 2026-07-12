@@ -33,6 +33,23 @@ function runCreator(args: readonly string[]): Promise<{
 }
 
 describe("create-clockify-addon", () => {
+  it("ships a typed programmatic export and a real workspace test command", async () => {
+    const packageJson = JSON.parse(
+      await readFile(
+        resolve(import.meta.dirname, "../../create-clockify-addon/package.json"),
+        "utf8",
+      ),
+    );
+
+    expect(packageJson.types).toBe("./src/index.d.ts");
+    expect(packageJson.exports).toEqual({
+      ".": { types: "./src/index.d.ts", import: "./src/index.mjs" },
+    });
+    expect(packageJson.scripts.test).toBe(
+      "npm test -w @apet97/clockify-addon-sdk -- tests/creator.test.ts",
+    );
+  });
+
   it.each(["node", "worker"] as const)("creates a fail-closed %s project", async (runtime) => {
     const parent = await mkdtemp(join(tmpdir(), "clockify-addon-creator-"));
     const directory = join(parent, `${runtime}-addon`);
@@ -112,7 +129,7 @@ describe("create-clockify-addon", () => {
         const source = await readFile(join(directory, "src", "addon.ts"), "utf8");
         const bootstrap = await readFile(join(directory, "src", "index.ts"), "utf8");
         expect(packageJson.scripts.start).toBe(
-          runtime === "node" ? "tsx src/index.ts" : "wrangler dev",
+          runtime === "node" ? "tsx src/index.ts" : "wrangler dev src/index.ts",
         );
         expect(bootstrap).toContain(
           `@apet97/clockify-addon-sdk/adapters/${runtime === "node" ? "node" : "fetch"}`,
