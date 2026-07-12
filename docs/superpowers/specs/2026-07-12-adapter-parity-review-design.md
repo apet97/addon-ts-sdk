@@ -42,8 +42,7 @@ remain responsible for enforcing the streamed byte count.
 
 Node and the Express fallback will share one internal raw-target parser. Registration will treat a
 missing optional descriptor array as an empty list and attach it only after route registration
-succeeds. Its structural comparator will visit every array index instead of relying on
-`Array.prototype.every`, which skips sparse slots.
+succeeds.
 
 The Worker package script will name `src/index.ts` explicitly. The creator will retain its ESM
 programmatic export and add a declaration file for that existing API. Packed-artifact verification
@@ -65,8 +64,7 @@ a Fetch body, the existing bounded stream reader parses JSON or text as before.
 
 For registration, a valid manifest with an absent optional collection receives that collection only
 after the corresponding handler is registered. Conflicting descriptors still fail before either
-the router or manifest changes. Nested sparse arrays in descriptors are compared index-by-index, so
-a hole cannot conceal a conflicting value.
+the router or manifest changes.
 
 For creator projects, `npm start` for Worker variants invokes `wrangler dev src/index.ts`. The packed
 creator module remains importable as ESM and its declaration exposes the exact runtime/features
@@ -84,7 +82,6 @@ Focused regression tests will prove the old behavior first and the fixed behavio
 - Existing POST declared-length and streamed-length tests continue to pass.
 - Schema-valid raw manifests with no descriptor arrays can register one component, lifecycle event,
   and webhook without duplication or partial mutation.
-- A sparse nested descriptor array conflicts with a populated value at the same index.
 - An Express-like request with no `path` preserves a leading-`//` URL and returns 404.
 - The real generated Worker start command includes its entry point, and Wrangler can dry-run that
   entry point after installation.

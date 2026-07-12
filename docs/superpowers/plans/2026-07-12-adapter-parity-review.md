@@ -4,13 +4,13 @@
 > (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use
 > checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Make Node HTTP and Fetch request handling obey the same documented path and declared-body
-limit contracts, then finish the current non-security adversarial review.
+**Goal:** Correct all confirmed non-security request, registration, Worker-start, and creator-package
+failures, then finish the current adversarial review.
 
-**Architecture:** Keep the correction inside the two runtime adapters. Node will preserve leading
-slashes while parsing its raw request target; Fetch will validate `Content-Length` before deciding
-whether the method exposes a readable body. Public APIs, dependencies, router semantics, and
-scaffolds remain unchanged.
+**Architecture:** Keep request corrections inside the runtime adapters, initialize optional
+manifest collections only after successful route registration, and retain the creator's existing
+ESM API while adding declarations. Verify generated variants through the packed creator and compile
+Worker entry points with Wrangler. Dependencies and SDK public APIs remain unchanged.
 
 **Tech Stack:** TypeScript 6, Node 22 HTTP, Fetch API, Vitest 4, npm workspaces.
 
@@ -18,7 +18,7 @@ scaffolds remain unchanged.
 
 - Keep the root entrypoint runtime-neutral and do not add runtime dependencies.
 - Keep `AGENTS.md` and `CLAUDE.md` synchronized except for their headings and introductions.
-- Use test-first red-green-refactor for both runtime changes.
+- Use test-first red-green-refactor for every behavior change.
 - Keep security assessment explicitly out of scope.
 - Do not publish, tag, submit to Marketplace, push, or modify another repository.
 
@@ -276,7 +276,370 @@ git commit -m "Document adapter request parity"
 
 ---
 
-### Task 4: Finish the non-security adversarial review
+### Task 4: Register against valid manifests with absent arrays
+
+**Files:**
+- Modify: `addon-sdk/tests/clockify.test.ts`
+- Modify: `addon-sdk/src/clockify/clockify-addon.ts`
+
+**Interfaces:**
+- Consumes: schema-valid `ClockifyManifest<"1.4">` values whose optional descriptor arrays are
+  absent.
+- Produces: unchanged `registerComponent`, `registerLifecycleEvent`, and `registerWebhook` methods
+  that attach arrays only after successful route registration.
+
+- [ ] **Step 1: Write the failing absent-array regression test**
+
+Import `createValidatedClockifyAddon`, then add:
+
+```ts
+it("registers routes against schema-valid manifests with absent optional arrays", () => {
+  const manifest: ClockifyManifest<"1.4"> = {
+    schemaVersion: "1.4",
+    key: "raw-valid-addon",
+    name: "Raw Valid Addon",
+    baseUrl: "https://example.com/addon",
+    minimalSubscriptionPlan: "BASIC",
+  };
+  const addon = createValidatedClockifyAddon(manifest);
+  const component = generated.v1_4
+    .ClockifyComponentBuilder()
+    .type("sidebar")
+    .allowEveryone()
+    .path("/component/raw")
+    .label("Raw component")
+    .build();
+  const lifecycle = generated.v1_4
+    .ClockifyLifecycleEventBuilder()
+    .path("/lifecycle/raw")
+    .onInstalled()
+    .build();
+  const webhook = generated.v1_4
+    .ClockifyWebhookBuilder()
+    .event("NEW_PROJECT")
+    .path("/webhooks/raw")
+    .build();
+
+  addon.registerComponent(component, () => ({ status: 204 }));
+  addon.registerLifecycleEvent(lifecycle, () => ({ status: 204 }));
+  addon.registerWebhook(webhook, () => ({ status: 204 }));
+
+  expect(addon.getManifest().components).toEqual([component]);
+  expect(addon.getManifest().lifecycle).toEqual([lifecycle]);
+  expect(addon.getManifest().webhooks).toEqual([webhook]);
+});
+```
+
+- [ ] **Step 2: Verify the test fails for the reproduced reason**
+
+```bash
+npm test -w @apet97/clockify-addon-sdk -- tests/clockify.test.ts \
+  -t "absent optional arrays"
+```
+
+Expected: the case throws while reading `find` from `undefined`.
+
+- [ ] **Step 3: Return initialized manifest entries**
+
+Change `registerManifestRoute` to accept `T[] | undefined` and return the array it used:
+
+```ts
+function registerManifestRoute<T extends { readonly path: string }>(
+  addon: { registerHandler(path: string, method: string, handler: RequestHandler): void },
+  kind: string,
+  entries: T[] | undefined,
+  descriptor: T,
+  method: string,
+  handler: RequestHandler,
+): T[] {
+  const manifestEntries = entries ?? [];
+  const existing = manifestEntries.find((entry) => entry.path === descriptor.path);
+  if (existing && !descriptorsEqual(existing, descriptor)) {
+    throw new IllegalArgumentException(
+      `Conflicting ${kind} is already declared for path ${descriptor.path}.`,
+    );
+  }
+
+  addon.registerHandler(descriptor.path, method, handler);
+  if (!existing) manifestEntries.push(descriptor);
+  return manifestEntries;
+}
+```
+
+Assign each returned array to `m.webhooks`, `m.lifecycle`, or `m.components` after the helper
+returns.
+
+- [ ] **Step 4: Verify the full registration suite passes**
+
+```bash
+npm test -w @apet97/clockify-addon-sdk -- tests/clockify.test.ts
+```
+
+- [ ] **Step 5: Commit registration hardening**
+
+```bash
+git add addon-sdk/src/clockify/clockify-addon.ts addon-sdk/tests/clockify.test.ts
+git commit -m "Support manifests with optional descriptor arrays"
+```
+
+---
+
+### Task 5: Share raw-target parsing with Express-like fallbacks
+
+**Files:**
+- Create: `addon-sdk/src/adapters/request-target.ts`
+- Modify: `addon-sdk/src/adapters/node-http.ts`
+- Modify: `addon-sdk/src/adapters/express.ts`
+- Modify: `addon-sdk/tests/adapters.test.ts`
+
+**Interfaces:**
+- Consumes: an optional raw HTTP request target.
+- Produces: internal `parseHttpRequestTarget(requestTarget): URL`, used only by Node and Express
+  adapter implementation files.
+
+- [ ] **Step 1: Write the failing Express fallback regression test**
+
+Add this beside the existing Express URL-query fallback test:
+
+```ts
+it("preserves leading slashes when Express-like req.path is unavailable", async () => {
+  const addon = new ClockifyAddon(mockManifest);
+  const route = vi.fn(() => ({ status: 204 }));
+  addon.registerHandler("/component", "GET", route);
+  const handler = createExpressAddonHandler(addon);
+  const mockRes = {
+    status: vi.fn().mockReturnThis(),
+    set: vi.fn().mockReturnThis(),
+    json: vi.fn().mockReturnThis(),
+    send: vi.fn().mockReturnThis(),
+    end: vi.fn().mockReturnThis(),
+  };
+
+  await handler(
+    { method: "GET", url: "//other.example/component", headers: {} },
+    mockRes,
+  );
+
+  expect(mockRes.status).toHaveBeenCalledWith(404);
+  expect(route).not.toHaveBeenCalled();
+});
+```
+
+- [ ] **Step 2: Verify the test fails because `/component` is dispatched**
+
+```bash
+npm test -w @apet97/clockify-addon-sdk -- tests/adapters.test.ts \
+  -t "Express-like req.path is unavailable"
+```
+
+Expected: FAIL with status 204 and one route invocation.
+
+- [ ] **Step 3: Extract and reuse the internal parser**
+
+Create `request-target.ts`:
+
+```ts
+export function parseHttpRequestTarget(requestTarget: string | undefined): URL {
+  const target = requestTarget || "";
+  return new URL(target.startsWith("/") ? `http://localhost${target}` : target, "http://localhost");
+}
+```
+
+Import it from `node-http.ts` and `express.ts`, remove the private Node helper, and construct both
+adapter URLs with `parseHttpRequestTarget(req.url)`.
+
+- [ ] **Step 4: Verify Node and Express adapter suites pass**
+
+```bash
+npm test -w @apet97/clockify-addon-sdk -- \
+  tests/adapters.test.ts tests/adapters-node-server.test.ts tests/express-runtime.test.ts
+```
+
+- [ ] **Step 5: Commit shared target parsing**
+
+```bash
+git add addon-sdk/src/adapters/request-target.ts addon-sdk/src/adapters/node-http.ts \
+  addon-sdk/src/adapters/express.ts addon-sdk/tests/adapters.test.ts
+git commit -m "Preserve Express fallback request targets"
+```
+
+---
+
+### Task 6: Make the packed creator typed, tested, and runnable
+
+**Files:**
+- Create: `create-clockify-addon/src/index.d.ts`
+- Modify: `create-clockify-addon/package.json`
+- Modify: `create-clockify-addon/src/index.mjs`
+- Modify: `addon-sdk/tests/creator.test.ts`
+- Modify: `create-clockify-addon/scripts/verify-scaffolds.mjs`
+- Modify: `addon-sdk/scripts/verify-package-lint.mjs`
+
+**Interfaces:**
+- Consumes: existing `scaffoldClockifyAddon(options)` ESM implementation.
+- Produces: `ScaffoldClockifyAddonOptions`, `ClockifyAddonRuntime`,
+  `ClockifyAddonFeatureSet`, and the existing function declaration; Worker start scripts explicitly
+  name `src/index.ts`.
+
+- [ ] **Step 1: Write failing creator metadata and Worker start tests**
+
+In `creator.test.ts`, load the creator package manifest once and assert:
+
+```ts
+it("ships a typed programmatic export and a real workspace test command", async () => {
+  const packageJson = JSON.parse(
+    await readFile(resolve(import.meta.dirname, "../../create-clockify-addon/package.json"), "utf8"),
+  );
+  expect(packageJson.types).toBe("./src/index.d.ts");
+  expect(packageJson.exports).toEqual({
+    ".": { types: "./src/index.d.ts", import: "./src/index.mjs" },
+  });
+  expect(packageJson.scripts.test).toBe(
+    "npm test -w @apet97/clockify-addon-sdk -- tests/creator.test.ts",
+  );
+});
+```
+
+Change the generated Worker start expectation to `wrangler dev src/index.ts`.
+
+- [ ] **Step 2: Verify metadata/start tests fail**
+
+```bash
+npm test -w @apet97/clockify-addon-sdk -- tests/creator.test.ts \
+  -t "typed programmatic export|real CLI"
+```
+
+Expected: FAIL because types are absent, the test command is disconnected, and Worker start omits
+its entry point.
+
+- [ ] **Step 3: Add the exact creator declaration surface**
+
+Create `src/index.d.ts`:
+
+```ts
+export type ClockifyAddonRuntime = "node" | "worker";
+export type ClockifyAddonFeatureSet = "all" | "minimal";
+
+export interface ScaffoldClockifyAddonOptions {
+  readonly directory: string;
+  readonly runtime: ClockifyAddonRuntime;
+  readonly features: ClockifyAddonFeatureSet;
+  readonly sdkSpec?: string;
+}
+
+/** Creates a Clockify add-on project without overwriting existing files. */
+export function scaffoldClockifyAddon(options: ScaffoldClockifyAddonOptions): Promise<string>;
+```
+
+Set `package.json#types`, the conditional export, and the real workspace test command exactly as the
+test expects. Change the Worker start script in `src/index.mjs` to `wrangler dev src/index.ts`.
+
+- [ ] **Step 4: Make scaffold verification consume the packed creator**
+
+Pack both workspaces with `npm pack --ignore-scripts --json`. Install the creator tarball into a
+temporary runner containing this script:
+
+```js
+import { scaffoldClockifyAddon } from "create-clockify-addon";
+
+const [directory, runtime, features, sdkSpec] = process.argv.slice(2);
+await scaffoldClockifyAddon({ directory, runtime, features, sdkSpec });
+```
+
+Execute that installed script for all four variants instead of importing workspace source. After
+each Worker install/typecheck, run:
+
+```bash
+npm exec -- wrangler deploy src/index.ts --dry-run
+```
+
+- [ ] **Step 5: Lint both packed artifacts**
+
+Refactor `verify-package-lint.mjs` to pack and run `publint --strict` plus Are The Types Wrong
+Node16 against both `addon-sdk/` and `create-clockify-addon/`. Keep the existing temporary cleanup
+and fail immediately if either artifact fails.
+
+- [ ] **Step 6: Verify creator tests, direct workspace test, package lint, and scaffold gate**
+
+```bash
+npm test -w @apet97/clockify-addon-sdk -- tests/creator.test.ts
+npm test -w create-clockify-addon
+npm run build
+npm run verify:package-lint
+npm run verify:scaffolds
+```
+
+Expected: creator tests execute (not zero), both tarballs lint/type-resolve, and all four variants
+are generated through the installed creator; Worker variants complete Wrangler dry-runs.
+
+- [ ] **Step 7: Commit creator artifact hardening**
+
+```bash
+git add create-clockify-addon/src/index.d.ts create-clockify-addon/package.json \
+  create-clockify-addon/src/index.mjs create-clockify-addon/scripts/verify-scaffolds.mjs \
+  addon-sdk/tests/creator.test.ts addon-sdk/scripts/verify-package-lint.mjs
+git commit -m "Verify the packed creator runtime"
+```
+
+---
+
+### Task 7: Correct current documentation claims
+
+**Files:**
+- Modify: `AGENTS.md`
+- Modify: `CLAUDE.md`
+- Modify: `CHANGELOG.md`
+- Modify: `create-clockify-addon/README.md`
+- Modify: `docs/product-surface.md`
+- Modify: `docs/quality-gates.md`
+- Modify: `docs/marketplace-coverage.md`
+- Modify: `docs/release-readiness.md`
+
+**Interfaces:**
+- Consumes: behavior and gates completed in Tasks 4-6.
+- Produces: synchronized, source-only documentation that treats the prior live receipt as historical.
+
+- [ ] **Step 1: Update the synchronized hardening checkpoint**
+
+In both agent files, call `addon-sdk/` the publishable package workspace rather than a published
+package. State that optional manifest arrays are initialized by registration, Node/Express fallback
+targets preserve leading slashes, the packed creator is typed and used by scaffold verification,
+and Worker entry points complete a Wrangler dry-run. Mark the authenticated `bbaff21` receipt as
+historical evidence that predates the current request/scaffold changes.
+
+- [ ] **Step 2: Update user-facing gate and creator truth**
+
+Document `wrangler dev src/index.ts`, the ESM programmatic creator export, two-package package lint,
+packed-creator generation, and Worker dry-runs. In release readiness and Marketplace coverage,
+state that the 2026-07-12 live pass applies to `bbaff21` and must be repeated before a new release
+claim.
+
+- [ ] **Step 3: Record the fixes in the changelog and product surface**
+
+Add concise bullets for optional-array registration, shared request-target parsing, runnable Worker
+start, creator declarations, and packed creator proof. Do not add security findings.
+
+- [ ] **Step 4: Verify documentation synchronization and claims**
+
+```bash
+diff -u <(tail -n +4 AGENTS.md) <(tail -n +4 CLAUDE.md)
+npm test -w @apet97/clockify-addon-sdk -- tests/source-only-docs.test.ts \
+  tests/tooling-config.test.ts tests/perfect-foundations.test.ts tests/creator.test.ts
+git diff --check
+```
+
+- [ ] **Step 5: Commit documentation corrections**
+
+```bash
+git add AGENTS.md CLAUDE.md CHANGELOG.md create-clockify-addon/README.md \
+  docs/product-surface.md docs/quality-gates.md docs/marketplace-coverage.md \
+  docs/release-readiness.md
+git commit -m "Correct creator readiness documentation"
+```
+
+---
+
+### Task 8: Finish the non-security adversarial review
 
 **Files:**
 - Create outside repository: `/Users/15x/Downloads/addon-ts-sdk-nonsecurity-review-2026-07-12.md`
@@ -317,14 +680,14 @@ Use these headings:
 ```
 
 State the exact baseline SHA `bbaff21e494d5d92cd2da1e11d21938f61417d18` and final reviewed
-SHA. Record the two baseline adapter findings as remediated, including their red-green tests and
-fix commits. If nothing else survives investigation, state `No remaining confirmed non-security
-findings.` Do not copy claims from the stale review at
+SHA. Record the two baseline adapter findings and four approved follow-up findings as remediated,
+including their red-green tests and fix commits. If nothing else survives investigation, state
+`No remaining confirmed non-security findings.` Do not copy claims from the stale review at
 `/Users/15x/Downloads/addon-ts-sdk-hostile-review-2026-07-12.md`.
 
 ---
 
-### Task 5: Run final proof and record project evidence
+### Task 9: Run final proof and record project evidence
 
 **Files:**
 - Modify outside repository: `/Users/15x/Documents/Obsidian Vault/03 Projects/Clockify Add-on TypeScript SDK.md`
@@ -375,10 +738,10 @@ original main checkout still at origin parity `0 0`.
 
 - [ ] **Step 4: Update the existing Obsidian project note**
 
-Append a sanitized dated entry containing the baseline and final SHAs, the two corrected adapter
-contracts, exact gate results, the review-report path, and the fact that no push/publication/tag or
-Marketplace action occurred. Preserve the note's existing frontmatter and never include headers,
-queries, bodies, JWTs, tokens, or credentials.
+Append a sanitized dated entry containing the baseline and final SHAs, the six corrected findings,
+exact gate results, the review-report path, and the fact that no push/publication/tag or Marketplace
+action occurred. Preserve the note's existing frontmatter and never include headers, queries,
+bodies, JWTs, tokens, or credentials.
 
 - [ ] **Step 5: Commit any final in-repository corrections discovered by verification**
 
