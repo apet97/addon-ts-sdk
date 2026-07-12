@@ -108,3 +108,21 @@ The creator dry-run package should include only its npm-generated `package.json`
 
 Neither package should include `node_modules`, `coverage`, temporary tarballs, workspace root files,
 or generated proof artifacts.
+
+## Deferred non-security improvements
+
+The following maintenance work is intentionally deferred until the next improvement pass. None of
+these items blocks the published `1.0.1` packages or invalidates the current release evidence.
+
+1. Add deterministic lint, formatting, and focused unit coverage for the root release tools
+   (`scripts/release-preflight.mjs` and `scripts/verify-registry-consumer.mjs`) to the canonical
+   local gate. Keep the live registry probe itself outside deterministic CI.
+2. Add a bounded retry with clear package-specific progress to the post-publish
+   `verify:registry` availability check so expected npm propagation delay does not cause a false
+   failure. Keep `release:preflight` fail-fast.
+3. Await Node and Express integration-test server shutdown and monitor the one observed but
+   unreproduced Express `/manifest` 404 before attributing a root cause.
+4. Recreate or rebase the compatible patch-dependency update lane before merging it. Keep
+   `@types/node` on the Node 22 line rather than accepting the failing Node 26 Dependabot update.
+5. Reduce duplicated current-version strings across release documentation, or add a consistency
+   check that derives the expected versions from the workspace package manifests.
