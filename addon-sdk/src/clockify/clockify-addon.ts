@@ -31,12 +31,13 @@ function descriptorsEqual(left: unknown, right: unknown): boolean {
 function registerManifestRoute<T extends { readonly path: string }>(
   addon: { registerHandler(path: string, method: string, handler: RequestHandler): void },
   kind: string,
-  entries: T[],
+  entries: T[] | undefined,
   descriptor: T,
   method: string,
   handler: RequestHandler,
-): void {
-  const existing = entries.find((entry) => entry.path === descriptor.path);
+): T[] {
+  const manifestEntries = entries ?? [];
+  const existing = manifestEntries.find((entry) => entry.path === descriptor.path);
   if (existing && !descriptorsEqual(existing, descriptor)) {
     throw new IllegalArgumentException(
       `Conflicting ${kind} is already declared for path ${descriptor.path}.`,
@@ -44,7 +45,8 @@ function registerManifestRoute<T extends { readonly path: string }>(
   }
 
   addon.registerHandler(descriptor.path, method, handler);
-  if (!existing) entries.push(descriptor);
+  if (!existing) manifestEntries.push(descriptor);
+  return manifestEntries;
 }
 
 /**
@@ -65,8 +67,15 @@ export class ClockifyAddon<
   }
 
   registerWebhook(webhook: ClockifyWebhook<M["schemaVersion"]>, handler: RequestHandler): void {
-    const m = this.manifest as unknown as { webhooks: ClockifyWebhook<M["schemaVersion"]>[] };
-    registerManifestRoute(this, "webhook", m.webhooks, webhook, Addon.HTTP_POST, handler);
+    const m = this.manifest as unknown as { webhooks?: ClockifyWebhook<M["schemaVersion"]>[] };
+    m.webhooks = registerManifestRoute(
+      this,
+      "webhook",
+      m.webhooks,
+      webhook,
+      Addon.HTTP_POST,
+      handler,
+    );
   }
 
   registerLifecycleEvent(
@@ -74,17 +83,31 @@ export class ClockifyAddon<
     handler: RequestHandler,
   ): void {
     const m = this.manifest as unknown as {
-      lifecycle: ClockifyLifecycleEvent<M["schemaVersion"]>[];
+      lifecycle?: ClockifyLifecycleEvent<M["schemaVersion"]>[];
     };
-    registerManifestRoute(this, "lifecycle event", m.lifecycle, event, Addon.HTTP_POST, handler);
+    m.lifecycle = registerManifestRoute(
+      this,
+      "lifecycle event",
+      m.lifecycle,
+      event,
+      Addon.HTTP_POST,
+      handler,
+    );
   }
 
   registerComponent(
     component: ClockifyComponent<M["schemaVersion"]>,
     handler: RequestHandler,
   ): void {
-    const m = this.manifest as unknown as { components: ClockifyComponent<M["schemaVersion"]>[] };
-    registerManifestRoute(this, "component", m.components, component, Addon.HTTP_GET, handler);
+    const m = this.manifest as unknown as { components?: ClockifyComponent<M["schemaVersion"]>[] };
+    m.components = registerManifestRoute(
+      this,
+      "component",
+      m.components,
+      component,
+      Addon.HTTP_GET,
+      handler,
+    );
   }
 
   registerCustomSettings(path: string, handler: RequestHandler): void {

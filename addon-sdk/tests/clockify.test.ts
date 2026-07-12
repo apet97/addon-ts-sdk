@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { ClockifyAddon, ClockifyManifest } from "../src";
+import { ClockifyAddon, ClockifyManifest, createValidatedClockifyAddon } from "../src";
 import { generated } from "../src";
 
 describe("Clockify Addon Hooks", () => {
@@ -65,6 +65,42 @@ describe("Clockify Addon Hooks", () => {
     expect(addon.getManifest().components).toContainEqual(component);
     const requests = addon.getRegisteredRequests();
     expect(requests).toContainEqual({ method: "GET", path: "/ui/sidebar" });
+  });
+
+  it("registers routes against schema-valid manifests with absent optional arrays", () => {
+    const manifest: ClockifyManifest<"1.4"> = {
+      schemaVersion: "1.4",
+      key: "raw-valid-addon",
+      name: "Raw Valid Addon",
+      baseUrl: "https://example.com/addon",
+      minimalSubscriptionPlan: "BASIC",
+    };
+    const addon = createValidatedClockifyAddon(manifest);
+    const component = generated.v1_4
+      .ClockifyComponentBuilder()
+      .type("sidebar")
+      .allowEveryone()
+      .path("/component/raw")
+      .label("Raw component")
+      .build();
+    const lifecycle = generated.v1_4
+      .ClockifyLifecycleEventBuilder()
+      .path("/lifecycle/raw")
+      .onInstalled()
+      .build();
+    const webhook = generated.v1_4
+      .ClockifyWebhookBuilder()
+      .event("NEW_PROJECT")
+      .path("/webhooks/raw")
+      .build();
+
+    addon.registerComponent(component, () => ({ status: 204 }));
+    addon.registerLifecycleEvent(lifecycle, () => ({ status: 204 }));
+    addon.registerWebhook(webhook, () => ({ status: 204 }));
+
+    expect(addon.getManifest().components).toEqual([component]);
+    expect(addon.getManifest().lifecycle).toEqual([lifecycle]);
+    expect(addon.getManifest().webhooks).toEqual([webhook]);
   });
 
   it("binds handlers to identical predeclared descriptors without duplicating them", () => {
