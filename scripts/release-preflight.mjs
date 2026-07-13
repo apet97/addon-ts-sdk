@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { setTimeout as sleep } from "node:timers/promises";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 const defaultRoot = fileURLToPath(new URL("..", import.meta.url));
@@ -117,6 +118,14 @@ function packageVersion(releasePackage) {
   return `${releasePackage.name}@${releasePackage.version}`;
 }
 
+function missingVersionsError(missing) {
+  return new Error(
+    `Registry verification failed; exact version is not published:\n${missing
+      .map((releasePackage) => `- ${packageVersion(releasePackage)}`)
+      .join("\n")}`,
+  );
+}
+
 /** Fail when any exact workspace version already exists in the configured registry. */
 export async function assertVersionsUnpublished(packages, options = {}) {
   const results = await inspectExactVersions(packages, options);
@@ -136,13 +145,46 @@ export async function assertVersionsPublished(packages, options = {}) {
   const results = await inspectExactVersions(packages, options);
   const missing = results.filter((result) => !result.published);
   if (missing.length > 0) {
-    throw new Error(
-      `Registry verification failed; exact version is not published:\n${missing
-        .map((releasePackage) => `- ${packageVersion(releasePackage)}`)
-        .join("\n")}`,
-    );
+    throw missingVersionsError(missing);
   }
   return results;
+}
+
+/** Wait briefly for exact package versions to become visible after publication. */
+export async function waitForVersionsPublished(packages, options = {}) {
+  const maxAttempts = options.maxAttempts ?? 7;
+  const retryDelayMs = options.retryDelayMs ?? 5_000;
+  if (!Number.isInteger(maxAttempts) || maxAttempts < 1) {
+    throw new Error("maxAttempts must be a positive integer");
+  }
+  if (!Number.isFinite(retryDelayMs) || retryDelayMs < 0) {
+    throw new Error("retryDelayMs must be a non-negative finite number");
+  }
+
+  let attempt = 1;
+  while (true) {
+    const results = await inspectExactVersions(packages, options);
+    const missing = results.filter((result) => !result.published);
+    if (missing.length === 0) {
+      return results;
+    }
+    if (attempt >= maxAttempts) {
+      throw missingVersionsError(missing);
+    }
+
+    options.onRetry?.({
+      attempt,
+      maxAttempts,
+      missing,
+      retryDelayMs,
+    });
+    await sleep(
+      retryDelayMs,
+      undefined,
+      options.signal == null ? undefined : { signal: options.signal },
+    );
+    attempt += 1;
+  }
 }
 
 function printHelp() {

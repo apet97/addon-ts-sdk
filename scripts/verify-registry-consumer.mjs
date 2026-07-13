@@ -5,8 +5,8 @@ import { join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 import {
-  assertVersionsPublished,
   readReleasePackages,
+  waitForVersionsPublished,
 } from "./release-preflight.mjs";
 
 const repoRoot = fileURLToPath(new URL("..", import.meta.url));
@@ -216,7 +216,15 @@ async function main(args) {
   }
 
   const packages = readReleasePackages(repoRoot);
-  await assertVersionsPublished(packages);
+  await waitForVersionsPublished(packages, {
+    onRetry: ({ attempt, maxAttempts, missing, retryDelayMs }) => {
+      console.log(
+        `Registry propagation pending after attempt ${attempt}/${maxAttempts}; retrying in ${retryDelayMs / 1_000}s:\n${missing
+          .map(({ name, version }) => `- ${name}@${version}`)
+          .join("\n")}`,
+      );
+    },
+  });
   const sdkPackage = packages.find(
     ({ directory }) => directory === "addon-sdk",
   );
