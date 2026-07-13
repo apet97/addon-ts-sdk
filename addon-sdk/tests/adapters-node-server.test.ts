@@ -7,10 +7,13 @@ import { createNodeHttpAddonServer } from "../src/adapters";
 describe("Node HTTP server boot (integration)", () => {
   let server: Server | undefined;
 
-  afterEach(() => {
-    if (server) {
-      server.close();
-      server = undefined;
+  afterEach(async () => {
+    const activeServer = server;
+    server = undefined;
+    if (activeServer) {
+      await new Promise<void>((resolve, reject) => {
+        activeServer.close((error) => (error ? reject(error) : resolve()));
+      });
     }
   });
 

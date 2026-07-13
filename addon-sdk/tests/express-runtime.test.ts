@@ -12,10 +12,13 @@ const expressVersion = require("express/package.json").version as string;
 describe("Express runtime adapter", () => {
   let server: Server | undefined;
 
-  afterEach(() => {
-    if (server) {
-      server.close();
-      server = undefined;
+  afterEach(async () => {
+    const activeServer = server;
+    server = undefined;
+    if (activeServer) {
+      await new Promise<void>((resolve, reject) => {
+        activeServer.close((error) => (error ? reject(error) : resolve()));
+      });
     }
   });
 
