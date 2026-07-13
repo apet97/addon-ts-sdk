@@ -22,9 +22,19 @@ updates:
           - "eslint-config-prettier"
           - "prettier"
           - "tsx"
+        update-types:
+          - "minor"
+          - "patch"
       sdk-runtime:
         patterns:
           - "jose"
+    ignore:
+      - dependency-name: "@types/node"
+        update-types:
+          - "version-update:semver-major"
+      - dependency-name: "typescript"
+        update-types:
+          - "version-update:semver-major"
 
   - package-ecosystem: "github-actions"
     directory: "/"
