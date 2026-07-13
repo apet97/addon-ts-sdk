@@ -14,7 +14,6 @@ describe("published distribution docs", () => {
 
     expect(packageJson).toMatchObject({
       name: "@apet97/clockify-addon-sdk",
-      version: "1.0.1",
       publishConfig: { access: "public" },
       repository: {
         type: "git",
@@ -24,7 +23,6 @@ describe("published distribution docs", () => {
     });
     expect(creatorPackageJson).toMatchObject({
       name: "create-clockify-addon",
-      version: "1.0.1",
       publishConfig: { access: "public" },
       repository: {
         type: "git",
@@ -59,6 +57,8 @@ describe("published distribution docs", () => {
       resolve(packageRoot, "docs", "dependency-strategy.md"),
       "utf8",
     );
+    const agents = readFileSync(resolve(repoRoot, "AGENTS.md"), "utf8");
+    const claude = readFileSync(resolve(repoRoot, "CLAUDE.md"), "utf8");
     const evidenceMap = readFileSync(
       resolve(packageRoot, "docs", "porting", "evidence-map.md"),
       "utf8",
@@ -76,8 +76,22 @@ describe("published distribution docs", () => {
     expect(creatorReadme).toContain("npm create clockify-addon@latest");
     expect(productSurface).toContain("published to the npm registry");
     expect(releaseReadiness).toContain("Published versions");
-    expect(releaseReadiness).toContain("@apet97/clockify-addon-sdk@1.0.1");
-    expect(releaseReadiness).toContain("create-clockify-addon@1.0.1");
+    expect(releaseReadiness).toContain(`${packageJson.name}@${packageJson.version}`);
+    expect(releaseReadiness).toContain(`${creatorPackageJson.name}@${creatorPackageJson.version}`);
+
+    const activeVersionNeutralDocuments = [
+      rootReadme,
+      packageReadme,
+      productSurface,
+      qualityGates,
+      agents,
+      claude,
+    ];
+    for (const version of new Set([packageJson.version, creatorPackageJson.version])) {
+      for (const document of activeVersionNeutralDocuments) {
+        expect(document).not.toContain(version);
+      }
+    }
 
     for (const document of [
       rootReadme,
@@ -110,9 +124,11 @@ describe("published distribution docs", () => {
     expect(releaseReadiness).toContain("npm run release:preflight");
     expect(releaseReadiness).toContain("npm run verify:registry");
     expect(releaseReadiness).toContain(
-      "`release:verify` and `release:dry-run` are also expected to fail",
+      "Run `release:verify` only for unpublished workspace versions",
     );
-    expect(releaseReadiness).not.toContain("npm view @apet97/clockify-addon-sdk@1.0.1 version");
+    expect(releaseReadiness).not.toContain(
+      `npm view ${packageJson.name}@${packageJson.version} version`,
+    );
     expect(releaseReadiness).toContain(
       "npm publish --dry-run -w @apet97/clockify-addon-sdk --access public",
     );
@@ -145,13 +161,19 @@ describe("published distribution docs", () => {
       "npm run ci:verify && npm run verify:schema-live && npm run release:dry-run",
     );
     expect(packageJson.sideEffects).toBe(false);
-    expect(creatorPackageJson.version).toBe("1.0.1");
     expect(packageLock.packages["addon-sdk"].version).toBe(packageJson.version);
     expect(packageLock.packages["create-clockify-addon"].version).toBe(creatorPackageJson.version);
     expect(packageJson.devDependencies["@types/node"]).toMatch(/^\^22\./);
     expect(evidenceMap).toContain("clockify-request-verifiers.ts");
     expect(evidenceMap).toContain("clockify-request-handlers.ts");
     expect(evidenceMap).toContain("clockify-request-wire.ts");
+  });
+
+  it("keeps AGENTS.md and CLAUDE.md synchronized after their introductions", () => {
+    const agents = readFileSync(resolve(repoRoot, "AGENTS.md"), "utf8").split("\n").slice(4);
+    const claude = readFileSync(resolve(repoRoot, "CLAUDE.md"), "utf8").split("\n").slice(4);
+
+    expect(agents).toEqual(claude);
   });
 
   it("documents the secure server installation and webhook token recipe", () => {

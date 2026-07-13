@@ -37,7 +37,7 @@ npm pack --dry-run -w @apet97/clockify-addon-sdk
 # When another local project needs an unreleased package, create and install a tarball intentionally.
 cd addon-sdk
 npm pack
-npm install /absolute/path/to/apet97-clockify-addon-sdk-1.0.1.tgz
+npm install "/absolute/path/to/apet97-clockify-addon-sdk-<version>.tgz"
 ```
 
 Do not use the repo-root Git URL as an npm package dependency: npm installs the private workspace

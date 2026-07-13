@@ -1,8 +1,7 @@
 # Product Surface: @apet97/clockify-addon-sdk
 
 This package provides a layered TypeScript toolkit for CAKE.com Marketplace add-ons targeting
-Clockify. Version 1.0.1 is published to the npm registry together with the
-`create-clockify-addon` creator.
+Clockify. The SDK and the `create-clockify-addon` creator are published to the npm registry.
 
 ## Scope
 

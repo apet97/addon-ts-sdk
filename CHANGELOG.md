@@ -4,6 +4,17 @@ All notable changes to this SDK are recorded here.
 
 ## Unreleased
 
+## 1.0.2 - 2026-07-13
+
+- Add deterministic root release-tool lint, formatting, and focused registry verification tests.
+- Tolerate bounded npm propagation delay after publication while keeping release preflight and
+  registry failures fail-fast.
+- Await Node and Express integration-test server shutdown and verify the focused suites repeatedly.
+- Refresh compatible development tooling, keep TypeScript 6 and Node 22 ambient types, and pin the
+  source-development floor to Node 22.13.0.
+- Derive current release documentation checks from the two workspace manifests and synchronize
+  maintainer guidance. This maintenance release does not change the public runtime API.
+
 ## 1.0.1 - 2026-07-12
 
 - Correct post-publication security, architecture, and migration guidance.

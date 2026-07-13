@@ -4,8 +4,8 @@
 
 The public npm releases are:
 
-- `@apet97/clockify-addon-sdk@1.0.1`
-- `create-clockify-addon@1.0.1`
+- `@apet97/clockify-addon-sdk@1.0.2`
+- `create-clockify-addon@1.0.2`
 
 Install the SDK with `npm install @apet97/clockify-addon-sdk` or create a project with
 `npm create clockify-addon@latest`. npm versions are immutable: every future release requires a
@@ -22,13 +22,13 @@ npm run release:verify
 ```
 
 `npm run release:preflight` reads both workspace package versions and fails unless those exact
-versions are absent from the configured npm registry. Because the current workspace versions are
-the already-published `1.0.1` releases, it is expected to fail until both package manifests are
-bumped for a future release.
+versions are absent from the configured npm registry. It is intentionally a one-shot, fail-fast
+check and must run immediately before publishing.
 
-On this published `1.0.1` checkout, `release:verify` and `release:dry-run` are also expected to fail
-when npm reaches its immutable-version registry check. That rejection is correct. Use the preflight
-first so a missing version bump fails quickly, before the more expensive local release gates run.
+Run `release:verify` only for unpublished workspace versions. After publication,
+`release:dry-run` correctly fails when npm reaches its immutable-version registry check; use
+`verify:registry` instead for post-publish proof. Run the preflight first so an accidental reused
+version fails quickly, before the more expensive local release gates.
 
 `npm run release:verify` runs the canonical `npm run ci:verify` gate, including the public API
 snapshot check, the manual `npm run verify:schema-live` freshness check, and the dry-run publish
@@ -70,14 +70,17 @@ repository:
 npm run verify:registry
 ```
 
-`verify:registry` reads the exact versions from both workspace manifests, requires both to exist in
-the configured registry, and installs those exact versions in a disposable consumer. It exercises
-SDK ESM, CommonJS, and TypeScript imports; imports the creator API; runs the installed creator's help
-command; then uses the version-pinned canonical `npm create` flow to generate a Node minimal project.
-The generated project must resolve the exact SDK version, type-check, serve a schema-valid manifest
-with one component and no lifecycle/webhook descriptors, return 404 for an unknown path, reject an
-unsigned component request, and fail closed without a public origin. The command always removes its
-temporary files. Do not treat a dry-run publish as registry installation proof.
+`verify:registry` reads the exact versions from both workspace manifests and allows up to seven
+registry visibility checks separated by five-second waits before installing those exact versions in
+a disposable consumer. Progress lists only package names and versions still absent from valid npm
+metadata. HTTP errors, timeouts, aborts, invalid JSON, and malformed metadata fail immediately; the
+retry is only for normal post-publish propagation. The command then exercises SDK ESM, CommonJS, and
+TypeScript imports; imports the creator API; runs the installed creator's help command; and uses the
+version-pinned canonical `npm create` flow to generate a Node minimal project. The generated project
+must resolve the exact SDK version, type-check, serve a schema-valid manifest with one component and
+no lifecycle/webhook descriptors, return 404 for an unknown path, reject an unsigned component
+request, and fail closed without a public origin. The command always removes its temporary files. Do
+not treat a dry-run publish as registry installation proof.
 
 ## Final-SHA manual checkpoint
 
@@ -109,20 +112,17 @@ The creator dry-run package should include only its npm-generated `package.json`
 Neither package should include `node_modules`, `coverage`, temporary tarballs, workspace root files,
 or generated proof artifacts.
 
-## Deferred non-security improvements
+## 1.0.2 maintenance completion
 
-The following maintenance work is intentionally deferred until the next improvement pass. None of
-these items blocks the published `1.0.1` packages or invalidates the current release evidence.
+The deferred non-security maintenance queue was completed for this release:
 
-1. Add deterministic lint, formatting, and focused unit coverage for the root release tools
-   (`scripts/release-preflight.mjs` and `scripts/verify-registry-consumer.mjs`) to the canonical
-   local gate. Keep the live registry probe itself outside deterministic CI.
-2. Add a bounded retry with clear package-specific progress to the post-publish
-   `verify:registry` availability check so expected npm propagation delay does not cause a false
-   failure. Keep `release:preflight` fail-fast.
-3. Await Node and Express integration-test server shutdown and monitor the one observed but
-   unreproduced Express `/manifest` 404 before attributing a root cause.
-4. Recreate or rebase the compatible patch-dependency update lane before merging it. Keep
-   `@types/node` on the Node 22 line rather than accepting the failing Node 26 Dependabot update.
-5. Reduce duplicated current-version strings across release documentation, or add a consistency
-   check that derives the expected versions from the workspace package manifests.
+- The canonical lint and format gates now cover every root release tool, with focused tests for
+  registry behavior and command boundaries.
+- Post-publish verification retries only exact-version absence for a bounded 30-second propagation
+  window; preflight and registry failures remain fail-fast.
+- Node and Express integration tests await server shutdown. Fifty consecutive focused suite runs
+  did not reproduce the historical `/manifest` 404, so no unproven production cause is claimed.
+- Compatible patch/minor tooling updates landed while TypeScript remains on major 6 and
+  `@types/node` remains on major 22. Dependabot now excludes those unsupported majors.
+- Active documentation is version-neutral except for this canonical published-version record, and
+  tests derive both package versions independently from their workspace manifests.

@@ -37,9 +37,13 @@ contract:
   resolution.
 - Vitest 4 runs the test suite. `npm run test:coverage` uses the V8 coverage provider with text and
   JSON summary reporters.
-- Vite 8 powers Vitest and requires Node 22.12+ within the supported Node 22 line. The published
-  package runtime support remains `>=22`; do not raise it just because the source-build tools have a
-  narrower patch-level requirement.
+- Vite 8 powers Vitest and requires Node 22.12+ within the supported Node 22 line. ESLint 10 sets the
+  effective source-development floor at Node 22.13.0, which is pinned in root metadata and CI. The
+  published package runtime support remains `>=22`; do not raise it just because source-build tools
+  have a narrower patch-level requirement.
+- TypeScript stays on major 6 and `@types/node` stays on major 22 until their compatibility lanes are
+  reviewed deliberately. Dependabot groups routine tooling updates as minor/patch changes and
+  ignores those two unsupported majors.
 
 ## Express
 

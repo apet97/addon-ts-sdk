@@ -21,10 +21,11 @@ consumer, audit, or live-schema checks.
    - **`npm run test:replay`** — focused local Clockify replay coverage for component auth-token,
      installed lifecycle, stored-token webhook verification, and negative token/workspace cases.
 5. **`npm run test`** — a focused non-coverage unit-test shortcut for local development.
-6. **`npm run lint`** — check-only ESLint over the package source, tests, scripts, examples, and docs
-   where applicable.
-7. **`npm run format:check`** — check-only Prettier over the package. Vendored Marketplace docs,
-   manifest schemas, generated Clockify models, build output, coverage, and tarballs are ignored.
+6. **`npm run lint`** — check-only ESLint over the package plus every root `scripts/*.mjs` release
+   tool through the shared flat configuration.
+7. **`npm run format:check`** — check-only Prettier over the package and root release tools. Vendored
+   Marketplace docs, manifest schemas, generated Clockify models, build output, coverage, and
+   tarballs are ignored.
 8. **`npm run build`** — emits the ESM and CJS outputs with type declarations.
 9. **`npm run verify:public-api`** — compares the built ESM declaration surface for the root,
    `/clockify`, `/adapters`, `/client`, `/ui`, and `/testing` entry points against
@@ -67,26 +68,28 @@ Manual freshness check:
 Manual registry boundary checks:
 
 - **`npm run release:preflight`** — reads the SDK and creator versions from their workspace
-  manifests and fails unless both exact versions are absent from the configured npm registry. The
-  current `1.0.1` workspace versions are already published, so this command intentionally fails until
-  the manifests are bumped for a future release.
+  manifests and fails unless both exact versions are absent from the configured npm registry. It is
+  intentionally one-shot and fail-fast.
 - **`npm run verify:registry`** — requires both exact workspace versions to exist in the configured
   registry, installs them into a disposable consumer, exercises ESM/CommonJS/TypeScript imports and
   the installed creator CLI, then generates, installs, type-checks, and executes a Node minimal
-  project with manifest-count and failure-path assertions.
+  project with manifest-count and failure-path assertions. Before installation it allows seven
+  exact-version visibility checks with five-second waits, reporting only missing package versions;
+  HTTP, timeout, abort, and malformed-metadata failures remain immediate.
 
 Both commands depend on registry state and therefore remain outside `ci:verify`, `release:verify`,
-and normal pull-request CI. Run the preflight immediately before a future publish and the registry
-consumer verification immediately after it. Because `release:verify` ends with `release:dry-run`,
-both also reject this checkout's already-published `1.0.1` versions; run them as future-release gates
-only after a version bump.
+and normal pull-request CI. Run the preflight immediately before publishing and the registry
+consumer verification immediately afterward. Because `release:verify` ends with `release:dry-run`,
+run it only for unpublished workspace versions.
 
 Dependency freshness:
 
 - `.github/dependabot.yml` checks npm and GitHub Actions weekly. npm updates are grouped into
-  SDK-tooling and SDK-runtime PRs so dependency review stays deliberate instead of noisy.
+  SDK-tooling and SDK-runtime PRs so dependency review stays deliberate instead of noisy. Tooling
+  groups accept only minor and patch updates.
 - Keep `@types/node` aligned to the Node 22 runtime floor (`^22`) unless the package support policy
-  changes. Newer ambient Node majors are not routine maintenance bumps for this SDK.
+  changes. Keep TypeScript on major 6 until its next major is reviewed separately; Dependabot ignores
+  both unsupported majors.
 
 Makefile shortcuts:
 
@@ -95,9 +98,10 @@ Makefile shortcuts:
   scripts. Legacy `addon-sdk-package` and `addon-sdk-parity` targets point at `ci-verify` and
   `verify-fast` respectively.
 
-GitHub Actions runs the same root gate on Node 22.x and 24.x for pushes to `main`, pull requests,
-and manual dispatches. Node 22 is the minimum supported runtime. The source-build toolchain is
-TypeScript 6, Vitest 4, and Vite 8; Vite 8 requires Node 22.12+ within the supported Node 22 line.
+GitHub Actions runs the same root gate on Node 22.13.0 and 24.x for pushes to `main`, pull requests,
+and manual dispatches. Published-package runtime support starts at Node 22; the source-build floor is
+Node 22.13.0 because the accepted ESLint toolchain is narrower. The source-build toolchain remains
+TypeScript 6, Vitest 4, and Vite 8.
 
 The package `prepack` chain includes type-check, generated drift, tests, lint, format check, build,
 `verify:public-api`, and `verify:dist`; `npm pack --dry-run` is therefore both a contents check and

@@ -2,7 +2,7 @@
 
 Conventions for anyone (human or agent) working in this repository.
 
-## Current hardening checkpoint (2026-07-12)
+## Current hardening checkpoint (2026-07-13)
 
 - The root SDK entrypoint is runtime-neutral. Import Node, Express, and Fetch integration from the
   granular adapter subpaths; never reintroduce `node:*` through the root.
@@ -25,14 +25,14 @@ Conventions for anyone (human or agent) working in this repository.
   installed creator artifact, installs the packed SDK, executes and validates their exact runtime
   manifests, probes failure paths, and compiles Worker entry points with a Wrangler dry-run. This is
   not a substitute for a fresh authenticated Clockify developer-workspace pass before release.
-- `@apet97/clockify-addon-sdk@1.0.1` and `create-clockify-addon@1.0.1` are public npm packages.
-  Consumers install with `npm install @apet97/clockify-addon-sdk` or scaffold with
-  `npm create clockify-addon@latest`.
+- The SDK and creator are public npm packages. Consumers install with
+  `npm install @apet97/clockify-addon-sdk` or scaffold with `npm create clockify-addon@latest`;
+  `docs/release-readiness.md` is the canonical exact-version record.
 - `release:preflight` and `verify:registry` read both workspace versions dynamically. The former
-  fails unless exact versions are unpublished; the latter installs the exact published artifacts
-  and executes a generated Node minimal project. Both depend on registry state and stay outside
-  deterministic `ci:verify` and `release:verify`. On the already-published `1.0.1` checkout,
-  `release:verify` also ends in the expected immutable-version rejection from `release:dry-run`.
+  fails unless exact versions are unpublished; the latter waits briefly for normal npm propagation,
+  installs the exact published artifacts, and executes a generated Node minimal project. Both depend
+  on registry state and stay outside deterministic `ci:verify`; run `release:verify` only before
+  publication because its dry run correctly rejects immutable published versions.
 - A sanitized 2026-07-12 authenticated Firefox pass at final runtime commit `e74e1f7` installed the
   packed Node all-features scaffold, observed successful manifest, `INSTALLED`, component,
   `NEW_TIME_ENTRY`, and `DELETED` requests, and confirmed exact-origin iframe enforcement in the
@@ -46,10 +46,10 @@ Conventions for anyone (human or agent) working in this repository.
   invoking `onError`. The Node adapter and the Express structural fallback must preserve leading
   slashes in origin-form request targets; `//host/path` is a path, not an alternate authority.
   Express body limits stay with the host app.
-- Runtime support starts at Node 22, so `@types/node` stays on `^22` unless the runtime support
-  contract changes. Do not accept Node 26 ambient types as a routine Dependabot bump.
-- The SDK-tooling Dependabot lane can move ESLint, Prettier, and Vite together, but rerun
-  `npm run format:check` after applying it because Prettier changes may require source wrapping.
+- Published-package runtime support starts at Node 22, while source development requires Node
+  22.13.0 or newer. Keep `@types/node` on `^22` unless the runtime contract changes.
+- The SDK-tooling Dependabot lane accepts minor and patch updates only. Keep TypeScript on major 6
+  and Node ambient types on major 22 until each next major receives a deliberate compatibility pass.
 - Discarded commit `623fbdc` was reviewed during the July 2026 plan pass. Do not restore its
   benchmark, scaffold, fuzz, or broad parity files wholesale; reintroduce only pieces that have
   current-code proof and a clear maintenance payoff.
@@ -100,9 +100,10 @@ Conventions for anyone (human or agent) working in this repository.
   Express body limits are configured by the host app, not the SDK.
 - Express remains an optional peer. Keep the adapter structurally typed so root imports and non-Express
   consumers do not need Express types installed.
-- Runtime support starts at Node 22. CI verifies Node 22.x and 24.x.
-- Source-build tooling uses TypeScript 6, Vitest 4, and Vite 8. Vite 8 requires Node 22.12+ within
-  the supported Node 22 line; do not raise package runtime support beyond `>=22` just for tooling.
+- Published-package runtime support starts at Node 22. CI verifies the source-development floor at
+  Node 22.13.0 and the current Node 24 line.
+- Source-build tooling uses TypeScript 6, Vitest 4, Vite 8, and ESLint 10. Keep package runtime
+  support at `>=22` even though the accepted source toolchain has a narrower patch-level floor.
 
 ## Gates
 
@@ -114,8 +115,8 @@ Conventions for anyone (human or agent) working in this repository.
 | `npm run verify:generated`                 | Checks schema provenance, generates to a temporary directory, compares against committed generated files, and leaves tracked files untouched.                                                                                                         |
 | `npm run test`                             | vitest suite.                                                                                                                                                                                                                                         |
 | `npm run test:coverage`                    | Enforced Vitest V8 coverage over handwritten `src/**/*.ts`, excluding generated models: 97% statements, 92% branches, 98% functions, and 98% lines.                                                                                                   |
-| `npm run lint`                             | Check-only ESLint over the package.                                                                                                                                                                                                                   |
-| `npm run format:check`                     | Check-only Prettier over the package.                                                                                                                                                                                                                 |
+| `npm run lint`                             | Check-only ESLint over the package and every root release tool through the shared configuration.                                                                                                                                                     |
+| `npm run format:check`                     | Check-only Prettier over the package and root release tools.                                                                                                                                                                                          |
 | `npm run build`                            | ESM + CJS output.                                                                                                                                                                                                                                     |
 | `npm run verify:public-api`                | Compares built declaration surfaces for root, Clockify, adapters, client, UI, and testing entrypoints against `addon-sdk/public-api.snapshot.md`.                                                                                                     |
 | `npm run verify:dist`                      | Imports the **built** ESM and CJS and boots the quick-start. A green `build` alone does not prove the package imports.                                                                                                                                |
@@ -123,11 +124,11 @@ Conventions for anyone (human or agent) working in this repository.
 | `npm run verify:package-lint`              | Packs both artifacts with scripts ignored, then runs `publint --strict` and Are The Types Wrong: Node16 for the dual-format SDK and `esm-only` for the creator. Node10 findings are outside the supported runtime policy.                             |
 | `npm run verify:package-consumer`          | Packs the already-built package with scripts ignored, installs it into temporary runtime ESM/CJS and TypeScript ESM/CJS consumers, imports public subpaths, signs/verifies test tokens, type-checks declarations, and serves `/manifest`.             |
 | `npm run verify:scaffolds`                 | Packs the creator and SDK; generates Node/Worker minimal/all through the installed creator; installs, type-checks, and executes each; validates manifests/counts and failure paths; dry-runs both Worker entry points with Wrangler.                  |
-| `npm run release:preflight`                | Manual network gate: fails unless both exact workspace versions are absent from the configured npm registry. The published `1.0.1` versions intentionally fail until a future version bump.                                                           |
-| `npm run verify:registry`                  | Manual post-publish gate: installs both exact registry versions into a disposable consumer, checks ESM/CJS/TypeScript/creator entrypoints, and generates, type-checks, and executes a Node minimal project.                                           |
+| `npm run release:preflight`                | Manual one-shot network gate: fails unless both exact workspace versions are absent from the configured npm registry.                                                                                                                                |
+| `npm run verify:registry`                  | Manual post-publish gate: waits up to 30 seconds only for absent exact versions, then installs them into a disposable consumer and checks ESM/CJS/TypeScript/creator plus a generated Node minimal project.                                          |
 | `npm run audit:prod` / `npm run audit:all` | Production and full dependency audits; both should report 0 vulnerabilities.                                                                                                                                                                          |
 
-GitHub Actions runs `npm run ci:verify` on Node 22.x and 24.x for pushes to `main` and `codex/**`,
+GitHub Actions runs `npm run ci:verify` on Node 22.13.0 and 24.x for pushes to `main` and `codex/**`,
 pull requests, and manual dispatches. A separate scheduled/manual `Live Schema Drift` workflow runs
 `npm run verify:schema-live` on Node 24.x so normal PR CI stays deterministic.
 

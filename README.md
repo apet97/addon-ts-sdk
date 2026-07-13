@@ -14,7 +14,8 @@ router, runtime adapters, and RS256 webhook-signature verification.
   manifest schemas 1.2–1.5 plus provenance hashes used by `npm run verify:generated`.
 - [`MARKETPLACE_DOCS/`](./MARKETPLACE_DOCS) — Clockify's published add-on documentation, kept for reference.
 
-Runtime support starts at Node 22. The GitHub Actions matrix verifies Node 22.x and 24.x.
+Published-package runtime support starts at Node 22. Source development requires Node 22.13.0 or
+newer; GitHub Actions verifies the exact 22.13.0 floor and the current Node 24 line.
 
 Install the SDK or create a project from npm:
 
@@ -46,9 +47,9 @@ npm run release:preflight
 npm run verify:registry
 ```
 
-The current workspace remains at the published `1.0.1` versions, so `release:preflight` is expected
-to fail until a future version bump. `release:verify` also ends in an expected immutable-version
-rejection at its `release:dry-run` step on this checkout. These registry-dependent commands are
-intentionally separate from deterministic `ci:verify`.
+Run `release:preflight` and `release:verify` only while preparing unpublished workspace versions.
+After publication, npm's immutable-version check correctly rejects another dry run of those exact
+versions; use `verify:registry` for post-publish proof. Registry-dependent commands remain separate
+from deterministic `ci:verify`.
 
 Independent, unofficial project — not affiliated with, endorsed by, or supported by Clockify or CAKE.com.
