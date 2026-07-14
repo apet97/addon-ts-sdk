@@ -4,11 +4,19 @@ All notable changes to this SDK are recorded here.
 
 ## Unreleased
 
+## 1.0.5 - 2026-07-14
+
 - Reorganized active documentation into a builder-first journey with separate SDK reference and
   maintainer ownership boundaries.
 - Added runtime- and feature-aware README output to generated creator projects.
 - Added a repository documentation verifier for active links and anchors, required builder
   navigation, paired agent guidance, and configured stale claims.
+- Replaced runtime AJV compilation with deterministic standalone Draft-04 validators so generated
+  Worker projects execute under real `workerd` without string code generation.
+- Executed all four packed Node/Worker scaffold variants, hardened detached Wrangler process-group
+  cleanup, and expanded syntax-aware bundle inspection for indirect and aliased code generation.
+- Corrected builder, lifecycle, client, routing, storage, migration, publication, and maintainer
+  guidance against current source, package contents, and executable behavior.
 
 ## 1.0.4 - 2026-07-14
 

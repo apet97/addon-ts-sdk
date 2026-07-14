@@ -29,6 +29,18 @@ check must reject immutable versions that are already published. Documentation v
 not create a new release candidate, registry receipt, authenticated Clockify receipt, or Marketplace
 submission evidence.
 
+## 1.0.5 release candidate
+
+The authorized candidate versions are:
+
+- `@apet97/clockify-addon-sdk@1.0.5`
+- `create-clockify-addon@1.0.5`
+
+Publication requires a clean `release:preflight` and `release:verify`, an ancestry-safe direct push
+of the exact source to `main`, and green Node 22/24 CI. Publish the SDK first and the creator second,
+then replace this candidate record with the immutable registry receipt after `verify:registry`
+passes. This candidate makes no fresh authenticated Marketplace lifecycle claim.
+
 ## 1.0.4 release evidence
 
 Release source commit `0e2fde5a49e8d6860961339b7945ba6d2a177c07` corrects direct-client retry

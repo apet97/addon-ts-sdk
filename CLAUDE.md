@@ -120,6 +120,9 @@ respecting the upstream, generated, historical, and ignored-local boundaries abo
 - Commit when requested. Push only when explicitly requested, and publish only with explicit
   npm-owner approval for the exact packages and versions. When both packages are authorized, publish
   the SDK first and the creator second, then run `npm run verify:registry`.
+- For an authorized two-package release, update both workspace versions and the lockfile together,
+  run `release:preflight` then `release:verify`, push the exact source and wait for green CI before
+  publishing, and record the post-registry receipt in `docs/maintainers/release-readiness.md`.
 - Before a direct `main` push, fetch `origin`, confirm `origin/main` is an ancestor of the commit,
   push without force, and verify the remote and local tips match. Never force-push or amend a pushed
   commit, and never redirect this repository's history to a similarly named project.
