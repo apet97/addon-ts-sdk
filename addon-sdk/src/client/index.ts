@@ -30,6 +30,9 @@ export class ClockifyAddonHttpError extends Error {
 
 function normalizeBackendUrl(value: string): URL {
   const url = new URL(value);
+  if (url.username !== "" || url.password !== "") {
+    throw new Error("Clockify backendUrl must not include credentials.");
+  }
   if (url.protocol !== "https:" && !(url.protocol === "http:" && url.hostname === "localhost")) {
     throw new Error("Clockify backendUrl must use HTTPS outside localhost.");
   }
@@ -68,7 +71,11 @@ export class ClockifyAddonClient {
     this.backendUrl = normalizeBackendUrl(options.backendUrl);
     this.fetch = options.fetch ?? globalThis.fetch;
     this.signal = options.signal;
-    this.timeoutMs = options.timeoutMs ?? 15_000;
+    const timeoutMs = options.timeoutMs ?? 15_000;
+    if (!Number.isInteger(timeoutMs) || timeoutMs < 1 || timeoutMs > 2_147_483_647) {
+      throw new Error("timeoutMs must be an integer between 1 and 2147483647.");
+    }
+    this.timeoutMs = timeoutMs;
     this.maxAttempts = options.maxAttempts ?? 3;
     this.sleep =
       options.sleep ??

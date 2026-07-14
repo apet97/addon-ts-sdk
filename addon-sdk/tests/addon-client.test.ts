@@ -17,6 +17,38 @@ describe("ClockifyAddonClient", () => {
           maxAttempts: 0,
         }),
     ).toThrow(/positive integer/i);
+    expect(
+      () =>
+        new ClockifyAddonClient({
+          token: "token",
+          backendUrl: "https://user:password@api.example/api",
+        }),
+    ).toThrow(/credentials/i);
+  });
+
+  it.each([0, -1, Number.NaN, Number.POSITIVE_INFINITY, 1.5, 2_147_483_648])(
+    "rejects invalid timeoutMs %s",
+    (timeoutMs) => {
+      expect(
+        () =>
+          new ClockifyAddonClient({
+            token: "token",
+            backendUrl: "https://api.example/api",
+            timeoutMs,
+          }),
+      ).toThrow(new Error("timeoutMs must be an integer between 1 and 2147483647."));
+    },
+  );
+
+  it.each([1, 15_000, 2_147_483_647])("accepts timeoutMs %s", (timeoutMs) => {
+    expect(
+      () =>
+        new ClockifyAddonClient({
+          token: "token",
+          backendUrl: "https://api.example/api",
+          timeoutMs,
+        }),
+    ).not.toThrow();
   });
 
   it("uses claim-derived URLs, X-Addon-Token, and encoded path segments", async () => {
@@ -109,6 +141,21 @@ describe("ClockifyAddonClient", () => {
     const response = await client.request(["v1", "workspaces", "w/1"]);
     expect(await response.text()).toBe("ok");
     expect(String(fetch.mock.calls[1][0])).toContain("w%2F1");
+  });
+
+  it("strips query and fragment data from the configured backend URL", async () => {
+    const fetch = vi
+      .fn<typeof globalThis.fetch>()
+      .mockResolvedValue(new Response("ok", { status: 200 }));
+    const client = new ClockifyAddonClient({
+      token: "token",
+      backendUrl: "https://api.example/api?discard=true#fragment",
+      fetch,
+    });
+
+    await client.request(["workspaces"]);
+
+    expect(String(fetch.mock.calls[0][0])).toBe("https://api.example/api/workspaces");
   });
 
   it("treats caller aborts as terminal", async () => {

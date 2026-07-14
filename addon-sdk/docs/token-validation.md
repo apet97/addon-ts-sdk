@@ -175,9 +175,13 @@ locations, or screenshots hosts. Read those URLs from the verified token claims,
 `undefined`; the SDK does not provide fallback production URLs.
 
 Use `resolveClockifyApiBaseUrl({ apiUrl, backendUrl })` when you have the installed lifecycle
-payload available: `apiUrl` wins over `backendUrl`, trailing slashes are trimmed, and `/v1` is
-appended only when missing. Use `resolveClockifyReportsBaseUrl({ reportsUrl })` for the reports
-claim; do not derive reports hosts from the API host.
+payload available: a nonblank `apiUrl` wins over `backendUrl`, trailing path slashes are trimmed,
+and `/v1` is appended only when missing. The resolvers accept absolute HTTPS URLs, plus HTTP only
+for URL-parser-canonical `localhost`, `127.0.0.1`, and `[::1]` loopback hosts. They return
+`undefined` for malformed or relative values, credentials, query strings, fragments, unsupported
+schemes, and non-loopback HTTP; an invalid preferred `apiUrl` does not fall back to `backendUrl`.
+Use `resolveClockifyReportsBaseUrl({ reportsUrl })` for the reports claim; do not derive reports
+hosts from the API host.
 
 These helpers produce the versioned `/v1` REST base only. Backend paths that do not live under `/v1`
 (for example, the add-on user-token endpoints under `{backendUrl}/addon/...`) should be built from

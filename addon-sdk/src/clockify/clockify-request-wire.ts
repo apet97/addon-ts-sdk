@@ -63,21 +63,41 @@ export function isClockifyAdminRole(role: unknown): boolean {
   return normalized === "owner" || normalized === "admin";
 }
 
-function normalizeClockifyVersionedBaseUrl(value: string | undefined): string | undefined {
-  const root = value?.trim().replace(/\/+$/, "");
-  if (!root) return undefined;
-  return root.endsWith("/v1") ? root : `${root}/v1`;
-}
+function normalizeClockifyVersionedBaseUrl(value: unknown): string | undefined {
+  if (typeof value !== "string") return undefined;
+  const root = value.trim();
+  if (root === "") return undefined;
 
-function firstNonEmpty(...values: Array<string | undefined>): string | undefined {
-  return values.find((value) => value !== undefined && value.trim() !== "");
+  let url: URL;
+  try {
+    url = new URL(root);
+  } catch {
+    return undefined;
+  }
+
+  const loopback =
+    url.hostname === "localhost" || url.hostname === "127.0.0.1" || url.hostname === "[::1]";
+  if (url.protocol !== "https:" && !(url.protocol === "http:" && loopback)) return undefined;
+  if (url.username !== "" || url.password !== "" || url.search !== "" || url.hash !== "") {
+    return undefined;
+  }
+
+  const pathname = url.pathname.replace(/\/+$/, "");
+  url.pathname = pathname.endsWith("/v1") ? pathname : `${pathname}/v1`;
+  url.search = "";
+  url.hash = "";
+  return url.toString();
 }
 
 export function resolveClockifyApiBaseUrl(input: {
   apiUrl?: string;
   backendUrl?: string;
 }): string | undefined {
-  return normalizeClockifyVersionedBaseUrl(firstNonEmpty(input.apiUrl, input.backendUrl));
+  if (input.apiUrl !== undefined) {
+    if (typeof input.apiUrl !== "string") return undefined;
+    if (input.apiUrl.trim() !== "") return normalizeClockifyVersionedBaseUrl(input.apiUrl);
+  }
+  return normalizeClockifyVersionedBaseUrl(input.backendUrl);
 }
 
 export function resolveClockifyReportsBaseUrl(input: { reportsUrl?: string }): string | undefined {

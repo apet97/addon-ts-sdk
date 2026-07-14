@@ -544,23 +544,79 @@ describe("Marketplace request verification helpers", () => {
     expect(isClockifyAdminRole(undefined)).toBe(false);
   });
 
-  it("normalizes Clockify environment URLs without adding production fallbacks", () => {
-    expect(resolveClockifyApiBaseUrl({ apiUrl: "https://developer.clockify.me/api" })).toBe(
-      "https://developer.clockify.me/api/v1",
+  it.each([
+    ["https://developer.clockify.me", "https://developer.clockify.me/v1"],
+    ["https://developer.clockify.me/", "https://developer.clockify.me/v1"],
+    ["https://developer.clockify.me/api", "https://developer.clockify.me/api/v1"],
+    ["https://developer.clockify.me/region/api///", "https://developer.clockify.me/region/api/v1"],
+    ["https://developer.clockify.me/api/v1", "https://developer.clockify.me/api/v1"],
+    ["https://developer.clockify.me/api/v1///", "https://developer.clockify.me/api/v1"],
+    ["http://localhost:3000/api", "http://localhost:3000/api/v1"],
+    ["http://127.0.0.1:3000/api", "http://127.0.0.1:3000/api/v1"],
+    ["http://[::1]:3000/api", "http://[::1]:3000/api/v1"],
+  ])("normalizes the Clockify API root %s", (apiUrl, expected) => {
+    expect(resolveClockifyApiBaseUrl({ apiUrl })).toBe(expected);
+  });
+
+  it("normalizes reports roots with the same URL policy", () => {
+    expect(
+      resolveClockifyReportsBaseUrl({
+        reportsUrl: "https://reports.example/region/report///",
+      }),
+    ).toBe("https://reports.example/region/report/v1");
+    expect(resolveClockifyReportsBaseUrl({ reportsUrl: "http://[::1]:8787/report/v1/" })).toBe(
+      "http://[::1]:8787/report/v1",
     );
-    expect(resolveClockifyApiBaseUrl({ apiUrl: "https://x.clockify.me/api/v1" })).toBe(
-      "https://x.clockify.me/api/v1",
-    );
+  });
+
+  it("prefers a nonblank apiUrl without falling back when it is invalid", () => {
     expect(
       resolveClockifyApiBaseUrl({
         apiUrl: "https://developer.clockify.me/api",
         backendUrl: "https://api.clockify.me/api",
       }),
     ).toBe("https://developer.clockify.me/api/v1");
-    expect(resolveClockifyApiBaseUrl({})).toBeUndefined();
     expect(
-      resolveClockifyReportsBaseUrl({ reportsUrl: "https://developer.clockify.me/report" }),
-    ).toBe("https://developer.clockify.me/report/v1");
+      resolveClockifyApiBaseUrl({
+        apiUrl: "   ",
+        backendUrl: "https://api.clockify.me/api",
+      }),
+    ).toBe("https://api.clockify.me/api/v1");
+    expect(
+      resolveClockifyApiBaseUrl({
+        apiUrl: "http://nonloopback.example/api",
+        backendUrl: "https://api.clockify.me/api",
+      }),
+    ).toBeUndefined();
+    expect(
+      resolveClockifyApiBaseUrl({
+        apiUrl: 42 as unknown as string,
+        backendUrl: "https://api.clockify.me/api",
+      }),
+    ).toBeUndefined();
+  });
+
+  it.each([
+    ["non-string", 42],
+    ["empty", ""],
+    ["whitespace", "   "],
+    ["username", "https://user@api.example/api"],
+    ["password", "https://:password@api.example/api"],
+    ["query", "https://api.example/api?workspace=secret"],
+    ["fragment", "https://api.example/api#secret"],
+    ["unsupported scheme", "ftp://api.example/api"],
+    ["relative URL", "/api"],
+    ["protocol-relative URL", "//api.example/api"],
+    ["malformed URL", "https://[::1"],
+    ["nonloopback HTTP", "http://api.example/api"],
+  ])("rejects a %s claim-derived URL", (_label, value) => {
+    expect(resolveClockifyApiBaseUrl({ apiUrl: value as string })).toBeUndefined();
+    expect(resolveClockifyReportsBaseUrl({ reportsUrl: value as string })).toBeUndefined();
+  });
+
+  it("does not add production URL fallbacks", () => {
+    expect(resolveClockifyApiBaseUrl({})).toBeUndefined();
+    expect(resolveClockifyReportsBaseUrl({})).toBeUndefined();
   });
 
   it("wraps handlers and returns 401 for failed verification", async () => {
