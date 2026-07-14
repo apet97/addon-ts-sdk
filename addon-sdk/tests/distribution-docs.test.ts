@@ -373,6 +373,19 @@ describe("published distribution docs", () => {
     expect(recipe).not.toContain("does not add a Clockify REST client");
   });
 
+  it("distinguishes the signed backend URL from the installed API URL", () => {
+    const tokenValidation = readFileSync(
+      resolve(packageRoot, "docs", "token-validation.md"),
+      "utf8",
+    );
+
+    expect(tokenValidation).toContain("`backendUrl` is a signed JWT claim");
+    expect(tokenValidation).toContain("`apiUrl` comes from the verified `INSTALLED` payload");
+    expect(tokenValidation).toContain("`ClockifyAddonClient` requires that verified `backendUrl`");
+    expect(tokenValidation).toContain("Retain the verified `backendUrl` separately");
+    expect(tokenValidation).not.toContain("raw `backendUrl`/`apiUrl` claim");
+  });
+
   it("documents current routing and manifest-builder reference behavior", () => {
     const routing = readFileSync(resolve(packageRoot, "docs", "routing.md"), "utf8");
     const manifestBuilders = readFileSync(

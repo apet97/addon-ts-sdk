@@ -182,16 +182,20 @@ locations, or screenshots hosts. Read those URLs from the verified token claims,
 `getClockifyEnvironmentContext(claims)` to collect them in one object. Missing claims stay
 `undefined`; the SDK does not provide fallback production URLs.
 
-Use `resolveClockifyApiBaseUrl({ apiUrl, backendUrl })` when you have the installed lifecycle
-payload available: a nonblank `apiUrl` wins over `backendUrl`, trailing path slashes are trimmed,
-and `/v1` is appended only when missing. The resolvers accept absolute HTTPS URLs, plus HTTP only
-for URL-parser-canonical `localhost`, `127.0.0.1`, and `[::1]` loopback hosts. They return
-`undefined` for malformed or relative values, credentials, query strings, fragments, unsupported
-schemes, and non-loopback HTTP; an invalid preferred `apiUrl` does not fall back to `backendUrl`.
-Use `resolveClockifyReportsBaseUrl({ reportsUrl })` for the reports claim; do not derive reports
-hosts from the API host.
+`apiUrl` comes from the verified `INSTALLED` payload and is stored in
+`ClockifyInstallationContext`; `backendUrl` is a signed JWT claim. Use
+`resolveClockifyApiBaseUrl({ apiUrl, backendUrl })` to produce the versioned `/v1` entity REST base:
+a nonblank `apiUrl` wins over `backendUrl`, trailing path slashes are trimmed, and `/v1` is appended
+only when missing. The resolvers accept absolute HTTPS URLs, plus HTTP only for
+URL-parser-canonical `localhost`, `127.0.0.1`, and `[::1]` loopback hosts. They return `undefined`
+for malformed or relative values, credentials, query strings, fragments, unsupported schemes, and
+non-loopback HTTP; an invalid preferred `apiUrl` does not fall back to `backendUrl`. Use
+`resolveClockifyReportsBaseUrl({ reportsUrl })` for the reports claim; do not derive reports hosts
+from the API host.
 
-These helpers produce the versioned `/v1` REST base only. Backend paths that do not live under `/v1`
-(for example, the add-on user-token endpoints under `{backendUrl}/addon/...`) should be built from
-the raw `backendUrl`/`apiUrl` claim instead. `getClockifyEnvironmentContext()` also surfaces the
-`ptoUrl` claim alongside the hosts listed above when Clockify includes it.
+Marketplace paths under `/addon/...` use a different base contract.
+`ClockifyAddonClient` requires that verified `backendUrl`; `apiUrl` is not an interchangeable
+Marketplace endpoint base. Retain the verified `backendUrl` separately alongside the SDK
+installation context, which stores `apiUrl`.
+`getClockifyEnvironmentContext()` also surfaces the `ptoUrl` claim alongside the hosts listed above
+when Clockify includes it.
