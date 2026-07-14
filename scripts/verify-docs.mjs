@@ -1,4 +1,4 @@
-import { readFile, readdir, stat } from "node:fs/promises";
+import { readFile, readdir, realpath, stat } from "node:fs/promises";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 
@@ -57,32 +57,121 @@ export async function discoverActiveMarkdown(root) {
   return output.sort();
 }
 
+function fenceLine(line) {
+  let content = line.endsWith("\r") ? line.slice(0, -1) : line;
+  let blockquoteDepth = 0;
+  while (true) {
+    const marker = content.match(/^ {0,3}>[ \t]?/);
+    if (marker === null) return { content, blockquoteDepth };
+    content = content.slice(marker[0].length);
+    blockquoteDepth++;
+  }
+}
+
 function stripFencedCode(source) {
   let fence;
   return source
     .split("\n")
     .map((line) => {
-      const comparable = line.endsWith("\r") ? line.slice(0, -1) : line;
+      const candidate = fenceLine(line);
       if (fence !== undefined) {
-        const closing = comparable.match(/^ {0,3}(`{3,}|~{3,})[ \t]*$/);
         if (
-          closing !== null &&
-          closing[1][0] === fence.marker &&
-          closing[1].length >= fence.length
+          fence.blockquoteDepth === 0 ||
+          candidate.blockquoteDepth >= fence.blockquoteDepth
         ) {
-          fence = undefined;
+          const closing = candidate.content.match(
+            /^ {0,3}(`{3,}|~{3,})[ \t]*$/,
+          );
+          if (
+            closing !== null &&
+            candidate.blockquoteDepth === fence.blockquoteDepth &&
+            closing[1][0] === fence.marker &&
+            closing[1].length >= fence.length
+          ) {
+            fence = undefined;
+          }
+          return "";
         }
-        return "";
+        fence = undefined;
       }
 
-      const opening = comparable.match(/^ {0,3}(`{3,}|~{3,})(.*)$/);
+      const opening = candidate.content.match(/^ {0,3}(`{3,}|~{3,})(.*)$/);
       if (opening === null) return line;
       const marker = opening[1][0];
       if (marker === "`" && opening[2].includes("`")) return line;
-      fence = { marker, length: opening[1].length };
+      fence = {
+        marker,
+        length: opening[1].length,
+        blockquoteDepth: candidate.blockquoteDepth,
+      };
       return "";
     })
     .join("\n");
+}
+
+function isEscaped(source, position) {
+  let backslashes = 0;
+  for (
+    let cursor = position - 1;
+    cursor >= 0 && source[cursor] === "\\";
+    cursor--
+  )
+    backslashes++;
+  return backslashes % 2 === 1;
+}
+
+function maskRange(output, source, start, end) {
+  for (let cursor = start; cursor < end; cursor++) {
+    if (source[cursor] !== "\n" && source[cursor] !== "\r")
+      output[cursor] = " ";
+  }
+}
+
+function maskHtmlComments(source) {
+  const output = source.split("");
+  let cursor = 0;
+  while (cursor < source.length) {
+    const start = source.indexOf("<!--", cursor);
+    if (start === -1) break;
+    if (isEscaped(source, start)) {
+      cursor = start + 4;
+      continue;
+    }
+    const closing = source.indexOf("-->", start + 4);
+    const end = closing === -1 ? source.length : closing + 3;
+    maskRange(output, source, start, end);
+    cursor = end;
+  }
+  return output.join("");
+}
+
+function maskInlineCode(source) {
+  const output = source.split("");
+  for (let cursor = 0; cursor < source.length; cursor++) {
+    if (source[cursor] !== "`" || isEscaped(source, cursor)) continue;
+    let openingEnd = cursor + 1;
+    while (source[openingEnd] === "`") openingEnd++;
+    const delimiter = source.slice(cursor, openingEnd);
+    let closing = openingEnd;
+    while ((closing = source.indexOf(delimiter, closing)) !== -1) {
+      if (
+        source[closing - 1] !== "`" &&
+        source[closing + delimiter.length] !== "`"
+      ) {
+        const end = closing + delimiter.length;
+        maskRange(output, source, cursor, end);
+        cursor = end - 1;
+        break;
+      }
+      closing++;
+    }
+    if (closing === -1) cursor = openingEnd - 1;
+  }
+  return output.join("");
+}
+
+function stripNonRendered(source) {
+  return maskInlineCode(maskHtmlComments(stripFencedCode(source)));
 }
 
 const MARKDOWN_ESCAPABLE = new Set("!\"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~");
@@ -278,12 +367,63 @@ function referenceDefinitions(source) {
   return { content, definitions };
 }
 
+function linkDestination(parsed, label) {
+  const following = label.end + 1;
+  if (parsed.content[following] === "(") {
+    const destination = inlineDestination(parsed.content, following);
+    if (destination !== null && destination.href !== "") return destination;
+  }
+
+  let referenceLabel = label.value;
+  let end = label.end;
+  if (parsed.content[following] === "[") {
+    const reference = bracket(parsed.content, following);
+    if (reference === null) return null;
+    referenceLabel = reference.value === "" ? label.value : reference.value;
+    end = reference.end;
+  }
+  const definition = parsed.definitions.get(
+    normalizeReferenceLabel(referenceLabel),
+  );
+  return definition === undefined
+    ? null
+    : { href: definition.href, end, definition };
+}
+
+function nestedImages(parsed, start, end) {
+  const images = [];
+  for (let cursor = start; cursor < end; cursor++) {
+    if (
+      parsed.content[cursor] !== "!" ||
+      parsed.content[cursor + 1] !== "[" ||
+      isEscaped(parsed.content, cursor)
+    )
+      continue;
+    const label = bracket(parsed.content, cursor + 1);
+    if (label === null || label.end >= end) continue;
+    const destination = linkDestination(parsed, label);
+    if (destination === null || destination.end >= end) continue;
+    if (destination.definition !== undefined)
+      destination.definition.used = true;
+    images.push({
+      href: destination.href,
+      navigational: false,
+      position: cursor,
+    });
+    images.push(...nestedImages(parsed, cursor + 2, label.end));
+    cursor = destination.end;
+  }
+  return images;
+}
+
 function markdownLinks(source) {
-  const parsed = referenceDefinitions(stripFencedCode(source));
+  const parsed = referenceDefinitions(stripNonRendered(source));
   const links = [];
   for (let cursor = 0; cursor < parsed.content.length; cursor++) {
     const image =
-      parsed.content[cursor] === "!" && parsed.content[cursor + 1] === "[";
+      parsed.content[cursor] === "!" &&
+      parsed.content[cursor + 1] === "[" &&
+      !isEscaped(parsed.content, cursor);
     const bracketStart = image
       ? cursor + 1
       : parsed.content[cursor] === "["
@@ -293,43 +433,20 @@ function markdownLinks(source) {
     const label = bracket(parsed.content, bracketStart);
     if (label === null) continue;
 
-    const following = label.end + 1;
-    if (parsed.content[following] === "(") {
-      const destination = inlineDestination(parsed.content, following);
-      if (destination !== null && destination.href !== "") {
-        links.push({
-          href: destination.href,
-          navigational: !image,
-          position: cursor,
-        });
-        cursor = destination.end;
-        continue;
-      }
+    const destination = linkDestination(parsed, label);
+    if (destination === null) {
+      cursor = label.end;
+      continue;
     }
-
-    let referenceLabel = label.value;
-    let referenceEnd = label.end;
-    if (parsed.content[following] === "[") {
-      const reference = bracket(parsed.content, following);
-      if (reference === null) {
-        cursor = label.end;
-        continue;
-      }
-      referenceLabel = reference.value === "" ? label.value : reference.value;
-      referenceEnd = reference.end;
-    }
-    const definition = parsed.definitions.get(
-      normalizeReferenceLabel(referenceLabel),
-    );
-    if (definition !== undefined) {
-      definition.used = true;
-      links.push({
-        href: definition.href,
-        navigational: !image,
-        position: cursor,
-      });
-    }
-    cursor = referenceEnd;
+    if (destination.definition !== undefined)
+      destination.definition.used = true;
+    links.push({
+      href: destination.href,
+      navigational: !image,
+      position: cursor,
+    });
+    links.push(...nestedImages(parsed, bracketStart + 1, label.end));
+    cursor = destination.end;
   }
 
   for (const definition of parsed.definitions.values()) {
@@ -406,7 +523,7 @@ function localParts(href) {
   }
 }
 
-async function resolvedTarget(root, sourceFile, parts) {
+async function resolvedTarget(root, canonicalRoot, sourceFile, parts) {
   let absolute = parts.path
     ? path.resolve(root, path.dirname(sourceFile), parts.path)
     : path.resolve(root, sourceFile);
@@ -419,6 +536,13 @@ async function resolvedTarget(root, sourceFile, parts) {
       if (!(await stat(absolute)).isFile()) return { missing: relative };
       await readFile(absolute);
     }
+    const canonicalTarget = await realpath(absolute);
+    const canonicalRelative = path.relative(canonicalRoot, canonicalTarget);
+    if (
+      canonicalRelative === ".." ||
+      canonicalRelative.startsWith(`..${path.sep}`)
+    )
+      return { escaped: true };
   } catch {
     return { missing: relative };
   }
@@ -439,6 +563,7 @@ export async function collectDocumentationErrors(
   } = {},
 ) {
   const absoluteRoot = path.resolve(root);
+  const canonicalRoot = await realpath(absoluteRoot);
   const files = documents ?? (await discoverActiveMarkdown(absoluteRoot));
   const contents = new Map();
   const directLinks = new Map();
@@ -459,7 +584,12 @@ export async function collectDocumentationErrors(
         );
         continue;
       }
-      const target = await resolvedTarget(absoluteRoot, sourceFile, parts);
+      const target = await resolvedTarget(
+        absoluteRoot,
+        canonicalRoot,
+        sourceFile,
+        parts,
+      );
       if (target.escaped) {
         errors.push(`${sourceFile}: link escapes the repository: ${href}`);
         continue;

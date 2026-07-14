@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -160,6 +160,108 @@ describe("documentation verification", () => {
         requiredFromIndex: ["docs/guide one.md", "docs/preview.png"],
       }),
     ).resolves.toEqual(["docs/README.md: does not link required document docs/preview.png"]);
+  });
+
+  it("validates linked images and their outer navigation independently", async () => {
+    const root = await fixture({
+      "docs/README.md": "# Docs\n\n[![Badge](missing.png)](guide.md)\n",
+      "docs/guide.md": "# Guide\n",
+    });
+
+    await expect(
+      collectDocumentationErrors(root, {
+        documents: ["docs/README.md", "docs/guide.md"],
+        requiredFromIndex: ["docs/guide.md"],
+      }),
+    ).resolves.toEqual(["docs/README.md: missing link target: missing.png"]);
+  });
+
+  it("treats an escaped exclamation mark before a link as literal text", async () => {
+    const root = await fixture({
+      "docs/README.md": "# Docs\n\n\\![Guide](guide.md)\n",
+      "docs/guide.md": "# Guide\n",
+    });
+
+    await expect(
+      collectDocumentationErrors(root, {
+        documents: ["docs/README.md", "docs/guide.md"],
+        requiredFromIndex: ["docs/guide.md"],
+      }),
+    ).resolves.toEqual([]);
+  });
+
+  it("ignores links in inline code and HTML comments beside rendered links", async () => {
+    const root = await fixture({
+      "docs/README.md": [
+        "# Docs",
+        "",
+        "`[Inline](missing-inline.md) [Guide](guide.md)`",
+        "<!-- [Comment](missing-comment.md) [Guide](guide.md) -->",
+        "[Rendered](rendered.md)",
+        "",
+      ].join("\n"),
+      "docs/guide.md": "# Guide\n",
+      "docs/rendered.md": "# Rendered\n",
+    });
+
+    await expect(
+      collectDocumentationErrors(root, {
+        documents: ["docs/README.md", "docs/guide.md", "docs/rendered.md"],
+        requiredFromIndex: ["docs/guide.md"],
+      }),
+    ).resolves.toEqual(["docs/README.md: does not link required document docs/guide.md"]);
+  });
+
+  it("ignores links in blockquoted variable-length fences beside rendered links", async () => {
+    const root = await fixture({
+      "docs/README.md": [
+        "# Docs",
+        "",
+        "> ````markdown",
+        "> [Quoted](missing-quoted.md)",
+        "> ```",
+        "> [Still quoted](missing-after-short-close.md)",
+        "> [Guide](guide.md)",
+        "> ````",
+        "",
+        "[Rendered](rendered.md)",
+        "",
+      ].join("\n"),
+      "docs/guide.md": "# Guide\n",
+      "docs/rendered.md": "# Rendered\n",
+    });
+
+    await expect(
+      collectDocumentationErrors(root, {
+        documents: ["docs/README.md", "docs/guide.md", "docs/rendered.md"],
+        requiredFromIndex: ["docs/guide.md"],
+      }),
+    ).resolves.toEqual(["docs/README.md: does not link required document docs/guide.md"]);
+  });
+
+  it("rejects file and directory README symlinks that leave the repository", async () => {
+    const outsideRoot = await mkdtemp(join(tmpdir(), "clockify-docs-outside-"));
+    temporaryRoots.push(outsideRoot);
+    await writeFile(join(outsideRoot, "outside.md"), "# Outside\n");
+    await mkdir(join(outsideRoot, "guide"));
+    await writeFile(join(outsideRoot, "guide", "README.md"), "# Outside directory\n");
+
+    const root = await fixture({
+      "docs/README.md":
+        "# Docs\n\n[File](file-link.md)\n[Directory](directory-link/#outside-directory)\n",
+    });
+    await symlink(join(outsideRoot, "outside.md"), join(root, "docs", "file-link.md"));
+    await symlink(join(outsideRoot, "guide"), join(root, "docs", "directory-link"));
+
+    await expect(
+      collectDocumentationErrors(root, {
+        documents: ["docs/README.md"],
+        requiredFromIndex: [],
+      }),
+    ).resolves.toEqual([
+      "docs/README.md: link escapes the repository: file-link.md",
+      "docs/README.md: link escapes the repository: directory-link/#outside-directory",
+    ]);
   });
 
   it("reports broken files, anchors, and index reachability together", async () => {
