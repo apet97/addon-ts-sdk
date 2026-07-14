@@ -8,7 +8,7 @@ describe("ClockifyAddonClient", () => {
     ).toThrow(/token/i);
     expect(
       () => new ClockifyAddonClient({ token: "token", backendUrl: "http://api.example/api" }),
-    ).toThrow(/HTTPS/i);
+    ).toThrow(new Error("Clockify backendUrl must use HTTPS outside canonical loopback hosts."));
     expect(
       () =>
         new ClockifyAddonClient({
@@ -24,6 +24,52 @@ describe("ClockifyAddonClient", () => {
           backendUrl: "https://user:password@api.example/api",
         }),
     ).toThrow(/credentials/i);
+    expect(
+      () =>
+        new ClockifyAddonClient({
+          token: "token",
+          backendUrl: "http://user:password@127.1:8080/api",
+        }),
+    ).toThrow(new Error("Clockify backendUrl must not include credentials."));
+  });
+
+  it.each(["http://127.0.0.1:8080/api", "http://[::1]:8080/api"])(
+    "accepts canonical loopback backendUrl %s",
+    (backendUrl) => {
+      expect(() => new ClockifyAddonClient({ token: "token", backendUrl })).not.toThrow();
+    },
+  );
+
+  it.each([
+    ["http://localhost\\api", "http://localhost/api/v1"],
+    ["http://localhost:8080\\api", "http://localhost:8080/api/v1"],
+  ])(
+    "normalizes a special-URL backslash path in backendUrl %s",
+    async (backendUrl, expectedUrl) => {
+      const fetch = vi
+        .fn<typeof globalThis.fetch>()
+        .mockResolvedValue(new Response("ok", { status: 200 }));
+      const client = new ClockifyAddonClient({ token: "token", backendUrl, fetch });
+
+      await client.request(["v1"]);
+
+      expect(fetch).toHaveBeenCalledTimes(1);
+      expect(String(fetch.mock.calls[0][0])).toBe(expectedUrl);
+    },
+  );
+
+  it.each([
+    "http://127.0.0.1.:8080/api",
+    "http://127.1:8080/api",
+    "http://2130706433:8080/api",
+    "http://0x7f000001:8080/api",
+    "http://[0:0:0:0:0:0:0:1]:8080/api",
+    "http://LOCALHOST:8080/api",
+    "http://localhost.:8080/api",
+  ])("rejects noncanonical loopback backendUrl spelling %s", (backendUrl) => {
+    expect(() => new ClockifyAddonClient({ token: "token", backendUrl })).toThrow(
+      new Error("Clockify backendUrl must use HTTPS outside canonical loopback hosts."),
+    );
   });
 
   it.each([0, -1, Number.NaN, Number.POSITIVE_INFINITY, 1.5, 2_147_483_648])(

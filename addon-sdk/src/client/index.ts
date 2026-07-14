@@ -33,8 +33,15 @@ function normalizeBackendUrl(value: string): URL {
   if (url.username !== "" || url.password !== "") {
     throw new Error("Clockify backendUrl must not include credentials.");
   }
-  if (url.protocol !== "https:" && !(url.protocol === "http:" && url.hostname === "localhost")) {
-    throw new Error("Clockify backendUrl must use HTTPS outside localhost.");
+  const rawHostname =
+    /^[a-z][a-z\d+.-]*:\/\/(\[[^?/#\\]+\]|[^:/?#\\]+)(?::[^/?#\\]*)?(?:[/?#\\]|$)/i.exec(
+      value.trim(),
+    )?.[1];
+  const loopback =
+    rawHostname === url.hostname &&
+    (url.hostname === "localhost" || url.hostname === "127.0.0.1" || url.hostname === "[::1]");
+  if (url.protocol !== "https:" && !(url.protocol === "http:" && loopback)) {
+    throw new Error("Clockify backendUrl must use HTTPS outside canonical loopback hosts.");
   }
   url.search = "";
   url.hash = "";

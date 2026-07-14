@@ -4,6 +4,7 @@ All notable changes to this SDK are recorded here.
 
 ## Unreleased
 
+- Accept http://127.0.0.1 and http://[::1] backendUrl values in ClockifyAddonClient, matching the canonical loopback policy used by the claim-derived URL resolvers.
 - Reject empty, '.', and '..' client path segments that previously collapsed into a different endpoint during URL normalization.
 - Apply the bounded exponential backoff when a retryable response omits the Retry-After header instead of retrying immediately.
 
