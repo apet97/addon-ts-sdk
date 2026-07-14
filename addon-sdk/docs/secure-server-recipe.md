@@ -46,8 +46,13 @@ addon.registerWebhook(
 );
 ```
 
-The wrapper checks the signed JWT, the expected event header, workspace/add-on context, and the
-stored webhook token before the handler runs.
+The wrapper requires exactly one token source: either a fixed `expectedWebhookAuthToken` or
+`getExpectedWebhookAuthToken`, never neither or both. It verifies the signature and event plus
+nonblank signed workspace/add-on context before calling a lookup, then compares the resolved stored
+token before the handler runs. Invalid or contextless requests never reach the lookup or handler.
+
+If you call `verifyClockifyWebhookRequest()` directly instead, pass the fixed stored token as its
+required `expectedWebhookAuthToken`; dynamic lookup belongs in the wrapper.
 
 ## Local Replay
 

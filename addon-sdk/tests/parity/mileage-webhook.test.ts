@@ -2,6 +2,7 @@
 // (examples/expense-webhook) through addon.handle() with REAL RS256 tokens, mirroring
 // mileage-for-clockify's MileageWebhookIntegrationTest.
 import { describe, it, expect, beforeAll } from "vitest";
+import type { ClockifyWebhookAuthTokenLookup } from "../../src";
 import { generateTestKeys, signTestToken } from "../../src/testing";
 import { createExpenseWebhookAddon, ConvertFn } from "../../examples/expense-webhook";
 
@@ -19,7 +20,7 @@ interface Recorded {
   eventType: string;
 }
 
-function buildAddon() {
+function buildAddon(getExpectedWebhookAuthToken: ClockifyWebhookAuthTokenLookup = () => undefined) {
   const conversions: Recorded[] = [];
   const onConvert: ConvertFn = (claims, expenseId, source, eventType) => {
     conversions.push({ workspaceId: claims.workspaceId, expenseId, source, eventType });
@@ -29,6 +30,7 @@ function buildAddon() {
     name: "Mileage for Clockify",
     baseUrl: "https://mileage.example.test",
     publicKey: keys.pem,
+    getExpectedWebhookAuthToken,
     onConvert,
   });
   return { addon, conversions };
@@ -37,6 +39,7 @@ function buildAddon() {
 function validToken(extraClaims: Record<string, unknown> = {}) {
   return signTestToken(keys.privateKey, KEY, {
     workspaceId: "ws-webhook",
+    addonId: "addon-webhook",
     user: "user-claims",
     workspaceRole: "OWNER",
     ...extraClaims,
@@ -53,8 +56,12 @@ const PATH = "/webhook/expense-created";
 
 describe("Ported EXPENSE_CREATED webhook (real RS256 token)", () => {
   it("valid token + full payload → converts using `id`", async () => {
-    const { addon, conversions } = buildAddon();
     const token = await validToken();
+    const lookups: Parameters<ClockifyWebhookAuthTokenLookup>[0][] = [];
+    const { addon, conversions } = buildAddon((input) => {
+      lookups.push(input);
+      return token;
+    });
     const res = await addon.handle(
       post(
         PATH,
@@ -80,11 +87,18 @@ describe("Ported EXPENSE_CREATED webhook (real RS256 token)", () => {
         eventType: "EXPENSE_CREATED",
       },
     ]);
+    expect(lookups).toEqual([
+      {
+        workspaceId: "ws-webhook",
+        addonId: "addon-webhook",
+        eventType: "EXPENSE_CREATED",
+      },
+    ]);
   });
 
   it("valid token + reference payload → converts using `expenseId`", async () => {
-    const { addon, conversions } = buildAddon();
     const token = await validToken();
+    const { addon, conversions } = buildAddon(() => token);
     const res = await addon.handle(
       post(
         PATH,
@@ -109,8 +123,8 @@ describe("Ported EXPENSE_CREATED webhook (real RS256 token)", () => {
   });
 
   it("valid token + payload without an id → 200 no-op (no conversion)", async () => {
-    const { addon, conversions } = buildAddon();
     const token = await validToken();
+    const { addon, conversions } = buildAddon(() => token);
     const res = await addon.handle(
       post(
         PATH,
@@ -142,6 +156,7 @@ describe("Ported EXPENSE_CREATED webhook (real RS256 token)", () => {
     const { addon, conversions } = buildAddon();
     const wrong = await signTestToken(keys.privateKey, "some-other-addon", {
       workspaceId: "ws-webhook",
+      addonId: "addon-webhook",
     });
     const res = await addon.handle(post(PATH, { [SIG]: wrong }, { id: "exp-1" }));
     expect(res.status).toBe(401);
@@ -161,6 +176,16 @@ describe("Ported EXPENSE_CREATED webhook (real RS256 token)", () => {
     const token = await validToken();
     const res = await addon.handle(
       post(PATH, { [SIG]: token, [EVENT]: "EXPENSE_DELETED" }, { id: "exp-1" }),
+    );
+    expect(res.status).toBe(401);
+    expect(conversions).toEqual([]);
+  });
+
+  it("missing stored webhook token → 401, no conversion", async () => {
+    const token = await validToken();
+    const { addon, conversions } = buildAddon(() => undefined);
+    const res = await addon.handle(
+      post(PATH, { [SIG]: token, [EVENT]: "EXPENSE_CREATED" }, { id: "exp-1" }),
     );
     expect(res.status).toBe(401);
     expect(conversions).toEqual([]);

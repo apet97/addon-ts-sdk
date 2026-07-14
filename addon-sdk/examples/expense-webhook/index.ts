@@ -15,7 +15,8 @@ import {
   ClockifySignatureParser,
   ClockifyAddonClaims,
   ClockifyHeaders,
-  verifyClockifyWebhookRequest,
+  ClockifyWebhookAuthTokenLookup,
+  withClockifyVerifiedWebhookRequest,
   generated,
 } from "../../src";
 
@@ -55,6 +56,8 @@ export interface ExpenseWebhookAddonOptions {
   baseUrl: string;
   /** The Clockify RSA public key (SPKI PEM) used to verify webhook signatures. */
   publicKey: string;
+  /** Loads the stored webhook token for the verified installation context. */
+  getExpectedWebhookAuthToken: ClockifyWebhookAuthTokenLookup;
   /** Business hook invoked once a webhook is authenticated and an expense id is resolved. */
   onConvert: ConvertFn;
 }
@@ -84,23 +87,26 @@ export function createExpenseWebhookAddon(
     .path("/webhook/expense-created")
     .build();
 
-  addon.registerWebhook(webhook, async (req) => {
-    const verification = await verifyClockifyWebhookRequest(parser, req, {
-      expectedEventType: "EXPENSE_CREATED",
-      eventHeader: ClockifyHeaders.WEBHOOK_EVENT_TYPE,
-    });
-    if (!verification.ok) {
-      return { status: 401, body: "Unauthorized" };
-    }
-
-    const expenseId = resolveExpenseId(req.body as ExpenseWebhookPayload | undefined);
-    if (!expenseId) {
-      // Java handler returns void -> 200 with no conversion.
-      return { status: 200 };
-    }
-    await opts.onConvert(verification.claims, expenseId, "WEBHOOK_CREATED", verification.eventType);
-    return { status: 200 };
-  });
+  addon.registerWebhook(
+    webhook,
+    withClockifyVerifiedWebhookRequest(
+      parser,
+      {
+        expectedEventType: "EXPENSE_CREATED",
+        eventHeader: ClockifyHeaders.WEBHOOK_EVENT_TYPE,
+        getExpectedWebhookAuthToken: opts.getExpectedWebhookAuthToken,
+      },
+      async (req, claims, context) => {
+        const expenseId = resolveExpenseId(req.body as ExpenseWebhookPayload | undefined);
+        if (!expenseId) {
+          // Java handler returns void -> 200 with no conversion.
+          return { status: 200 };
+        }
+        await opts.onConvert(claims, expenseId, "WEBHOOK_CREATED", context.eventType);
+        return { status: 200 };
+      },
+    ),
+  );
 
   return addon;
 }

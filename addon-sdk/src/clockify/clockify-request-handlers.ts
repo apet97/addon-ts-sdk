@@ -177,14 +177,16 @@ export function withClockifyVerifiedWebhookRequest(
   handler: ClockifyVerifiedWebhookRequestHandler,
 ): RequestHandler {
   return async (request) => {
-    if (options == null) {
+    if (options == null || !isNonEmptyString(options.expectedEventType)) {
       return unauthorizedResponse();
     }
 
-    if (
-      options.getExpectedWebhookAuthToken !== undefined &&
-      options.expectedWebhookAuthToken !== undefined
-    ) {
+    const hasFixedToken = options.expectedWebhookAuthToken !== undefined;
+    const hasTokenLookup = options.getExpectedWebhookAuthToken !== undefined;
+    if (hasFixedToken === hasTokenLookup) {
+      return unauthorizedResponse();
+    }
+    if (hasTokenLookup && typeof options.getExpectedWebhookAuthToken !== "function") {
       return unauthorizedResponse();
     }
 
@@ -205,20 +207,25 @@ export function withClockifyVerifiedWebhookRequest(
       expectedWebhookAuthToken: _expectedWebhookAuthToken,
       ...firstPassOptions
     } = options;
-    const firstPass = await verifyClockifyWebhookRequest(parser, request, firstPassOptions);
+    const firstPass = await verifyClockifyRequest(parser, request, firstPassOptions);
     if (!firstPass.ok) {
       return unauthorizedResponse();
     }
 
     const { workspaceId, addonId } = firstPass.claims;
-    if (!isNonEmptyString(workspaceId) || !isNonEmptyString(addonId)) {
+    const eventType = firstPass.eventType;
+    if (
+      !isNonEmptyString(workspaceId) ||
+      !isNonEmptyString(addonId) ||
+      !isNonEmptyString(eventType)
+    ) {
       return unauthorizedResponse();
     }
 
     const expectedWebhookAuthToken = await getExpectedWebhookAuthToken({
       workspaceId,
       addonId,
-      eventType: firstPass.eventType,
+      eventType,
     });
     if (!isNonEmptyString(expectedWebhookAuthToken)) {
       return unauthorizedResponse();

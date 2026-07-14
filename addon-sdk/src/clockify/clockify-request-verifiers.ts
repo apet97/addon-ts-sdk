@@ -121,6 +121,12 @@ export async function verifyClockifyWebhookRequest(
   ) {
     return { ok: false, reason: "missing-expected-event-type" };
   }
+  if (
+    typeof options.expectedWebhookAuthToken !== "string" ||
+    options.expectedWebhookAuthToken.trim() === ""
+  ) {
+    return { ok: false, reason: "missing-expected-webhook-auth-token" };
+  }
 
   const signatureHeader = options.signatureHeader ?? ClockifyHeaders.SIGNATURE;
   const signature = getSingleClockifyHeader(
@@ -139,10 +145,7 @@ export async function verifyClockifyWebhookRequest(
     return { ok: false, reason: "missing-signature" };
   }
 
-  if (
-    options.expectedWebhookAuthToken !== undefined &&
-    token !== options.expectedWebhookAuthToken
-  ) {
+  if (token !== options.expectedWebhookAuthToken) {
     return { ok: false, reason: "webhook-token-mismatch" };
   }
 
@@ -155,6 +158,14 @@ export async function verifyClockifyWebhookRequest(
   });
 
   if (!result.ok) return result;
+  if (
+    typeof result.claims.workspaceId !== "string" ||
+    result.claims.workspaceId.trim() === "" ||
+    typeof result.claims.addonId !== "string" ||
+    result.claims.addonId.trim() === ""
+  ) {
+    return { ok: false, reason: "missing-installation-context" };
+  }
   return { ok: true, claims: result.claims, eventType: result.eventType! };
 }
 

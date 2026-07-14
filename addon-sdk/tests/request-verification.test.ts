@@ -220,10 +220,21 @@ describe("Marketplace request verification helpers", () => {
       verifyClockifyWebhookRequest(
         parser(),
         request({
+          [ClockifyHeaders.SIGNATURE]: [token, token],
+          [ClockifyHeaders.WEBHOOK_EVENT_TYPE]: "EXPENSE_CREATED",
+        }),
+        { expectedEventType: "EXPENSE_CREATED", expectedWebhookAuthToken: token },
+      ),
+    ).resolves.toEqual({ ok: false, reason: "ambiguous-signature" });
+
+    await expect(
+      verifyClockifyWebhookRequest(
+        parser(),
+        request({
           [ClockifyHeaders.SIGNATURE]: token,
           [ClockifyHeaders.WEBHOOK_EVENT_TYPE]: ["EXPENSE_CREATED", "EXPENSE_CREATED"],
         }),
-        { expectedEventType: "EXPENSE_CREATED" },
+        { expectedEventType: "EXPENSE_CREATED", expectedWebhookAuthToken: token },
       ),
     ).resolves.toEqual({ ok: false, reason: "ambiguous-event-type" });
   });
@@ -245,6 +256,7 @@ describe("Marketplace request verification helpers", () => {
     await expect(
       verifyClockifyWebhookRequest(parser(), request({ [ClockifyHeaders.SIGNATURE]: token }), {
         expectedEventType: "EXPENSE_CREATED",
+        expectedWebhookAuthToken: token,
       }),
     ).resolves.toEqual({ ok: false, reason: "missing-event-type" });
 
@@ -255,7 +267,7 @@ describe("Marketplace request verification helpers", () => {
           [ClockifyHeaders.SIGNATURE]: token,
           [ClockifyHeaders.WEBHOOK_EVENT_TYPE]: "EXPENSE_DELETED",
         }),
-        { expectedEventType: "EXPENSE_CREATED" },
+        { expectedEventType: "EXPENSE_CREATED", expectedWebhookAuthToken: token },
       ),
     ).resolves.toEqual({ ok: false, reason: "event-type-mismatch" });
 
@@ -292,6 +304,73 @@ describe("Marketplace request verification helpers", () => {
       eventType: "EXPENSE_CREATED",
       claims: { workspaceId: WORKSPACE_ID, addonId: ADDON_ID },
     });
+  });
+
+  it("rejects missing or blank expected webhook tokens from runtime-unsafe callers", async () => {
+    const token = await validToken();
+    const webhookRequest = request({
+      [ClockifyHeaders.SIGNATURE]: token,
+      [ClockifyHeaders.WEBHOOK_EVENT_TYPE]: "EXPENSE_CREATED",
+    });
+
+    for (const expectedWebhookAuthToken of [undefined, "", " \t"] as const) {
+      await expect(
+        verifyClockifyWebhookRequest(parser(), webhookRequest, {
+          expectedEventType: "EXPENSE_CREATED",
+          expectedWebhookAuthToken,
+        } as any),
+      ).resolves.toEqual({
+        ok: false,
+        reason: "missing-expected-webhook-auth-token",
+      });
+    }
+  });
+
+  it("rejects fixed webhook tokens without nonblank installation context", async () => {
+    const tokens = [
+      await signTestToken(keys.privateKey, ADDON_KEY, { addonId: ADDON_ID }),
+      await signTestToken(keys.privateKey, ADDON_KEY, {
+        workspaceId: WORKSPACE_ID,
+        addonId: " ",
+      }),
+    ];
+
+    for (const token of tokens) {
+      const webhookRequest = request({
+        [ClockifyHeaders.SIGNATURE]: token,
+        [ClockifyHeaders.WEBHOOK_EVENT_TYPE]: "EXPENSE_CREATED",
+      });
+      await expect(
+        verifyClockifyWebhookRequest(parser(), webhookRequest, {
+          expectedEventType: "EXPENSE_CREATED",
+          expectedWebhookAuthToken: token,
+        }),
+      ).resolves.toEqual({ ok: false, reason: "missing-installation-context" });
+    }
+
+    let handled = false;
+    const token = tokens[0]!;
+    const handler = withClockifyVerifiedWebhookRequest(
+      parser(),
+      {
+        expectedEventType: "EXPENSE_CREATED",
+        expectedWebhookAuthToken: token,
+      },
+      async () => {
+        handled = true;
+        return { status: 204 };
+      },
+    );
+
+    await expect(
+      handler(
+        request({
+          [ClockifyHeaders.SIGNATURE]: token,
+          [ClockifyHeaders.WEBHOOK_EVENT_TYPE]: "EXPENSE_CREATED",
+        }),
+      ),
+    ).resolves.toEqual({ status: 401, body: "Unauthorized" });
+    expect(handled).toBe(false);
   });
 
   it("rejects verified tokens that target a different workspace or add-on id", async () => {
@@ -652,6 +731,47 @@ describe("Marketplace request verification helpers", () => {
     });
   });
 
+  it("wraps webhook handlers with an exact fixed stored token", async () => {
+    const token = await validToken();
+    let handled = false;
+    const handler = withClockifyVerifiedWebhookRequest(
+      parser(),
+      {
+        expectedEventType: "EXPENSE_CREATED",
+        expectedWebhookAuthToken: token,
+      },
+      async () => {
+        handled = true;
+        return { status: 204 };
+      },
+    );
+    const webhookRequest = request({
+      [ClockifyHeaders.SIGNATURE]: token,
+      [ClockifyHeaders.WEBHOOK_EVENT_TYPE]: "EXPENSE_CREATED",
+    });
+
+    await expect(handler(webhookRequest)).resolves.toEqual({ status: 204 });
+    expect(handled).toBe(true);
+
+    handled = false;
+    const mismatchedHandler = withClockifyVerifiedWebhookRequest(
+      parser(),
+      {
+        expectedEventType: "EXPENSE_CREATED",
+        expectedWebhookAuthToken: "different-token",
+      },
+      async () => {
+        handled = true;
+        return { status: 204 };
+      },
+    );
+    await expect(mismatchedHandler(webhookRequest)).resolves.toEqual({
+      status: 401,
+      body: "Unauthorized",
+    });
+    expect(handled).toBe(false);
+  });
+
   it("wraps webhook handlers with stored-token lookup and strict context checks", async () => {
     const token = await validToken();
     const lookups: Array<{ workspaceId: string; addonId: string; eventType: string }> = [];
@@ -729,11 +849,15 @@ describe("Marketplace request verification helpers", () => {
     ).resolves.toEqual({ status: 401, body: "Unauthorized" });
 
     const tokenWithoutContext = await signTestToken(keys.privateKey, ADDON_KEY, {});
+    let contextlessLookups = 0;
     const missingClaims = withClockifyVerifiedWebhookRequest(
       parser(),
       {
         expectedEventType: "EXPENSE_CREATED",
-        getExpectedWebhookAuthToken: () => tokenWithoutContext,
+        getExpectedWebhookAuthToken: () => {
+          contextlessLookups += 1;
+          return tokenWithoutContext;
+        },
       },
       async () => ({ status: 204 }),
     );
@@ -745,6 +869,7 @@ describe("Marketplace request verification helpers", () => {
         }),
       ),
     ).resolves.toEqual({ status: 401, body: "Unauthorized" });
+    expect(contextlessLookups).toBe(0);
   });
 
   it("rejects webhook wrappers with ambiguous fixed and lookup token configuration", async () => {
@@ -756,6 +881,55 @@ describe("Marketplace request verification helpers", () => {
         expectedEventType: "EXPENSE_CREATED",
         expectedWebhookAuthToken: token,
         getExpectedWebhookAuthToken: () => token,
+      } as any,
+      async () => {
+        handled = true;
+        return { status: 204 };
+      },
+    );
+
+    await expect(
+      handler(
+        request({
+          [ClockifyHeaders.SIGNATURE]: token,
+          [ClockifyHeaders.WEBHOOK_EVENT_TYPE]: "EXPENSE_CREATED",
+        }),
+      ),
+    ).resolves.toEqual({ status: 401, body: "Unauthorized" });
+    expect(handled).toBe(false);
+  });
+
+  it("rejects webhook wrappers without a fixed or lookup token source", async () => {
+    const token = await validToken();
+    let handled = false;
+    const handler = withClockifyVerifiedWebhookRequest(
+      parser(),
+      { expectedEventType: "EXPENSE_CREATED" } as any,
+      async () => {
+        handled = true;
+        return { status: 204 };
+      },
+    );
+
+    await expect(
+      handler(
+        request({
+          [ClockifyHeaders.SIGNATURE]: token,
+          [ClockifyHeaders.WEBHOOK_EVENT_TYPE]: "EXPENSE_CREATED",
+        }),
+      ),
+    ).resolves.toEqual({ status: 401, body: "Unauthorized" });
+    expect(handled).toBe(false);
+  });
+
+  it("rejects non-callable webhook token lookups from runtime-unsafe callers", async () => {
+    const token = await validToken();
+    let handled = false;
+    const handler = withClockifyVerifiedWebhookRequest(
+      parser(),
+      {
+        expectedEventType: "EXPENSE_CREATED",
+        getExpectedWebhookAuthToken: null,
       } as any,
       async () => {
         handled = true;

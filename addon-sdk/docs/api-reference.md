@@ -48,10 +48,13 @@ Clockify entity REST SDK.
   platform key and pinned fingerprint.
 - `verifyClockifyWebhookRequest()`, `verifyClockifyComponentRequest()`,
   `verifyClockifyLifecycleRequest()`, and `verifyClockifyToken()` return typed result objects instead
-  of throwing for normal authentication failures.
+  of throwing for normal authentication failures. Raw webhook verification requires a fixed stored
+  `expectedWebhookAuthToken` and nonblank signed `workspaceId` plus `addonId` context.
 - `withClockifyVerifiedComponentRequest()`, `withClockifyVerifiedLifecycleRequest()`,
   `withClockifyInstalledLifecycleRequest()`, and `withClockifyVerifiedWebhookRequest()` wrap route
-  handlers and return `401 Unauthorized` before application code runs when verification fails.
+  handlers and return `401 Unauthorized` before application code runs when verification fails. The
+  webhook wrapper requires exactly one token source: fixed `expectedWebhookAuthToken` or
+  `getExpectedWebhookAuthToken`, never neither or both.
 - `ClockifyHeaders`, `ClockifyQueryParams`, `getClockifyHeader()`, and `getClockifyQueryParam()`
   centralize Marketplace wire names.
 - `getClockifyEnvironmentContext()`, `resolveClockifyApiBaseUrl()`, and

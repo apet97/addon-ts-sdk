@@ -23,7 +23,7 @@ export interface ClockifyWebhookVerificationOptions {
   expectedEventType: string;
   expectedWorkspaceId?: string;
   expectedAddonId?: string;
-  expectedWebhookAuthToken?: string;
+  expectedWebhookAuthToken: string;
 }
 
 export interface ClockifyTokenVerificationOptions {
@@ -45,6 +45,8 @@ export type ClockifyRequestVerificationFailureReason =
 export type ClockifyWebhookVerificationFailureReason =
   | ClockifyRequestVerificationFailureReason
   | "missing-expected-event-type"
+  | "missing-expected-webhook-auth-token"
+  | "missing-installation-context"
   | "webhook-token-mismatch";
 
 export type ClockifyTokenVerificationFailureReason =

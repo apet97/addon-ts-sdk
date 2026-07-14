@@ -75,13 +75,15 @@ easy to miss:
 - webhook event header matches the expected event
 - token `workspaceId` matches the request/installation context
 - token `addonId` matches the stored add-on installation
-- optional stored webhook `authToken` matches the `clockify-signature` header
+- required stored webhook `authToken` matches the `clockify-signature` header
 
 Use `verifyClockifyWebhookRequest()` for webhook routes because it requires `expectedEventType`.
+The raw verifier also requires a fixed, nonblank `expectedWebhookAuthToken`; it rejects valid signed
+tokens that do not contain nonblank `workspaceId` and `addonId` installation claims.
 `verifyClockifyRequest()` remains available as a lower-level helper for advanced cases that need a
 custom policy.
-Plain JavaScript callers that omit `expectedEventType` receive `{ ok: false, reason:
-"missing-expected-event-type" }` rather than an accidentally permissive verification result.
+Plain JavaScript callers that omit `expectedEventType` or the fixed stored webhook token receive a
+typed failure result rather than an accidentally permissive verification result.
 
 Lifecycle and component routes are served by `verifyClockifyLifecycleRequest()` and
 `verifyClockifyComponentRequest()`, which read the `x-addon-lifecycle-token` header and the
@@ -102,8 +104,9 @@ For common route shapes, use the narrower wrappers:
   matches the payload `workspaceId`/`addonId` to the verified claims before the handler runs.
 - `withClockifyVerifiedWebhookRequest()` requires `expectedEventType`; it can also call
   `getExpectedWebhookAuthToken({ workspaceId, addonId, eventType })` after the first JWT pass and
-  then verify the stored webhook token before invoking the handler. Choose either a fixed
-  `expectedWebhookAuthToken` or the lookup callback for a webhook route, not both.
+  installation-context check, then verify the resolved stored token before invoking the handler.
+  Configure exactly one token source for every route: either a fixed `expectedWebhookAuthToken` or
+  the lookup callback, never neither or both.
 
 For component and lifecycle routes, use the narrower helpers when you only need to verify the
 signed add-on JWT:
