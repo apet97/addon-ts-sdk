@@ -28,6 +28,43 @@ function locationOf(node) {
   };
 }
 
+function staticMemberName(node) {
+  if (!node.computed && node.property.type === "Identifier") {
+    return node.property.name;
+  }
+  if (node.computed && node.property.type === "Literal") {
+    return typeof node.property.value === "string"
+      ? node.property.value
+      : undefined;
+  }
+  return undefined;
+}
+
+function executableReferenceKind(node, aliases) {
+  if (!isNode(node)) return undefined;
+  if (node.type === "ChainExpression") {
+    return executableReferenceKind(node.expression, aliases);
+  }
+  if (node.type === "SequenceExpression") {
+    return executableReferenceKind(node.expressions.at(-1), aliases);
+  }
+  if (node.type === "Identifier") {
+    if (node.name === "eval") return "eval-call";
+    if (node.name === "Function") return "function-constructor";
+    return aliases.get(node.name);
+  }
+  if (
+    node.type === "MemberExpression" &&
+    node.object.type === "Identifier" &&
+    node.object.name === "globalThis"
+  ) {
+    const memberName = staticMemberName(node);
+    if (memberName === "eval") return "eval-call";
+    if (memberName === "Function") return "function-constructor";
+  }
+  return undefined;
+}
+
 /**
  * Parse JavaScript and report executable constructs that must not appear in
  * generated validators or Worker bundles. Text inside comments and literals is
@@ -45,6 +82,7 @@ export function inspectRuntimeJavaScript(source, options = {}) {
     sourceType: "module",
   });
   const findings = [];
+  const executableAliases = new Map();
 
   const report = (node, kind, message) => {
     findings.push({ kind, message, ...locationOf(node) });
@@ -66,20 +104,31 @@ export function inspectRuntimeJavaScript(source, options = {}) {
   const visit = (node) => {
     if (!isNode(node)) return;
 
+    if (node.type === "VariableDeclaration" && node.kind === "const") {
+      for (const declaration of node.declarations) {
+        if (declaration.id.type !== "Identifier") continue;
+        const kind = executableReferenceKind(
+          declaration.init,
+          executableAliases,
+        );
+        if (kind !== undefined)
+          executableAliases.set(declaration.id.name, kind);
+      }
+    }
+
     if (node.type === "ImportDeclaration") {
       inspectImport(node, "static-import");
     } else if (node.type === "ImportExpression") {
       inspectImport(node, "dynamic-import");
     } else if (
       node.type === "CallExpression" &&
-      node.callee.type === "Identifier" &&
-      node.callee.name === "eval"
+      executableReferenceKind(node.callee, executableAliases) === "eval-call"
     ) {
       report(node, "eval-call", "calls eval");
     } else if (
       (node.type === "CallExpression" || node.type === "NewExpression") &&
-      node.callee.type === "Identifier" &&
-      node.callee.name === "Function"
+      executableReferenceKind(node.callee, executableAliases) ===
+        "function-constructor"
     ) {
       report(
         node,

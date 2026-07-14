@@ -1,3 +1,4 @@
+import { spawn } from "node:child_process";
 import { EventEmitter } from "node:events";
 import { existsSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -14,6 +15,27 @@ const verifierPath = fileURLToPath(
 
 async function loadHelpers() {
   return import(helpersUrl);
+}
+
+function processExists(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    if (error && typeof error === "object" && "code" in error && error.code === "ESRCH") {
+      return false;
+    }
+    throw error;
+  }
+}
+
+async function waitForProcessExit(pid: number, timeoutMs: number): Promise<boolean> {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    if (!processExists(pid)) return true;
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+  return !processExists(pid);
 }
 
 describe("scaffold runtime helpers", () => {
@@ -57,6 +79,7 @@ describe("scaffold runtime helpers", () => {
 
     signalProcessTree(child, "SIGKILL", {
       platform: "darwin",
+      processGroupId: 42,
       killProcessGroup,
       killWindowsTree: vi.fn(),
     });
@@ -77,6 +100,7 @@ describe("scaffold runtime helpers", () => {
 
     signalProcessTree(child, "SIGTERM", {
       platform: "linux",
+      processGroupId: 42,
       killProcessGroup: vi.fn(() => {
         throw new Error("group unavailable");
       }),
@@ -127,6 +151,101 @@ describe("scaffold runtime helpers", () => {
     ).rejects.toThrow(/did not exit after SIGKILL/u);
     expect(signals).toEqual(["SIGTERM", "SIGKILL"]);
     expect(timeouts).toEqual([10, 20]);
+  });
+
+  it("continues detached POSIX group cleanup after the leader exits", async () => {
+    if (!helpersExist) return;
+    const { terminateChildProcessTree } = await loadHelpers();
+    const child = { pid: 42, exitCode: 0, signalCode: null, kill: vi.fn(() => true) };
+    const signals: Array<{ readonly signal: string; readonly processGroupId?: number }> = [];
+    const waits: Array<{ readonly processGroupId: number; readonly timeoutMs: number }> = [];
+    const waitResults = [false, true];
+
+    await terminateChildProcessTree(child, Promise.resolve({ exitCode: 0, signal: null }), {
+      platform: "linux",
+      processGroupId: 42,
+      graceMs: 10,
+      forceMs: 20,
+      signalTree: (
+        _child: unknown,
+        signal: string,
+        options: { readonly processGroupId?: number },
+      ) => signals.push({ signal, processGroupId: options.processGroupId }),
+      waitForProcessGroupExit: async (processGroupId: number, timeoutMs: number) => {
+        waits.push({ processGroupId, timeoutMs });
+        return waitResults.shift() ?? false;
+      },
+    });
+
+    expect(signals).toEqual([
+      { signal: "SIGTERM", processGroupId: 42 },
+      { signal: "SIGKILL", processGroupId: 42 },
+    ]);
+    expect(waits).toEqual([
+      { processGroupId: 42, timeoutMs: 10 },
+      { processGroupId: 42, timeoutMs: 20 },
+    ]);
+  });
+
+  it("removes a detached POSIX descendant after its leader exits", async () => {
+    if (!helpersExist || process.platform === "win32") return;
+    const { createChildClosePromise, terminateChildProcessTree } = await loadHelpers();
+    const descendantSource = `
+process.on("SIGTERM", () => {});
+process.send?.("ready");
+setInterval(() => {}, 1_000);
+`;
+    const leaderSource = `
+const { spawn } = require("node:child_process");
+const descendant = spawn(process.execPath, ["-e", ${JSON.stringify(descendantSource)}], {
+  stdio: ["ignore", "ignore", "ignore", "ipc"],
+});
+descendant.once("message", () => {
+  process.stdout.write(String(descendant.pid));
+  descendant.disconnect();
+  descendant.unref();
+});
+`;
+    const leader = spawn(process.execPath, ["-e", leaderSource], {
+      detached: true,
+      stdio: ["ignore", "pipe", "ignore"],
+    });
+    const processGroupId = leader.pid;
+    if (!Number.isInteger(processGroupId) || processGroupId <= 0) {
+      throw new Error("Detached test leader did not receive a process id.");
+    }
+    let output = "";
+    leader.stdout.setEncoding("utf8").on("data", (chunk) => {
+      output += chunk;
+    });
+    const closed = createChildClosePromise(leader);
+    let descendantPid;
+
+    try {
+      await closed;
+      descendantPid = Number.parseInt(output, 10);
+      if (!Number.isInteger(descendantPid) || descendantPid <= 0) {
+        throw new Error(`Detached test leader did not report its descendant: ${output}`);
+      }
+      expect(processExists(descendantPid)).toBe(true);
+      await terminateChildProcessTree(leader, closed, {
+        processGroupId,
+        graceMs: 50,
+        forceMs: 1_000,
+      });
+
+      expect(processExists(-processGroupId)).toBe(false);
+      expect(processExists(descendantPid)).toBe(false);
+    } finally {
+      if (processExists(-processGroupId)) {
+        process.kill(-processGroupId, "SIGKILL");
+        await waitForProcessExit(-processGroupId, 1_000);
+      }
+      if (Number.isInteger(descendantPid) && processExists(descendantPid)) {
+        process.kill(descendantPid, "SIGKILL");
+        await waitForProcessExit(descendantPid, 1_000);
+      }
+    }
   });
 
   it("includes response body and Wrangler output for invalid manifest JSON", async () => {

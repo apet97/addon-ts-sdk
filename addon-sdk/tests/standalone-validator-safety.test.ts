@@ -19,6 +19,17 @@ describe("standalone validator safety", () => {
     expect(() => assertStandaloneValidatorSafety(source)).toThrow(/import/u);
   });
 
+  it.each([
+    ["indirect eval", '(0, eval)("return true");'],
+    ["aliased Function constructor", 'const Factory = Function; new Factory("return true");'],
+  ])("rejects %s string code generation", async (_kind, source) => {
+    if (!safetyModuleExists) return;
+    const { assertStandaloneValidatorSafety } = await import(safetyModuleUrl);
+    expect(() => assertStandaloneValidatorSafety(source)).toThrow(
+      /eval-call|function-constructor/u,
+    );
+  });
+
   it("accepts self-contained validator JavaScript", async () => {
     if (!safetyModuleExists) return;
     const { assertStandaloneValidatorSafety } = await import(safetyModuleUrl);

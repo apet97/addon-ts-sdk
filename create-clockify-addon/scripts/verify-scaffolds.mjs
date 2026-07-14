@@ -224,6 +224,7 @@ async function verifyWorkerThroughWrangler(directory, variant) {
       stdio: ["ignore", "pipe", "pipe"],
     },
   );
+  const processGroupId = process.platform === "win32" ? undefined : child.pid;
   const closed = createChildClosePromise(child);
   const readOutput = captureChildOutput(child);
   let spawnError;
@@ -255,7 +256,7 @@ async function verifyWorkerThroughWrangler(directory, variant) {
       `${variant.name}: real workerd routes returned /manifest 200, /missing 404, /component 401.`,
     );
   } finally {
-    await terminateChildProcessTree(child, closed);
+    await terminateChildProcessTree(child, closed, { processGroupId });
   }
 }
 

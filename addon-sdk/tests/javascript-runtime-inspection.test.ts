@@ -50,6 +50,28 @@ require("left-pad");
     ]);
   });
 
+  it.each([
+    ["global eval member", 'globalThis.eval("payload");', "eval-call"],
+    ["computed global eval member", 'globalThis["eval"]("payload");', "eval-call"],
+    ["indirect eval sequence", '(0, eval)("payload");', "eval-call"],
+    ["global Function constructor", 'new globalThis.Function("payload");', "function-constructor"],
+    [
+      "computed global Function constructor",
+      'new globalThis["Function"]("payload");',
+      "function-constructor",
+    ],
+    ["immutable Function alias", 'const F = Function; new F("payload");', "function-constructor"],
+  ])("detects %s", async (_description, source, expectedKind) => {
+    const findings = await inspect(source);
+
+    expect(findings).toEqual([
+      expect.objectContaining({
+        kind: expectedKind,
+        line: 1,
+      }),
+    ]);
+  });
+
   it("detects imported and executable AJV compiler markers", async () => {
     const findings = await inspect(`
 import Ajv from "ajv";
