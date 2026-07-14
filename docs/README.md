@@ -5,6 +5,16 @@
 - [Getting started](getting-started.md)
 - [How an add-on works](how-an-addon-works.md)
 
+## Builder task guides
+
+- [Manifest and registration](guides/manifest-and-registration.md)
+- [Installation and storage](guides/installation-and-storage.md)
+- [Components and UI](guides/components-and-ui.md)
+- [Webhooks and idempotency](guides/webhooks-and-idempotency.md)
+- [Calling Clockify](guides/calling-clockify.md)
+- [Deployment and operations](guides/deployment-and-operations.md)
+- [Troubleshooting](guides/troubleshooting.md)
+
 ## SDK reference
 
 - [SDK package README](../addon-sdk/README.md)

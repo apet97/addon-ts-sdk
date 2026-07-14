@@ -97,6 +97,13 @@ application-generated links, and keep `CLOCKIFY_PARENT_ORIGIN` exact.
 ## Continue
 
 - [Understand the complete lifecycle and responsibility model](how-an-addon-works.md)
+- [Build and register the manifest](guides/manifest-and-registration.md)
+- [Persist installation state safely](guides/installation-and-storage.md)
+- [Serve a verified component UI](guides/components-and-ui.md)
+- [Verify and deduplicate webhooks](guides/webhooks-and-idempotency.md)
+- [Call Clockify from the server](guides/calling-clockify.md)
+- [Deploy and operate the add-on](guides/deployment-and-operations.md)
+- [Troubleshoot by boundary](guides/troubleshooting.md)
 - [Browse the documentation index](README.md)
 - [Use the SDK package reference](../addon-sdk/README.md)
 - [Review the creator package reference](../create-clockify-addon/README.md)

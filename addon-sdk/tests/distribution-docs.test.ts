@@ -30,6 +30,33 @@ describe("published distribution docs", () => {
     }
   });
 
+  it("documents every builder lifecycle responsibility", () => {
+    const guides = new Map([
+      ["manifest-and-registration.md", ["v1_5Builder", "registerComponent", "/manifest"]],
+      ["installation-and-storage.md", ["INSTALLED", "installedAt", "encrypted", "DELETED"]],
+      [
+        "components-and-ui.md",
+        ["auth_token", "CLOCKIFY_PARENT_ORIGIN", "createClockifyHtmlResponse"],
+      ],
+      [
+        "webhooks-and-idempotency.md",
+        ["getExpectedWebhookAuthToken", "runClockifyIdempotentWebhook", "release"],
+      ],
+      ["calling-clockify.md", ["ClockifyAddonClient", "X-Addon-Token", "backendUrl"]],
+      ["deployment-and-operations.md", ["PUBLIC_BASE_URL", "durable", "Node", "Worker"]],
+      ["troubleshooting.md", ["404", "405", "413", "503"]],
+    ]);
+
+    const index = readFileSync(resolve(repoRoot, "docs", "README.md"), "utf8");
+    for (const [file, terms] of guides) {
+      const path = resolve(repoRoot, "docs", "guides", file);
+      expect(existsSync(path)).toBe(true);
+      expect(index).toContain(`guides/${file}`);
+      const content = readFileSync(path, "utf8");
+      for (const term of terms) expect(content).toContain(term);
+    }
+  });
+
   it("documents missing webhook tokens at the verification boundary", () => {
     const lifecycle = readFileSync(resolve(repoRoot, "docs/how-an-addon-works.md"), "utf8");
     const unavailable = lifecycle.match(/- `503 Service Unavailable`:[\s\S]*?(?=\n\n|$)/)?.[0];
