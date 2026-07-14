@@ -153,8 +153,6 @@ export async function verifyClockifyWebhookRequest(
     signatureHeader,
     eventHeader: options.eventHeader,
     expectedEventType: options.expectedEventType,
-    expectedWorkspaceId: options.expectedWorkspaceId,
-    expectedAddonId: options.expectedAddonId,
   });
 
   if (!result.ok) return result;
@@ -165,6 +163,10 @@ export async function verifyClockifyWebhookRequest(
     result.claims.addonId.trim() === ""
   ) {
     return { ok: false, reason: "missing-installation-context" };
+  }
+  const contextMismatch = checkClockifyClaimContext(result.claims, options);
+  if (contextMismatch) {
+    return { ok: false, reason: contextMismatch };
   }
   return { ok: true, claims: result.claims, eventType: result.eventType! };
 }

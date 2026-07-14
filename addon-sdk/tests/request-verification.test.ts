@@ -373,6 +373,53 @@ describe("Marketplace request verification helpers", () => {
     expect(handled).toBe(false);
   });
 
+  it("reports missing installation context before configured id mismatches", async () => {
+    const missingWorkspaceToken = await signTestToken(keys.privateKey, ADDON_KEY, {
+      addonId: ADDON_ID,
+    });
+    const missingAddonToken = await signTestToken(keys.privateKey, ADDON_KEY, {
+      workspaceId: WORKSPACE_ID,
+    });
+
+    for (const token of [missingWorkspaceToken, missingAddonToken]) {
+      await expect(
+        verifyClockifyWebhookRequest(
+          parser(),
+          request({
+            [ClockifyHeaders.SIGNATURE]: token,
+            [ClockifyHeaders.WEBHOOK_EVENT_TYPE]: "EXPENSE_CREATED",
+          }),
+          {
+            expectedEventType: "EXPENSE_CREATED",
+            expectedWebhookAuthToken: token,
+            expectedWorkspaceId: WORKSPACE_ID,
+            expectedAddonId: ADDON_ID,
+          },
+        ),
+      ).resolves.toEqual({ ok: false, reason: "missing-installation-context" });
+    }
+
+    const contextualToken = await validToken();
+    const contextualRequest = request({
+      [ClockifyHeaders.SIGNATURE]: contextualToken,
+      [ClockifyHeaders.WEBHOOK_EVENT_TYPE]: "EXPENSE_CREATED",
+    });
+    await expect(
+      verifyClockifyWebhookRequest(parser(), contextualRequest, {
+        expectedEventType: "EXPENSE_CREATED",
+        expectedWebhookAuthToken: contextualToken,
+        expectedWorkspaceId: "other-workspace",
+      }),
+    ).resolves.toEqual({ ok: false, reason: "workspace-id-mismatch" });
+    await expect(
+      verifyClockifyWebhookRequest(parser(), contextualRequest, {
+        expectedEventType: "EXPENSE_CREATED",
+        expectedWebhookAuthToken: contextualToken,
+        expectedAddonId: "other-addon",
+      }),
+    ).resolves.toEqual({ ok: false, reason: "addon-id-mismatch" });
+  });
+
   it("rejects verified tokens that target a different workspace or add-on id", async () => {
     const token = await validToken();
     const headers = { [ClockifyHeaders.SIGNATURE]: token };
