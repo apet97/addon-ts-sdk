@@ -27,12 +27,15 @@ builds the manifest and registers routes; runtime-specific `src/index.ts` starts
 
 `@apet97/clockify-addon-sdk` is layered so a runtime never imports code for another runtime.
 
-- The root and `/clockify` entrypoints contain manifests, routing, verification, security,
-  lifecycle/storage primitives and the Fetch-based add-on client.
+- The root entrypoint aggregates shared routing contracts plus the `/clockify` and `/client`
+  surfaces for consumers that prefer one import.
+- `/clockify` exports Clockify add-on modules only: manifests, verification, security, lifecycle,
+  and storage primitives.
 - `/adapters/node`, `/adapters/express`, and `/adapters/fetch` isolate host integration. The legacy
   `/adapters` aggregate remains available for package consumers but is Node-oriented.
-- `/client` contains Marketplace-specific token exchange, settings and generic authenticated
-  transport. Entity-specific Clockify REST APIs remain in the separate `clockify-ts-sdk` project.
+- `/client` exports the Fetch-based `ClockifyAddonClient` for Marketplace-specific token exchange,
+  settings, and generic authenticated transport. Entity-specific Clockify REST APIs remain in the
+  separate `clockify-ts-sdk` project.
 - `/ui` is browser-only and fails closed unless the exact Clockify parent origin is supplied.
 - `/testing` contains local RS256 keys and token signing only.
 

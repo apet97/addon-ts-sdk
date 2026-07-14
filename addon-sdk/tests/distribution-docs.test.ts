@@ -311,6 +311,46 @@ describe("published distribution docs", () => {
     expect(marketplaceIndex).toContain("../docs/how-an-addon-works.md");
   });
 
+  it("documents the root, Clockify, and client subpath boundary", () => {
+    const architecture = readFileSync(
+      resolve(repoRoot, "docs", "maintainers", "architecture.md"),
+      "utf8",
+    );
+
+    expect(architecture).toContain("The root entrypoint aggregates");
+    expect(architecture).toContain("`/clockify` exports Clockify add-on modules only");
+    expect(architecture).toContain("`/client` exports the Fetch-based `ClockifyAddonClient`");
+  });
+
+  it("documents exact 404 and 405 routing across Java-parity evidence", () => {
+    const parityRoot = resolve(repoRoot, "docs", "maintainers", "java-parity");
+    const documents = ["adversarial-review.md", "evidence-map.md", "parity-checklist.md"].map(
+      (file) => readFileSync(resolve(parityRoot, file), "utf8"),
+    );
+
+    for (const document of documents) {
+      expect(document).toContain("404");
+      expect(document).toContain("405");
+      expect(document).toContain("Allow");
+      expect(document).toContain("exact path");
+      expect(document).toContain("another method");
+      expect(document).not.toContain("405 Method Not Allowed for unmatched paths or methods");
+      expect(document).not.toContain("405 on unmatched");
+    }
+  });
+
+  it("scopes the verification-helper layer separately from the add-on client", () => {
+    const evidenceMap = readFileSync(
+      resolve(repoRoot, "docs", "maintainers", "java-parity", "evidence-map.md"),
+      "utf8",
+    );
+
+    expect(evidenceMap).toContain("listed verification-helper layer");
+    expect(evidenceMap).toContain("`ClockifyAddonClient`");
+    expect(evidenceMap).toContain("`/client`");
+    expect(evidenceMap).toContain("token exchange, settings, and generic authenticated transport");
+  });
+
   it("keeps AGENTS.md and CLAUDE.md synchronized after their introductions", () => {
     const agents = readFileSync(resolve(repoRoot, "AGENTS.md"), "utf8").split("\n").slice(4);
     const claude = readFileSync(resolve(repoRoot, "CLAUDE.md"), "utf8").split("\n").slice(4);

@@ -15,9 +15,11 @@ SDK. Revisit it when a parity change could blur an intentional runtime or langua
 
 **Decision**: We use `jose` for signature parsing. It is lightweight, native to Node.js/Web environments, and does not require complex cryptographic configurations. It verifies RS256 tokens in complete alignment with Java's JJWT configuration.
 
-## 4. Default Routing 405 vs 404
+## 4. Exact Routing: 404 vs 405
 
-**Decision**: We return 405 Method Not Allowed for unmatched paths or methods. This strictly preserves the Java Addon router behavior.
+**Decision**: An unknown path returns 404 Not Found. When the exact path exists for another method,
+the router returns 405 Method Not Allowed with an `Allow` header. This records the maintained
+routing contract without treating unknown paths and wrong methods as equivalent.
 
 ## 5. Manifest Serialization
 

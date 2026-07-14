@@ -16,7 +16,8 @@ This document tracks implementation status of Java parity requirements and moder
 
 - [x] Auto-register GET `/manifest` in `Addon` constructor
 - [x] Reject registered paths ending in slash or without leading slash (matches `ValidationUtils.isValidManifestPath`)
-- [x] Method Not Allowed (405) returned on unmatched routes or methods
+- [x] Return 404 Not Found for an unknown path
+- [x] Return 405 Method Not Allowed with `Allow` when the exact path exists for another method
 - [x] Internal Server Error (500) on exceptions inside handlers
 - [x] Trim trailing slash on incoming requests during dispatch
 - [x] Prevent duplicate route registration by throwing an error
