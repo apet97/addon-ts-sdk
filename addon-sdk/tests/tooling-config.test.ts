@@ -40,10 +40,16 @@ describe("tooling configuration", () => {
   it("includes every root release tool in the canonical lint and format gates", () => {
     const rootPackageJson = JSON.parse(readFileSync(resolve(repoRoot, "package.json"), "utf8"));
     const rootEslintConfigPath = resolve(repoRoot, "eslint.config.mjs");
+    const ciVerifySteps = rootPackageJson.scripts["ci:verify"].split(" && ");
+    const marketplaceDocsIndex = ciVerifySteps.indexOf("npm run verify:marketplace-docs");
 
     expect(existsSync(rootEslintConfigPath)).toBe(true);
     const rootEslintConfig = readFileSync(rootEslintConfigPath, "utf8");
     expect(rootEslintConfig).toContain("./addon-sdk/eslint.config.mjs");
+    expect(rootPackageJson.scripts["verify:docs"]).toBe("node scripts/verify-docs.mjs");
+    expect(rootPackageJson.scripts["ci:verify"]).toContain("npm run verify:docs");
+    expect(marketplaceDocsIndex).toBeGreaterThanOrEqual(0);
+    expect(ciVerifySteps[marketplaceDocsIndex + 1]).toBe("npm run verify:docs");
     expect(rootPackageJson.scripts["lint:release-tools"]).toBe(
       "npm exec -- eslint --config eslint.config.mjs scripts/*.mjs",
     );

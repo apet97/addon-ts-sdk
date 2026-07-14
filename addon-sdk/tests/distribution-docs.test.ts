@@ -7,7 +7,17 @@ describe("published distribution docs", () => {
   const repoRoot = resolve(packageRoot, "..");
 
   it("provides a builder-first documentation path", () => {
-    const builderDocs = ["docs/README.md", "docs/getting-started.md", "docs/how-an-addon-works.md"];
+    const builderDocs = [
+      "docs/getting-started.md",
+      "docs/how-an-addon-works.md",
+      "docs/guides/manifest-and-registration.md",
+      "docs/guides/installation-and-storage.md",
+      "docs/guides/components-and-ui.md",
+      "docs/guides/webhooks-and-idempotency.md",
+      "docs/guides/calling-clockify.md",
+      "docs/guides/deployment-and-operations.md",
+      "docs/guides/troubleshooting.md",
+    ];
     for (const file of builderDocs) expect(existsSync(resolve(repoRoot, file))).toBe(true);
 
     const rootReadme = readFileSync(resolve(repoRoot, "README.md"), "utf8");
@@ -22,8 +32,17 @@ describe("published distribution docs", () => {
     expect(gettingStarted).toContain("GET /manifest");
     expect(gettingStarted).toContain("PUBLIC_BASE_URL");
     expect(gettingStarted).toContain("CLOCKIFY_PARENT_ORIGIN");
-    for (const owner of ["Clockify", "SDK", "Add-on application"]) {
+    for (const owner of ["Clockify", "SDK", "Add-on application", "1.5"]) {
       expect(lifecycle).toContain(owner);
+    }
+    for (const classification of ["Maintainers", "Upstream", "generated", "historical"]) {
+      expect(index).toContain(classification);
+    }
+    for (const boundary of [
+      "MARKETPLACE_DOCS/provenance.json",
+      "addon-sdk/public-api.snapshot.md",
+    ]) {
+      expect(existsSync(resolve(repoRoot, boundary))).toBe(true);
     }
     for (const stage of ["INSTALLED", "auth_token", "webhook", "X-Addon-Token", "DELETED"]) {
       expect(lifecycle).toContain(stage);

@@ -12,6 +12,7 @@
     "type-check": "npm run type-check -w @apet97/clockify-addon-sdk",
     "verify:generated": "npm run verify:generated -w @apet97/clockify-addon-sdk",
     "verify:marketplace-docs": "node scripts/verify-marketplace-docs.mjs",
+    "verify:docs": "node scripts/verify-docs.mjs",
     "verify:schema-live": "npm run verify:schema-live -w @apet97/clockify-addon-sdk",
     "build": "npm run build -w @apet97/clockify-addon-sdk",
     "verify:public-api": "npm run verify:public-api -w @apet97/clockify-addon-sdk",
@@ -36,6 +37,6 @@
     "verify:deps": "npm ls --workspaces --depth=0",
     "audit:prod": "npm audit --omit=dev --json",
     "audit:all": "npm audit --json",
-    "ci:verify": "npm run verify:deps && npm run type-check && npm run verify:generated && npm run verify:marketplace-docs && npm run test:coverage && npm run lint && npm run format:check && npm run build && npm run verify:public-api && npm run verify:dist && npm run pack:dry-run && npm run verify:package-lint && npm run verify:package-consumer && npm run verify:scaffolds && npm run audit:prod && npm run audit:all"
+    "ci:verify": "npm run verify:deps && npm run type-check && npm run verify:generated && npm run verify:marketplace-docs && npm run verify:docs && npm run test:coverage && npm run lint && npm run format:check && npm run build && npm run verify:public-api && npm run verify:dist && npm run pack:dry-run && npm run verify:package-lint && npm run verify:package-consumer && npm run verify:scaffolds && npm run audit:prod && npm run audit:all"
   }
 }
