@@ -5,6 +5,7 @@ addon-sdk/coverage/
 *.tgz
 .DS_Store
 .remember/
+.worktrees/
 
 # Local working notes & third-party reference material — kept on disk, out of the repo.
 /GOAL.md
