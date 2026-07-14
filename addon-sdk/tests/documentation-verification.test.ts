@@ -37,6 +37,131 @@ describe("documentation verification", () => {
     ).resolves.toEqual([]);
   });
 
+  it("accepts escaped parentheses and angle-bracketed reference destinations", async () => {
+    const root = await fixture({
+      "docs/README.md":
+        "# Docs\n\n[Escaped](guide\\(one\\).md)\n[Spaced][spaced]\n\n[spaced]: <guide one.md>\n",
+      "docs/guide(one).md": "# Parentheses\n",
+      "docs/guide one.md": "# Space\n",
+    });
+
+    await expect(
+      collectDocumentationErrors(root, {
+        documents: ["docs/README.md", "docs/guide(one).md", "docs/guide one.md"],
+        requiredFromIndex: ["docs/guide(one).md", "docs/guide one.md"],
+      }),
+    ).resolves.toEqual([]);
+  });
+
+  it("ignores tilde fences and long backtick fences containing shorter fences", async () => {
+    const root = await fixture({
+      "docs/README.md": [
+        "# Docs",
+        "",
+        "~~~markdown",
+        "[Tilde](missing-tilde.md)",
+        "~~~",
+        "",
+        "````markdown",
+        "[Long](missing-long.md)",
+        "```",
+        "[Still fenced](missing-after-short-close.md)",
+        "````",
+        "",
+        "[Guide](guide.md)",
+        "",
+      ].join("\n"),
+      "docs/guide.md": "# Guide\n",
+    });
+
+    await expect(
+      collectDocumentationErrors(root, {
+        documents: ["docs/README.md", "docs/guide.md"],
+        requiredFromIndex: ["docs/guide.md"],
+      }),
+    ).resolves.toEqual([]);
+  });
+
+  it("decodes reserved path characters and aggregates malformed percent encodings", async () => {
+    const root = await fixture({
+      "docs/README.md": "# Docs\n\n[Encoded](guide%23one.md)\n[Malformed](guide%ZZ.md)\n",
+      "docs/guide#one.md": "# Encoded name\n",
+    });
+
+    await expect(
+      collectDocumentationErrors(root, {
+        documents: ["docs/README.md", "docs/guide#one.md"],
+        requiredFromIndex: ["docs/guide#one.md"],
+      }),
+    ).resolves.toEqual(["docs/README.md: invalid percent-encoding in link target: guide%ZZ.md"]);
+  });
+
+  it("reports directories without readable README files as missing targets", async () => {
+    const root = await fixture({
+      "docs/README.md": "# Docs\n\n[Directory](empty/)\n[Directory anchor](empty/#section)\n",
+      "docs/empty/.keep": "",
+    });
+
+    await expect(
+      collectDocumentationErrors(root, {
+        documents: ["docs/README.md"],
+        requiredFromIndex: [],
+      }),
+    ).resolves.toEqual([
+      "docs/README.md: missing link target: empty/",
+      "docs/README.md: missing link target: empty/#section",
+    ]);
+  });
+
+  it("supports Setext headings and globally resolves colliding GFM anchors", async () => {
+    const root = await fixture({
+      "docs/README.md":
+        "# Docs\n\n[One](guide.md#same)\n[Two](guide.md#same-1)\n[Three](guide.md#same-1-1)\n[Setext](guide.md#setext-heading)\n",
+      "docs/guide.md": "# Same\n\n## Same\n\n### Same-1\n\nSetext heading\n--------------\n",
+    });
+
+    await expect(
+      collectDocumentationErrors(root, {
+        documents: ["docs/README.md", "docs/guide.md"],
+        requiredFromIndex: ["docs/guide.md"],
+      }),
+    ).resolves.toEqual([]);
+  });
+
+  it("validates inline image targets without treating images as index navigation", async () => {
+    const root = await fixture({
+      "docs/README.md":
+        "# Docs\n\n![Existing guide image](guide.md)\n![Missing image](missing.png)\n",
+      "docs/guide.md": "# Guide\n",
+    });
+
+    await expect(
+      collectDocumentationErrors(root, {
+        documents: ["docs/README.md", "docs/guide.md"],
+        requiredFromIndex: ["docs/guide.md"],
+      }),
+    ).resolves.toEqual([
+      "docs/README.md: missing link target: missing.png",
+      "docs/README.md: does not link required document docs/guide.md",
+    ]);
+  });
+
+  it("counts referenced links but not referenced images as index navigation", async () => {
+    const root = await fixture({
+      "docs/README.md":
+        "# Docs\n\n[Guide][guide]\n![Preview][preview]\n\n[guide]: <guide one.md>\n[preview]: preview.png\n",
+      "docs/guide one.md": "# Guide\n",
+      "docs/preview.png": "image",
+    });
+
+    await expect(
+      collectDocumentationErrors(root, {
+        documents: ["docs/README.md", "docs/guide one.md"],
+        requiredFromIndex: ["docs/guide one.md", "docs/preview.png"],
+      }),
+    ).resolves.toEqual(["docs/README.md: does not link required document docs/preview.png"]);
+  });
+
   it("reports broken files, anchors, and index reachability together", async () => {
     const root = await fixture({
       "docs/README.md": "# Docs\n\n[Broken](missing.md)\n[Anchor](guide.md#absent)\n",

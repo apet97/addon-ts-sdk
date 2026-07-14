@@ -58,28 +58,290 @@ export async function discoverActiveMarkdown(root) {
 }
 
 function stripFencedCode(source) {
-  return source.replace(/```[\s\S]*?```/g, "");
+  let fence;
+  return source
+    .split("\n")
+    .map((line) => {
+      const comparable = line.endsWith("\r") ? line.slice(0, -1) : line;
+      if (fence !== undefined) {
+        const closing = comparable.match(/^ {0,3}(`{3,}|~{3,})[ \t]*$/);
+        if (
+          closing !== null &&
+          closing[1][0] === fence.marker &&
+          closing[1].length >= fence.length
+        ) {
+          fence = undefined;
+        }
+        return "";
+      }
+
+      const opening = comparable.match(/^ {0,3}(`{3,}|~{3,})(.*)$/);
+      if (opening === null) return line;
+      const marker = opening[1][0];
+      if (marker === "`" && opening[2].includes("`")) return line;
+      fence = { marker, length: opening[1].length };
+      return "";
+    })
+    .join("\n");
 }
 
-function linkTarget(raw) {
-  const value = raw.trim();
-  if (value.startsWith("<")) {
-    const end = value.indexOf(">");
-    return end === -1 ? value : value.slice(1, end);
+const MARKDOWN_ESCAPABLE = new Set("!\"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~");
+
+function unescapeMarkdown(value) {
+  return value.replace(/\\(.)/gs, (match, character) =>
+    MARKDOWN_ESCAPABLE.has(character) ? character : match,
+  );
+}
+
+function skipWhitespace(source, start) {
+  let cursor = start;
+  while (cursor < source.length && /[ \t\r\n]/.test(source[cursor])) cursor++;
+  return cursor;
+}
+
+function bracket(source, start) {
+  let depth = 0;
+  for (let cursor = start; cursor < source.length; cursor++) {
+    if (source[cursor] === "\\") {
+      cursor++;
+      continue;
+    }
+    if (source[cursor] === "[") {
+      depth++;
+      continue;
+    }
+    if (source[cursor] !== "]") continue;
+    depth--;
+    if (depth === 0) {
+      return { value: source.slice(start + 1, cursor), end: cursor };
+    }
   }
-  return value.split(/\s+/u, 1)[0] ?? "";
+  return null;
+}
+
+function angleDestination(source, start) {
+  for (let cursor = start + 1; cursor < source.length; cursor++) {
+    if (source[cursor] === "\n" || source[cursor] === "\r") return null;
+    if (source[cursor] === "\\") {
+      cursor++;
+      continue;
+    }
+    if (source[cursor] === ">") {
+      return {
+        href: unescapeMarkdown(source.slice(start + 1, cursor)),
+        end: cursor + 1,
+      };
+    }
+  }
+  return null;
+}
+
+function bareInlineDestination(source, start) {
+  let depth = 0;
+  for (let cursor = start; cursor < source.length; cursor++) {
+    const character = source[cursor];
+    if (character === "\\") {
+      cursor++;
+      continue;
+    }
+    if (character === "(") {
+      depth++;
+      continue;
+    }
+    if (character === ")") {
+      if (depth === 0) {
+        return {
+          href: unescapeMarkdown(source.slice(start, cursor)),
+          end: cursor,
+          closed: true,
+        };
+      }
+      depth--;
+      continue;
+    }
+    if (depth === 0 && /[ \t\r\n]/.test(character)) {
+      return {
+        href: unescapeMarkdown(source.slice(start, cursor)),
+        end: cursor,
+        closed: false,
+      };
+    }
+  }
+  return null;
+}
+
+function linkTitleEnd(source, start) {
+  const opener = source[start];
+  if (opener !== '"' && opener !== "'" && opener !== "(") return null;
+  const closer = opener === "(" ? ")" : opener;
+  let depth = 1;
+  for (let cursor = start + 1; cursor < source.length; cursor++) {
+    if (source[cursor] === "\\") {
+      cursor++;
+      continue;
+    }
+    if (opener === "(" && source[cursor] === "(") {
+      depth++;
+      continue;
+    }
+    if (source[cursor] !== closer) continue;
+    depth--;
+    if (depth === 0) return cursor + 1;
+  }
+  return null;
+}
+
+function inlineDestination(source, openingParenthesis) {
+  let cursor = skipWhitespace(source, openingParenthesis + 1);
+  const destination =
+    source[cursor] === "<"
+      ? angleDestination(source, cursor)
+      : bareInlineDestination(source, cursor);
+  if (destination === null) return null;
+  if (destination.closed === true) {
+    return { href: destination.href, end: destination.end };
+  }
+
+  cursor = skipWhitespace(source, destination.end);
+  if (source[cursor] === ")") return { href: destination.href, end: cursor };
+  const titleEnd = linkTitleEnd(source, cursor);
+  if (titleEnd === null) return null;
+  cursor = skipWhitespace(source, titleEnd);
+  if (source[cursor] !== ")") return null;
+  return { href: destination.href, end: cursor };
+}
+
+function definitionDestination(source) {
+  const start = skipWhitespace(source, 0);
+  if (source[start] === "<")
+    return angleDestination(source, start)?.href ?? null;
+
+  let depth = 0;
+  for (let cursor = start; cursor <= source.length; cursor++) {
+    const character = source[cursor];
+    if (character === "\\") {
+      cursor++;
+      continue;
+    }
+    if (character === "(") {
+      depth++;
+      continue;
+    }
+    if (character === ")") {
+      if (depth === 0) return null;
+      depth--;
+      continue;
+    }
+    if (
+      cursor === source.length ||
+      (depth === 0 && /[ \t\r]/.test(character))
+    ) {
+      if (depth !== 0 || cursor === start) return null;
+      return unescapeMarkdown(source.slice(start, cursor));
+    }
+  }
+  return null;
+}
+
+function normalizeReferenceLabel(value) {
+  return unescapeMarkdown(value)
+    .trim()
+    .replace(/[ \t\r\n]+/g, " ")
+    .toLowerCase();
+}
+
+function referenceDefinitions(source) {
+  const definitions = new Map();
+  let offset = 0;
+  const content = source
+    .split("\n")
+    .map((line) => {
+      const comparable = line.endsWith("\r") ? line.slice(0, -1) : line;
+      const match = comparable.match(/^ {0,3}\[([^\]]+)\]:[ \t]*(.*)$/);
+      if (match === null) {
+        offset += line.length + 1;
+        return line;
+      }
+      const href = definitionDestination(match[2]);
+      if (href === null) {
+        offset += line.length + 1;
+        return line;
+      }
+      const label = normalizeReferenceLabel(match[1]);
+      if (label !== "" && !definitions.has(label)) {
+        definitions.set(label, { href, position: offset, used: false });
+      }
+      offset += line.length + 1;
+      return " ".repeat(line.length);
+    })
+    .join("\n");
+  return { content, definitions };
 }
 
 function markdownLinks(source) {
-  const content = stripFencedCode(source);
+  const parsed = referenceDefinitions(stripFencedCode(source));
   const links = [];
-  for (const match of content.matchAll(/!?\[[^\]]*\]\(([^)\n]+)\)/g)) {
-    links.push(linkTarget(match[1]));
+  for (let cursor = 0; cursor < parsed.content.length; cursor++) {
+    const image =
+      parsed.content[cursor] === "!" && parsed.content[cursor + 1] === "[";
+    const bracketStart = image
+      ? cursor + 1
+      : parsed.content[cursor] === "["
+        ? cursor
+        : -1;
+    if (bracketStart === -1) continue;
+    const label = bracket(parsed.content, bracketStart);
+    if (label === null) continue;
+
+    const following = label.end + 1;
+    if (parsed.content[following] === "(") {
+      const destination = inlineDestination(parsed.content, following);
+      if (destination !== null && destination.href !== "") {
+        links.push({
+          href: destination.href,
+          navigational: !image,
+          position: cursor,
+        });
+        cursor = destination.end;
+        continue;
+      }
+    }
+
+    let referenceLabel = label.value;
+    let referenceEnd = label.end;
+    if (parsed.content[following] === "[") {
+      const reference = bracket(parsed.content, following);
+      if (reference === null) {
+        cursor = label.end;
+        continue;
+      }
+      referenceLabel = reference.value === "" ? label.value : reference.value;
+      referenceEnd = reference.end;
+    }
+    const definition = parsed.definitions.get(
+      normalizeReferenceLabel(referenceLabel),
+    );
+    if (definition !== undefined) {
+      definition.used = true;
+      links.push({
+        href: definition.href,
+        navigational: !image,
+        position: cursor,
+      });
+    }
+    cursor = referenceEnd;
   }
-  for (const match of content.matchAll(/^\s*\[[^\]]+\]:\s*(\S+)/gm)) {
-    links.push(linkTarget(match[1]));
+
+  for (const definition of parsed.definitions.values()) {
+    if (!definition.used && definition.href !== "") {
+      links.push({
+        href: definition.href,
+        navigational: false,
+        position: definition.position,
+      });
+    }
   }
-  return links.filter(Boolean);
+  return links.sort((left, right) => left.position - right.position);
 }
 
 function headingSlug(value) {
@@ -95,14 +357,36 @@ function headingSlug(value) {
 
 function headingAnchors(source) {
   const anchors = new Set();
-  const seen = new Map();
-  for (const match of stripFencedCode(source).matchAll(
-    /^#{1,6}\s+(.+?)\s*#*\s*$/gm,
-  )) {
-    const base = headingSlug(match[1]);
-    const count = seen.get(base) ?? 0;
-    seen.set(base, count + 1);
-    anchors.add(count === 0 ? base : `${base}-${count}`);
+  const add = (heading) => {
+    const base = headingSlug(heading);
+    let anchor = base;
+    let suffix = 0;
+    while (anchors.has(anchor)) {
+      suffix++;
+      anchor = `${base}-${suffix}`;
+    }
+    anchors.add(anchor);
+  };
+  const lines = stripFencedCode(source).split("\n");
+  for (let index = 0; index < lines.length; index++) {
+    const line = lines[index].endsWith("\r")
+      ? lines[index].slice(0, -1)
+      : lines[index];
+    const atx = line.match(/^ {0,3}#{1,6}(?:[ \t]+(.*)|[ \t]*)$/);
+    if (atx !== null) {
+      add((atx[1] ?? "").replace(/[ \t]+#+[ \t]*$/, ""));
+      continue;
+    }
+
+    const next = lines[index + 1]?.replace(/\r$/, "") ?? "";
+    if (
+      line.trim() !== "" &&
+      !/^ {4}/.test(line) &&
+      /^ {0,3}(?:=+|-+)[ \t]*$/.test(next)
+    ) {
+      add(line.trim());
+      index++;
+    }
   }
   return anchors;
 }
@@ -112,25 +396,33 @@ function localParts(href) {
   const hash = href.indexOf("#");
   const rawPath = hash === -1 ? href : href.slice(0, hash);
   const rawFragment = hash === -1 ? "" : href.slice(hash + 1);
-  return {
-    path: decodeURI(rawPath.split("?", 1)[0]),
-    fragment: decodeURIComponent(rawFragment),
-  };
+  try {
+    return {
+      path: decodeURIComponent(rawPath.split("?", 1)[0]),
+      fragment: decodeURIComponent(rawFragment),
+    };
+  } catch {
+    return { invalidEncoding: true };
+  }
 }
 
 async function resolvedTarget(root, sourceFile, parts) {
   let absolute = parts.path
     ? path.resolve(root, path.dirname(sourceFile), parts.path)
     : path.resolve(root, sourceFile);
-  const relative = posix(path.relative(root, absolute));
+  let relative = posix(path.relative(root, absolute));
   if (relative === ".." || relative.startsWith("../")) return { escaped: true };
   try {
-    if ((await stat(absolute)).isDirectory())
+    if ((await stat(absolute)).isDirectory()) {
       absolute = path.join(absolute, "README.md");
+      relative = posix(path.relative(root, absolute));
+      if (!(await stat(absolute)).isFile()) return { missing: relative };
+      await readFile(absolute);
+    }
   } catch {
     return { missing: relative };
   }
-  return { absolute, relative: posix(path.relative(root, absolute)) };
+  return { absolute, relative };
 }
 
 async function requiredText(root, file) {
@@ -157,9 +449,16 @@ export async function collectDocumentationErrors(
 
   for (const [sourceFile, source] of contents) {
     const targets = new Set();
-    for (const href of markdownLinks(source)) {
+    for (const link of markdownLinks(source)) {
+      const { href } = link;
       const parts = localParts(href);
       if (parts === null) continue;
+      if (parts.invalidEncoding) {
+        errors.push(
+          `${sourceFile}: invalid percent-encoding in link target: ${href}`,
+        );
+        continue;
+      }
       const target = await resolvedTarget(absoluteRoot, sourceFile, parts);
       if (target.escaped) {
         errors.push(`${sourceFile}: link escapes the repository: ${href}`);
@@ -169,7 +468,7 @@ export async function collectDocumentationErrors(
         errors.push(`${sourceFile}: missing link target: ${href}`);
         continue;
       }
-      targets.add(target.relative);
+      if (link.navigational) targets.add(target.relative);
       if (parts.fragment && target.relative.endsWith(".md")) {
         const targetSource =
           contents.get(target.relative) ??
