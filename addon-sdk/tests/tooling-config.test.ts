@@ -78,7 +78,7 @@ describe("tooling configuration", () => {
       prettier: "^3.9.5",
       tsx: "^4.23.1",
       typescript: "^6.0.3",
-      "typescript-eslint": "^8.63.0",
+      "typescript-eslint": "^8.64.0",
       vite: "^8.1.4",
       vitest: "^4.1.10",
     });
