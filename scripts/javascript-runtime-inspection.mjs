@@ -84,7 +84,11 @@ function definePatternBindings(scope, pattern, binding = {}) {
 
 function nearestVariableScope(scope) {
   let current = scope;
-  while (current.kind !== "function" && current.kind !== "program") {
+  while (
+    current.kind !== "function" &&
+    current.kind !== "program" &&
+    current.kind !== "static-block"
+  ) {
     current = current.parent;
   }
   return current;
@@ -241,7 +245,7 @@ export function inspectRuntimeJavaScript(source, options = {}) {
       return;
     }
     if (node.type === "StaticBlock") {
-      const staticBlockScope = createScope(scope, "block");
+      const staticBlockScope = createScope(scope, "static-block");
       scopeByNode.set(node, staticBlockScope);
       for (const statement of node.body) {
         collectScopes(statement, staticBlockScope);

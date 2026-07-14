@@ -181,6 +181,17 @@ class Example {
     ]);
   });
 
+  it("keeps a static-block var binding inside that block", async () => {
+    const findings = await inspect(
+      'const safe=(value)=>value; class C { static { var Function=safe; Function("safe"); } static { Function("return 1")(); } } Function("return 2")();',
+    );
+
+    expect(findings.map((finding: { readonly kind: string }) => finding.kind)).toEqual([
+      "function-constructor",
+      "function-constructor",
+    ]);
+  });
+
   it("detects imported and executable AJV compiler markers", async () => {
     const findings = await inspect(`
 import Ajv from "ajv";
