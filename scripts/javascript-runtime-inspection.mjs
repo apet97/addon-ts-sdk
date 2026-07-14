@@ -213,6 +213,41 @@ export function inspectRuntimeJavaScript(source, options = {}) {
       collectScopes(node.body, catchScope);
       return;
     }
+    if (
+      node.type === "ForStatement" ||
+      node.type === "ForInStatement" ||
+      node.type === "ForOfStatement"
+    ) {
+      const loopScope = createScope(scope, "block");
+      scopeByNode.set(node, loopScope);
+      if (node.type === "ForStatement") {
+        collectScopes(node.init, loopScope);
+        collectScopes(node.test, loopScope);
+        collectScopes(node.update, loopScope);
+      } else {
+        collectScopes(node.left, loopScope);
+        collectScopes(node.right, loopScope);
+      }
+      collectScopes(node.body, loopScope);
+      return;
+    }
+    if (node.type === "SwitchStatement") {
+      collectScopes(node.discriminant, scope);
+      const switchScope = createScope(scope, "block");
+      scopeByNode.set(node, switchScope);
+      for (const switchCase of node.cases) {
+        collectScopes(switchCase, switchScope);
+      }
+      return;
+    }
+    if (node.type === "StaticBlock") {
+      const staticBlockScope = createScope(scope, "block");
+      scopeByNode.set(node, staticBlockScope);
+      for (const statement of node.body) {
+        collectScopes(statement, staticBlockScope);
+      }
+      return;
+    }
     if (node.type === "VariableDeclaration") {
       const bindingScope =
         node.kind === "var" ? nearestVariableScope(scope) : scope;

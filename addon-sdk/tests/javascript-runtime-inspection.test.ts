@@ -128,6 +128,59 @@ require("left-pad");
     expect(await inspect(source)).toEqual([]);
   });
 
+  it.each([
+    [
+      "ForStatement",
+      'for (const Function = (value) => value; false; ) { Function("value"); } Function("return 1")();',
+    ],
+    [
+      "ForOfStatement",
+      'const safe = (value) => value; for (const Function of [safe]) { Function("value"); } Function("return 1")();',
+    ],
+    [
+      "ForInStatement",
+      'for (const Function in { value: true }) { void Function; } Function("return 1")();',
+    ],
+  ])("keeps a %s lexical header binding inside the loop", async (_description, source) => {
+    const findings = await inspect(source);
+
+    expect(findings.map((finding: { readonly kind: string }) => finding.kind)).toEqual([
+      "function-constructor",
+    ]);
+  });
+
+  it("shares switch-case bindings without leaking them outside the switch", async () => {
+    const findings = await inspect(`
+const safe = (value) => value;
+switch (Function("return 0")()) {
+  case 0:
+    const Function = safe;
+    Function("value");
+    break;
+}
+Function("return 1")();
+`);
+
+    expect(findings.map((finding: { readonly kind: string }) => finding.kind)).toEqual([
+      "function-constructor",
+      "function-constructor",
+    ]);
+  });
+
+  it("keeps a class static-block binding inside that block", async () => {
+    const findings = await inspect(`
+const safe = (value) => value;
+class Example {
+  static { const Function = safe; Function("value"); }
+  static { Function("return 1")(); }
+}
+`);
+
+    expect(findings.map((finding: { readonly kind: string }) => finding.kind)).toEqual([
+      "function-constructor",
+    ]);
+  });
+
   it("detects imported and executable AJV compiler markers", async () => {
     const findings = await inspect(`
 import Ajv from "ajv";
