@@ -1,12 +1,10 @@
+import { isCanonicalLoopbackHostname } from "../shared/loopback";
+
 /** Inputs accepted by the fail-closed public-origin resolver. */
 export interface ClockifyPublicOriginOptions {
   readonly publicBaseUrl?: string;
   readonly requestUrl?: string;
   readonly allowLocalRequestOrigin?: boolean;
-}
-
-function isLocalHostname(hostname: string): boolean {
-  return hostname === "localhost" || hostname === "127.0.0.1" || hostname === "[::1]";
 }
 
 /** Resolves the public origin used in manifests and browser security policies. */
@@ -27,7 +25,7 @@ export function resolveClockifyPublicOrigin(options: ClockifyPublicOriginOptions
   if (request.username || request.password) {
     throw new Error("Request URLs used for public origins must not contain credentials.");
   }
-  if (!isLocalHostname(request.hostname))
+  if (!isCanonicalLoopbackHostname(request.hostname))
     throw new Error("Request-derived public origins are limited to local development hosts.");
   if (request.protocol !== "http:" && request.protocol !== "https:")
     throw new Error("Local request origins must use HTTP or HTTPS.");

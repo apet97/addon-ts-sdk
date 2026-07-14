@@ -1,3 +1,4 @@
+import { isCanonicalLoopbackHostname } from "../shared/loopback";
 import type { AddonResponse } from "../shared/response";
 
 /** Options for the SDK's browser-facing response security baseline. */
@@ -40,8 +41,7 @@ function assertFrameAncestor(value: string): void {
   assertDirectiveValue(value);
   if (value === "'none'" || value === "'self'") return;
   const url = new URL(value);
-  const local =
-    url.hostname === "localhost" || url.hostname === "127.0.0.1" || url.hostname === "[::1]";
+  const local = isCanonicalLoopbackHostname(url.hostname);
   if (url.origin !== value) throw new Error("CSP frame ancestors must be origins without paths.");
   if (url.protocol !== "https:" && !(local && url.protocol === "http:")) {
     throw new Error("CSP frame ancestors must use HTTPS outside localhost.");

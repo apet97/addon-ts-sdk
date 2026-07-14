@@ -1,3 +1,5 @@
+import { isCanonicalLoopbackHostname } from "../shared/loopback";
+
 /** A structured settings value update accepted by Clockify's add-on endpoint. */
 export interface ClockifySettingUpdate {
   readonly id: string;
@@ -37,9 +39,7 @@ function normalizeBackendUrl(value: string): URL {
     /^[a-z][a-z\d+.-]*:\/\/(\[[^?/#\\]+\]|[^:/?#\\]+)(?::[^/?#\\]*)?(?:[/?#\\]|$)/i.exec(
       value.trim(),
     )?.[1];
-  const loopback =
-    rawHostname === url.hostname &&
-    (url.hostname === "localhost" || url.hostname === "127.0.0.1" || url.hostname === "[::1]");
+  const loopback = rawHostname === url.hostname && isCanonicalLoopbackHostname(url.hostname);
   if (url.protocol !== "https:" && !(url.protocol === "http:" && loopback)) {
     throw new Error("Clockify backendUrl must use HTTPS outside canonical loopback hosts.");
   }
