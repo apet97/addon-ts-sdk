@@ -168,8 +168,11 @@ Implementation verification will run, in order:
 3. `npm run verify:marketplace-docs`;
 4. `npm run verify:scaffolds`;
 5. `npm run ci:verify`;
-6. `npm run release:verify` when live schema and registry network access are available;
+6. `npm run verify:schema-live` when network access is available;
 7. `git diff --check` plus final contradiction and orphan scans.
+
+`npm run release:verify` is deliberately not part of this documentation-only pass: both unchanged
+workspace versions are already published, and its publish dry-run must reject immutable versions.
 
 ## Scope Boundaries
 
