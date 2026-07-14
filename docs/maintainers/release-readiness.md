@@ -7,8 +7,8 @@ Historical receipts below prove only the source SHA and environment they name.
 
 The latest registry publication is:
 
-- `@apet97/clockify-addon-sdk@1.0.4`
-- `create-clockify-addon@1.0.4`
+- `@apet97/clockify-addon-sdk@1.0.5`
+- `create-clockify-addon@1.0.5`
 
 Install the SDK with `npm install @apet97/clockify-addon-sdk` or create a project with
 `npm create clockify-addon@latest`. npm versions are immutable: every future release requires a
@@ -29,17 +29,32 @@ check must reject immutable versions that are already published. Documentation v
 not create a new release candidate, registry receipt, authenticated Clockify receipt, or Marketplace
 submission evidence.
 
-## 1.0.5 release candidate
+## 1.0.5 release evidence
 
-The authorized candidate versions are:
+Release source commit `d46723956b9b5ff7fb5587bdc03fc8858c90113f` reorganizes the active
+documentation around the builder journey, replaces runtime AJV compilation with generated
+standalone validators, and executes all four packed Node/Worker scaffolds, including real `workerd`
+routes. It also hardens detached-process cleanup and syntax-aware runtime inspection.
 
-- `@apet97/clockify-addon-sdk@1.0.5`
-- `create-clockify-addon@1.0.5`
+Before publication, `npm run release:verify` passed with 46 test files and 435 tests, thresholded
+coverage, package/scaffold execution, live schema parity, zero-vulnerability production and full
+audits, and both publish dry runs. SDK CI run
+[`29324693717`](https://github.com/apet97/addon-ts-sdk/actions/runs/29324693717) then passed on Node
+22.13.0 and Node 24.x.
 
-Publication requires a clean `release:preflight` and `release:verify`, an ancestry-safe direct push
-of the exact source to `main`, and green Node 22/24 CI. Publish the SDK first and the creator second,
-then replace this candidate record with the immutable registry receipt after `verify:registry`
-passes. This candidate makes no fresh authenticated Marketplace lifecycle claim.
+The exact artifacts were published in SDK-first order with these immutable registry digests:
+
+- `@apet97/clockify-addon-sdk@1.0.5`: SHA-1
+  `853a6701dfc53df18fa9086f04c08d5fda6904f8`; SHA-512
+  `sha512-CeWpMkPPDvke9hGYc211Hol3l4tbTgBkK7OR/QPgYUitffLLBisEsZ0dbvL8e7L/4kcY4U5+gm7MSSd2ZxTB0Q==`
+- `create-clockify-addon@1.0.5`: SHA-1
+  `770f864ba8ed67d2954cd486ec4231c474d41e63`; SHA-512
+  `sha512-gNaRwuek8M+sH0XI4fwwUcdXvNiqffmjOtCud8E8FvosIy0pgdkZfrs2JSOyFRPvArtoH+3YhG4kPRl404NDVQ==`
+
+Post-publication `npm run verify:registry` passed from an isolated empty npm cache and executed both
+exact public versions. Both `latest` tags resolve to 1.0.5. The authenticated 1.0.3
+developer-workspace receipt remains historical evidence for that exact release source; 1.0.5 makes
+no new Marketplace lifecycle claim. No Git tag or Marketplace submission was created.
 
 ## 1.0.4 release evidence
 
