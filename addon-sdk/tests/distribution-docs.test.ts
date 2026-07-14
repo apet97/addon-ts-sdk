@@ -128,6 +128,18 @@ describe("published distribution docs", () => {
     });
   });
 
+  it("links npm readers to the public builder guide", () => {
+    const publicGuide = "https://github.com/apet97/addon-ts-sdk/blob/main/docs/getting-started.md";
+    const packageReadme = readFileSync(resolve(packageRoot, "README.md"), "utf8");
+    const creatorReadme = readFileSync(
+      resolve(repoRoot, "create-clockify-addon", "README.md"),
+      "utf8",
+    );
+
+    expect(packageReadme).toContain(publicGuide);
+    expect(creatorReadme).toContain(publicGuide);
+  });
+
   it("documents registry installation for both public packages", () => {
     const rootReadme = readFileSync(resolve(repoRoot, "README.md"), "utf8");
     const packageReadme = readFileSync(resolve(packageRoot, "README.md"), "utf8");

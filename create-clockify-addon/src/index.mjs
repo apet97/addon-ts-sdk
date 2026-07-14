@@ -187,6 +187,65 @@ export default {
 `;
 }
 
+function projectReadme(runtime, features) {
+  const start =
+    runtime === "node"
+      ? "Run `npm start` to start the Node HTTP server."
+      : "Run `npm start`; the script invokes `wrangler dev src/index.ts`.";
+  const featureFlow =
+    features === "all"
+      ? `- Clockify sends \`INSTALLED\` to \`/lifecycle/installed\`.
+- Clockify sends \`NEW_TIME_ENTRY\` to \`/webhooks/time-entry\`.
+- Clockify sends \`DELETED\` to \`/lifecycle/deleted\`.`
+      : "Lifecycle and webhook routes were not generated for this minimal project.";
+  const productionStorage =
+    features === "all"
+      ? `- Replace the in-memory development store with a persistent encrypted installation store.
+- Back webhook processing with durable idempotency storage before handling \`NEW_TIME_ENTRY\` in production.`
+      : `- If you add lifecycle routes, use a persistent encrypted installation store for credentials.
+- If you add webhooks, add durable idempotency storage before processing them.`;
+
+  return `# Clockify Add-on
+
+## Run locally
+
+1. Copy \`.env.example\` to \`.env\` and replace its example values.
+2. Install dependencies with \`npm install\`.
+3. ${start}
+4. Request \`GET /manifest\` at the local URL printed by the runtime.
+
+## Configure Clockify
+
+- Replace \`replace-with-your-unique-addon-key\` in \`src/addon.ts\` with the manifest key from your Clockify add-on configuration.
+- Set \`PUBLIC_BASE_URL\` to the public HTTPS origin that serves this project.
+- Set \`CLOCKIFY_PARENT_ORIGIN\` to the exact Clockify origin that embeds the component. Do not use a wildcard or include a path.
+- Keep \`ALLOW_LOCAL_REQUEST_ORIGIN\` limited to explicit canonical-loopback development.
+
+## Project layout
+
+- \`src/addon.ts\` builds the schema 1.5 manifest and registers the shared routes.
+- \`src/index.ts\` is the ${runtime === "node" ? "Node HTTP" : "Fetch/Worker"} runtime entry point.
+- \`.env.example\` lists the required origins and local-development switches.
+
+## Request flow
+
+- \`GET /manifest\` serves the validated manifest.
+- \`/component\` verifies Clockify's signed component request before returning HTML.
+${featureFlow}
+
+## Before production
+
+- Serve the add-on over HTTPS and keep \`PUBLIC_BASE_URL\` and \`CLOCKIFY_PARENT_ORIGIN\` explicit.
+- Keep \`ALLOW_EPHEMERAL_STORAGE=false\`; the ephemeral path is for local development only.
+${productionStorage}
+
+## Learn more
+
+- [Getting started](https://github.com/apet97/addon-ts-sdk/blob/main/docs/getting-started.md)
+- [How a Clockify add-on works](https://github.com/apet97/addon-ts-sdk/blob/main/docs/how-an-addon-works.md)
+`;
+}
+
 function tsconfig(runtime) {
   return (
     JSON.stringify(
@@ -267,7 +326,7 @@ export async function scaffoldClockifyAddon(options) {
     ),
     writeFile(
       resolve(directory, "README.md"),
-      "# Clockify Add-on\n\nCopy `.env.example` to `.env`, replace the manifest key, and configure persistent encrypted storage before installation. Lifecycle and webhook routes intentionally return setup errors until that wiring exists.\n\nSet `CLOCKIFY_PARENT_ORIGIN` to the exact Clockify parent origin. Use `https://app.clockify.me` for the production app or `https://developer.clockify.me` for a developer workspace; do not broaden the iframe allowlist.\n",
+      projectReadme(options.runtime, options.features),
     ),
   ]);
   return directory;

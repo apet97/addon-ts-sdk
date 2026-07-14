@@ -1,14 +1,15 @@
 # @apet97/clockify-addon-sdk
 
 A TypeScript SDK for the server side of a Clockify add-on: typed manifest builders, a request
-router, runtime adapters, and RS256 webhook-signature verification.
+router, runtime adapters, Clockify request verification, installation storage contracts, and
+Marketplace-specific client helpers.
 
 > Independent, unofficial project. Not affiliated with, endorsed by, or supported by Clockify or
 > CAKE.com. "Clockify" is referenced only to describe what this library is compatible with.
 
-It builds and serves an add-on manifest and routes the requests Clockify sends to it — components,
-lifecycle events, and webhooks — and verifies the signature on each webhook. It is not a client for
-the Clockify REST API.
+It builds and serves an add-on manifest, routes the requests Clockify sends to it, and verifies
+component, lifecycle, and webhook context. `ClockifyAddonClient` handles add-on token exchange,
+settings, and authenticated transport; the package is not a general Clockify entity REST SDK.
 
 ## Install
 
@@ -19,6 +20,32 @@ npm install @apet97/clockify-addon-sdk
 ```
 
 Node 22+. Ships ESM and CommonJS builds with type declarations.
+
+## Imports
+
+The root entry point is runtime-neutral and supports both ESM and CommonJS:
+
+```typescript
+import { ClockifyAddon, ClockifyManifest } from "@apet97/clockify-addon-sdk";
+import { ClockifyAddonClient } from "@apet97/clockify-addon-sdk/client";
+```
+
+```javascript
+const { ClockifyAddon, ClockifyManifest } = require("@apet97/clockify-addon-sdk");
+const { ClockifyAddonClient } = require("@apet97/clockify-addon-sdk/client");
+```
+
+Import host integrations from the granular subpath for the runtime you use:
+
+| Import path                                   | Purpose                                  |
+| --------------------------------------------- | ---------------------------------------- |
+| `@apet97/clockify-addon-sdk/clockify`         | Clockify builders, models, and verifiers |
+| `@apet97/clockify-addon-sdk/client`           | `ClockifyAddonClient`                    |
+| `@apet97/clockify-addon-sdk/ui`               | Browser bridge and preference helpers    |
+| `@apet97/clockify-addon-sdk/adapters/node`    | Node `http` adapter                      |
+| `@apet97/clockify-addon-sdk/adapters/express` | Express adapter                          |
+| `@apet97/clockify-addon-sdk/adapters/fetch`   | Standard Fetch adapter                   |
+| `@apet97/clockify-addon-sdk/testing`          | Test keys and signed-token helpers       |
 
 ### Contributing or testing unreleased changes
 
@@ -58,7 +85,7 @@ import {
 import { createNodeHttpAddonServer } from "@apet97/clockify-addon-sdk/adapters/node";
 
 // 1. Build the manifest using the versioned builder
-const manifest = ClockifyManifest.v1_4Builder()
+const manifest = ClockifyManifest.v1_5Builder()
   .key("my-clockify-addon")
   .name("My Add-on")
   .baseUrl("https://example.com/addon")
@@ -71,7 +98,7 @@ const parser = createClockifySignatureParser("my-clockify-addon");
 
 // 3. Register a component and verify Clockify's signed auth_token on every request
 addon.registerComponent(
-  ClockifyComponent.v1_4Builder()
+  ClockifyComponent.v1_5Builder()
     .activityTab()
     .allowAdmins()
     .path("/component")
@@ -101,12 +128,13 @@ server.listen(8080, () => {
 });
 ```
 
-## What it does
+## Product surface
 
 - **Manifest builders** for schema versions 1.2–1.5. Required fields are enforced at the type
   level: the chain will not expose `.build()` until every required step is set.
-- **Router** that serves `/manifest`, trims a trailing slash before matching, returns 405 for an
-  unmatched route, and 500 when a handler throws.
+- **Router** that serves `/manifest`, trims one trailing slash before matching, returns 404 when no
+  route owns a path, returns 405 with `Allow` when the path exists for another method, and contains
+  handler failures as 500 responses.
 - **Clockify token helpers** — built-in platform public key, parser factory, RS256 JWT
   verification, component `auth_token` and lifecycle-header helpers, admin-role checks, and
   environment URL normalization.
@@ -117,6 +145,25 @@ server.listen(8080, () => {
 - **Structured setting helpers** for common setting types, keeping value types paired with
   `TXT`, `NUMBER`, `CHECKBOX`, `LINK`, dropdown, and user dropdown settings.
 - **Adapters** for Node `http`, Express, and the Fetch API (Hono, Cloudflare Workers, Bun, Deno).
+- **`ClockifyAddonClient`** for add-on token exchange, structured settings, and authenticated
+  server-side requests using `X-Addon-Token`.
+
+## Node and Express runtimes
+
+The quick start uses `createNodeHttpAddonServer` from the Node-only adapter subpath. It applies the
+SDK's request-body limit before dispatch and leaves process startup with the application.
+
+Express applications use the structurally typed optional adapter and configure their own body
+parser limit:
+
+```typescript
+import express from "express";
+import { createExpressAddonHandler } from "@apet97/clockify-addon-sdk/adapters/express";
+
+const app = express();
+app.use(express.json({ limit: "1mb" }));
+app.use(createExpressAddonHandler(addon));
+```
 
 ## Fetch and edge runtimes
 
@@ -215,6 +262,12 @@ console.log(schemaProvenance.supportedVersions);
 
 ## Documentation
 
+- [Builder getting started](https://github.com/apet97/addon-ts-sdk/blob/main/docs/getting-started.md)
+- [Complete add-on lifecycle](https://github.com/apet97/addon-ts-sdk/blob/main/docs/how-an-addon-works.md)
+- [Installation and storage](https://github.com/apet97/addon-ts-sdk/blob/main/docs/guides/installation-and-storage.md)
+- [Components and UI](https://github.com/apet97/addon-ts-sdk/blob/main/docs/guides/components-and-ui.md)
+- [Webhooks and idempotency](https://github.com/apet97/addon-ts-sdk/blob/main/docs/guides/webhooks-and-idempotency.md)
+- [Calling Clockify](https://github.com/apet97/addon-ts-sdk/blob/main/docs/guides/calling-clockify.md)
 - [Java Migration Guide](./docs/java-migration.md)
 - [API Reference](./docs/api-reference.md)
 - [Manifest Builders](./docs/manifest-builders.md)

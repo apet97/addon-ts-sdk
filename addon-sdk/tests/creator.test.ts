@@ -76,8 +76,24 @@ describe("create-clockify-addon", () => {
       expect(source).not.toContain(".lifecycle([installed, deleted])");
       expect(source).not.toContain(".webhooks([webhook])");
       expect(env).toContain("PUBLIC_BASE_URL=https://");
-      expect(readme).toContain("exact Clockify parent origin");
-      expect(readme).toContain("https://developer.clockify.me");
+      for (const heading of [
+        "## Run locally",
+        "## Configure Clockify",
+        "## Request flow",
+        "## Before production",
+      ]) {
+        expect(readme).toContain(heading);
+      }
+      expect(readme).toContain(runtime === "node" ? "npm start" : "wrangler dev");
+      expect(readme).toContain("PUBLIC_BASE_URL");
+      expect(readme).toContain("CLOCKIFY_PARENT_ORIGIN");
+      expect(readme).toContain("replace-with-your-unique-addon-key");
+      expect(readme).toContain("persistent encrypted installation store");
+      expect(readme).toContain("GET /manifest");
+      expect(readme).toContain("/component");
+      for (const event of ["INSTALLED", "NEW_TIME_ENTRY", "DELETED"]) {
+        expect(readme).toContain(event);
+      }
     } finally {
       await rm(parent, { recursive: true, force: true });
     }
@@ -101,10 +117,13 @@ describe("create-clockify-addon", () => {
     try {
       await scaffoldClockifyAddon({ directory, runtime: "node", features: "minimal" });
       const source = await readFile(join(directory, "src", "addon.ts"), "utf8");
+      const readme = await readFile(join(directory, "README.md"), "utf8");
       expect(source).not.toContain("ClockifyLifecycleEvent");
       expect(source).not.toContain("ClockifyWebhook");
       expect(source).toContain("ClockifyComponent");
       expect(source).not.toContain(".components([component])");
+      expect(readme).toContain("/component");
+      expect(readme).toContain("Lifecycle and webhook routes were not generated");
     } finally {
       await rm(parent, { recursive: true, force: true });
     }

@@ -15,11 +15,16 @@
 - [Deployment and operations](guides/deployment-and-operations.md)
 - [Troubleshooting](guides/troubleshooting.md)
 
-## SDK reference
+## Package entry points
 
-- [SDK package README](../addon-sdk/README.md)
-- [API reference](../addon-sdk/docs/api-reference.md)
-- [Creator package README](../create-clockify-addon/README.md)
+- [SDK package README](../addon-sdk/README.md) — installation, imports, runtime adapters, testing,
+  schemas, and package reference navigation.
+- [Creator package README](../create-clockify-addon/README.md) — CLI options, all four scaffold
+  variants, generated layout, configuration, and first-run commands.
+- [API reference](../addon-sdk/docs/api-reference.md) — public entry points and exported contracts.
+
+Every generated project also includes a runtime- and feature-aware README with its local commands,
+configuration, request flow, and production storage checklist.
 
 ## Maintainers
 

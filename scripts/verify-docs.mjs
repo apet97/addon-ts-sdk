@@ -692,6 +692,16 @@ export async function collectDocumentationErrors(
   if (repositoryContracts) {
     const rootReadme = await requiredText(absoluteRoot, "README.md");
     const indexSource = await requiredText(absoluteRoot, index);
+    const publicGuide =
+      "https://github.com/apet97/addon-ts-sdk/blob/main/docs/getting-started.md";
+    for (const file of [
+      "addon-sdk/README.md",
+      "create-clockify-addon/README.md",
+    ]) {
+      if (!(await requiredText(absoluteRoot, file)).includes(publicGuide)) {
+        errors.push(`${file}: missing public builder-guide link`);
+      }
+    }
     const lifecycle = await requiredText(
       absoluteRoot,
       "docs/how-an-addon-works.md",
