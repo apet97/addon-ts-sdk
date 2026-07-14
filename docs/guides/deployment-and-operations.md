@@ -110,13 +110,14 @@ npm run ci:verify
 Those local gates are not fresh Marketplace proof. Before a release, use an authenticated Clockify
 developer workspace to fetch the deployed manifest, install the add-on, load the iframe, deliver a
 webhook, exercise deletion, and record the exact source SHA and environment. Historical receipts,
-localhost probes, CI, and Wrangler dry-runs prove only the states they actually exercised.
+localhost probes, CI, real local `workerd` route probes, and Wrangler dry-runs prove only the states
+they actually exercised.
 
 ## Reference
 
 - [Getting started](../getting-started.md)
 - [Creator package reference](../../create-clockify-addon/README.md)
 - [Runtime adapters](../../addon-sdk/docs/routing.md)
-- [Quality gates](../quality-gates.md)
-- [Marketplace coverage and live evidence](../marketplace-coverage.md)
+- [Quality gates](../maintainers/quality-gates.md)
+- [Marketplace coverage and live evidence](../maintainers/marketplace-coverage.md)
 - [Current scaffold source](../../create-clockify-addon/src/index.mjs)

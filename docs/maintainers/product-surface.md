@@ -1,5 +1,8 @@
 # Product Surface: @apet97/clockify-addon-sdk
 
+This maintainer reference defines the shipped package boundary. Use it when deciding whether a
+feature belongs in this repository or in an application or entity-specific Clockify client.
+
 This package provides a layered TypeScript toolkit for CAKE.com Marketplace add-ons targeting
 Clockify. The SDK and the `create-clockify-addon` creator are published to the npm registry.
 
@@ -39,8 +42,8 @@ Clockify. The SDK and the `create-clockify-addon` creator are published to the n
 - Marketplace-specific add-on token exchange/settings transport and a secure iframe UI bridge.
 - A separate ESM-only creator workspace with a typed programmatic export. Its packed artifact
   generates Node/Worker minimal/all projects that install the packed SDK, type-check, execute their
-  runtime, serve schema-valid manifests with exact route counts, and compile Worker entry points in
-  Wrangler dry-runs.
+  runtime, serve schema-valid manifests with exact route counts, exercise Worker routes in real
+  `workerd` sessions, and compile Worker entry points in Wrangler dry-runs.
 
 ### Exclusions
 

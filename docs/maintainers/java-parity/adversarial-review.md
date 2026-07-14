@@ -1,5 +1,8 @@
 # Adversarial Review: Design Choices and Deviations
 
+This maintainer record captures deliberate TypeScript design choices made while porting the Java
+SDK. Revisit it when a parity change could blur an intentional runtime or language adaptation.
+
 ## 1. Monorepo vs Standalone Workspace
 
 **Decision**: Initialized a monorepo structure in the active workspace. This provides root-level validation scripts and governance targets, while keeping the primary code inside the `addon-sdk` package.

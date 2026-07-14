@@ -1,5 +1,9 @@
 # Evidence Map: Java to TypeScript
 
+This maintainer map ties the Java reference implementation and Marketplace contracts to their
+TypeScript counterparts. Preserve its cited baseline and update mappings only with reviewed parity
+evidence.
+
 This file documents the mapping from the official Clockify Java add-on SDK to the TypeScript SDK
 port. Last verified against `clockify/addon-java-sdk` main commit
 `1b3a60d17a12adf28ae37ede687558fd50e0a33c` (2025-08-22) and the local

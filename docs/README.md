@@ -28,17 +28,13 @@ configuration, request flow, and production storage checklist.
 
 ## Maintainers
 
-- [Architecture](architecture.md)
-- [Product surface](product-surface.md)
-- [Quality gates](quality-gates.md)
-- [Release readiness](release-readiness.md)
-- [Marketplace coverage](marketplace-coverage.md)
-- [Pre-release migration](pre-release-migration.md)
+- [Maintainer documentation](maintainers/README.md) — architecture, product boundaries, quality
+  gates, release and Marketplace evidence, migration history, and Java parity.
 
 ## Upstream, generated, and historical material
 
-- `MARKETPLACE_DOCS/` is the preserved upstream Marketplace snapshot and provenance source. It is
-  not authored builder documentation.
+- [`MARKETPLACE_DOCS/`](../MARKETPLACE_DOCS/README.md) is the preserved upstream Marketplace
+  snapshot and provenance source. It is not authored builder documentation.
 - `addon-sdk/public-api.snapshot.md` is generated API-surface evidence checked by repository gates;
   do not edit it by hand.
 - `docs/superpowers/` contains historical design and implementation evidence, not the active

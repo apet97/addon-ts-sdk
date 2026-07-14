@@ -1,5 +1,8 @@
 # Parity Checklist
 
+This maintainer checklist records verified Java-parity requirements and intentional TypeScript
+extensions. It is evidence for contributors, not an end-user feature guide.
+
 This document tracks implementation status of Java parity requirements and modern TypeScript adaptations.
 
 ## Source Baseline

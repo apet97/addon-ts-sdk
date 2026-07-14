@@ -143,22 +143,24 @@ describe("published distribution docs", () => {
   it("documents registry installation for both public packages", () => {
     const rootReadme = readFileSync(resolve(repoRoot, "README.md"), "utf8");
     const packageReadme = readFileSync(resolve(packageRoot, "README.md"), "utf8");
+    const maintainerDocs = resolve(repoRoot, "docs", "maintainers");
     const creatorReadme = readFileSync(
       resolve(repoRoot, "create-clockify-addon", "README.md"),
       "utf8",
     );
-    const productSurface = readFileSync(resolve(repoRoot, "docs", "product-surface.md"), "utf8");
-    const releaseReadiness = readFileSync(
-      resolve(repoRoot, "docs", "release-readiness.md"),
-      "utf8",
-    );
+    const productSurface = readFileSync(resolve(maintainerDocs, "product-surface.md"), "utf8");
+    const releaseReadiness = readFileSync(resolve(maintainerDocs, "release-readiness.md"), "utf8");
     const securityPolicy = readFileSync(resolve(repoRoot, "SECURITY.md"), "utf8");
-    const architecture = readFileSync(resolve(repoRoot, "docs", "architecture.md"), "utf8");
+    const architecture = readFileSync(resolve(maintainerDocs, "architecture.md"), "utf8");
     const preReleaseMigration = readFileSync(
-      resolve(repoRoot, "docs", "pre-release-migration.md"),
+      resolve(maintainerDocs, "pre-release-migration.md"),
       "utf8",
     );
-    const qualityGates = readFileSync(resolve(repoRoot, "docs", "quality-gates.md"), "utf8");
+    const qualityGates = readFileSync(resolve(maintainerDocs, "quality-gates.md"), "utf8");
+    const marketplaceCoverage = readFileSync(
+      resolve(maintainerDocs, "marketplace-coverage.md"),
+      "utf8",
+    );
     const dependencyStrategy = readFileSync(
       resolve(packageRoot, "docs", "dependency-strategy.md"),
       "utf8",
@@ -166,7 +168,7 @@ describe("published distribution docs", () => {
     const agents = readFileSync(resolve(repoRoot, "AGENTS.md"), "utf8");
     const claude = readFileSync(resolve(repoRoot, "CLAUDE.md"), "utf8");
     const evidenceMap = readFileSync(
-      resolve(packageRoot, "docs", "porting", "evidence-map.md"),
+      resolve(maintainerDocs, "java-parity", "evidence-map.md"),
       "utf8",
     );
     const rootPackageJson = JSON.parse(readFileSync(resolve(repoRoot, "package.json"), "utf8"));
@@ -245,6 +247,8 @@ describe("published distribution docs", () => {
     expect(qualityGates).toContain("Node minimal");
     expect(qualityGates).toContain("Worker all-features");
     expect(qualityGates).toContain("executes their runtime");
+    expect(qualityGates).toContain("real `workerd`");
+    expect(marketplaceCoverage).toContain("real `workerd`");
     expect(qualityGates).toContain("installs the creator tarball");
     expect(qualityGates).toContain("Wrangler dry-runs");
     expect(qualityGates).toContain("npm run release:preflight");
@@ -273,6 +277,38 @@ describe("published distribution docs", () => {
     expect(evidenceMap).toContain("clockify-request-verifiers.ts");
     expect(evidenceMap).toContain("clockify-request-handlers.ts");
     expect(evidenceMap).toContain("clockify-request-wire.ts");
+  });
+
+  it("indexes maintainer and captured upstream documentation", () => {
+    const maintainerDocs = resolve(repoRoot, "docs", "maintainers");
+    const maintainerIndex = readFileSync(resolve(maintainerDocs, "README.md"), "utf8");
+    const maintainerLinks = [
+      "architecture.md",
+      "product-surface.md",
+      "quality-gates.md",
+      "release-readiness.md",
+      "marketplace-coverage.md",
+      "pre-release-migration.md",
+      "java-parity/adversarial-review.md",
+      "java-parity/evidence-map.md",
+      "java-parity/parity-checklist.md",
+    ];
+
+    for (const link of maintainerLinks) {
+      expect(existsSync(resolve(maintainerDocs, link))).toBe(true);
+      expect(maintainerIndex).toContain(`](${link})`);
+    }
+
+    const marketplaceIndex = readFileSync(
+      resolve(repoRoot, "MARKETPLACE_DOCS", "README.md"),
+      "utf8",
+    );
+    expect(marketplaceIndex).toContain("numbered files");
+    expect(marketplaceIndex).toContain("upstream snapshots");
+    expect(marketplaceIndex).toContain("npm run verify:marketplace-docs");
+    expect(marketplaceIndex).toContain("provenance.json");
+    expect(marketplaceIndex).toContain("scripts/verify-marketplace-docs.mjs");
+    expect(marketplaceIndex).toContain("../docs/how-an-addon-works.md");
   });
 
   it("keeps AGENTS.md and CLAUDE.md synchronized after their introductions", () => {

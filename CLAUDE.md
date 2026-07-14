@@ -28,21 +28,22 @@ Quick reference for Claude Code and other contributors working in this repositor
   arrays. A `register*` call initializes its missing array only after the route binds successfully;
   conflicts leave both the router and manifest unchanged.
 - `verify:scaffolds` packs both packages, generates all four runtime/feature variants through the
-  installed creator artifact, installs the packed SDK, executes and validates their exact runtime
-  manifests, probes failure paths, and compiles Worker entry points with a Wrangler dry-run. This is
-  not a substitute for a fresh authenticated Clockify developer-workspace pass before release.
+  installed creator artifact, installs the packed SDK, executes Node and real `workerd` Worker
+  routes, validates their exact manifests and failure paths, and separately compiles Worker entry
+  points with a Wrangler dry-run. This is not a substitute for a fresh authenticated Clockify
+  developer-workspace pass before release.
 - The SDK and creator are public npm packages. Consumers install with
   `npm install @apet97/clockify-addon-sdk` or scaffold with `npm create clockify-addon@latest`;
-  `docs/release-readiness.md` is the canonical exact-version record.
+  `docs/maintainers/release-readiness.md` is the canonical exact-version record.
 - `release:preflight` and `verify:registry` read both workspace versions dynamically. The former
   fails unless exact versions are unpublished; the latter waits briefly for normal npm propagation,
   installs the exact published artifacts, and executes a generated Node minimal project. Both depend
   on registry state and stay outside deterministic `ci:verify`; run `release:verify` only before
   publication because its dry run correctly rejects immutable published versions.
-- `docs/release-readiness.md` is the canonical publication record and
-  `docs/marketplace-coverage.md` is the canonical live/Marketplace evidence record. Historical
-  receipts prove only their recorded SHA; local, CI, and dry-run checks are not fresh live,
-  registry, or Marketplace proof.
+- `docs/maintainers/release-readiness.md` is the canonical publication record and
+  `docs/maintainers/marketplace-coverage.md` is the canonical live/Marketplace evidence record.
+  Historical receipts prove only their recorded SHA; local, CI, and dry-run checks are not fresh
+  live, registry, or Marketplace proof.
 
 - Keep Node `http` and Fetch body-limit semantics aligned on every HTTP method: declared
   `content-length` values above `maxBodyBytes` must fail before routing, and streamed bodies must
@@ -86,9 +87,9 @@ Quick reference for Claude Code and other contributors working in this repositor
 - Builder step order follows each schema's `required` array (matching the upstream processor).
   Required array fields keep Java-parity empty-array defaults but must still throw at runtime when
   their setter was never called.
-- Marketplace coverage is tracked in `docs/marketplace-coverage.md`. The SDK owns add-on-specific
-  token/settings transport, storage contracts, secure UI messaging, and schema validation. The
-  separate `clockify-ts-sdk` owns entity-specific REST APIs, CLI, and MCP behavior.
+- Marketplace coverage is tracked in `docs/maintainers/marketplace-coverage.md`. The SDK owns
+  add-on-specific token/settings transport, storage contracts, secure UI messaging, and schema
+  validation. The separate `clockify-ts-sdk` owns entity-specific REST APIs, CLI, and MCP behavior.
 - Clockify-signed tokens are verified as `RS256` JWTs with `iss=clockify`, `type=addon`, and
   `sub=<manifest key>`. Raw webhook verification requires `expectedEventType`, a fixed
   `expectedWebhookAuthToken`, and nonblank signed `workspaceId`/`addonId`; the wrapper requires
@@ -131,7 +132,7 @@ Quick reference for Claude Code and other contributors working in this repositor
 | `npm run pack:dry-run`                     | SDK tarball contents (`dist` + `docs` + schemas + license/readme) and the separate creator tarball (`bin` + `src` + license/readme).                                                                                                                  |
 | `npm run verify:package-lint`              | Packs both artifacts with scripts ignored, then runs `publint --strict` and Are The Types Wrong: Node16 for the dual-format SDK and `esm-only` for the creator. Node10 findings are outside the supported runtime policy.                             |
 | `npm run verify:package-consumer`          | Packs the already-built package with scripts ignored, installs it into temporary runtime ESM/CJS and TypeScript ESM/CJS consumers, imports public subpaths, signs/verifies test tokens, type-checks declarations, and serves `/manifest`.             |
-| `npm run verify:scaffolds`                 | Packs the creator and SDK; generates Node/Worker minimal/all through the installed creator; installs, type-checks, and executes each; validates manifests/counts and failure paths; dry-runs both Worker entry points with Wrangler.                  |
+| `npm run verify:scaffolds`                 | Packs installed creator/SDK; generates, installs, and type-checks Node/Worker minimal/all; executes Node and real `workerd` routes; validates manifests/failures; Wrangler-dry-runs Worker entries.                                                   |
 | `npm run release:preflight`                | Manual one-shot network gate: fails unless both exact workspace versions are absent from the configured npm registry.                                                                                                                                 |
 | `npm run verify:registry`                  | Manual post-publish gate: waits up to 30 seconds only for absent exact versions, then installs them into a disposable consumer and checks ESM/CJS/TypeScript/creator plus a generated Node minimal project.                                           |
 | `npm run audit:prod` / `npm run audit:all` | Production and full dependency audits; both should report 0 vulnerabilities.                                                                                                                                                                          |

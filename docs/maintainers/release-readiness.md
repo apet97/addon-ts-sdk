@@ -1,5 +1,8 @@
 # Release Readiness
 
+This maintainer record owns exact published versions, release procedures, and evidence receipts.
+Historical receipts below prove only the source SHA and environment they name.
+
 ## Published versions
 
 The latest registry publication is:
@@ -51,8 +54,8 @@ order and retained these npm SHA-1 values:
 - `create-clockify-addon@1.0.3`: `c18c65a9ffcd4fc1003b86cfb7fd0d6d5c1531b7`
 
 Post-publication `npm run verify:registry` installed and executed both exact public versions. The
-fresh live receipt is recorded in `docs/marketplace-coverage.md`. No Git tag or Marketplace
-submission was created.
+fresh live receipt is recorded in `docs/maintainers/marketplace-coverage.md`. No Git tag or
+Marketplace submission was created.
 
 ## Future release checklist
 
@@ -132,8 +135,8 @@ On 2026-07-12, an authenticated Firefox developer-workspace pass at final runtim
 the `INSTALLED` lifecycle and `NEW_TIME_ENTRY` webhook, rendered the signed component with the exact
 developer parent origin, and delivered `DELETED` during uninstall. The disposable two-hour entry,
 installation, tunnel, server, proxy, and temporary files were removed. See
-`docs/marketplace-coverage.md` for the sanitized route/status receipt. This proves that exact
-runtime SHA, not future changes or a Marketplace submission.
+`docs/maintainers/marketplace-coverage.md` for the sanitized route/status receipt. This proves that
+exact runtime SHA, not future changes or a Marketplace submission.
 
 ## Expected package shape
 

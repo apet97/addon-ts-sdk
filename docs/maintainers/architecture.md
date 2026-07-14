@@ -1,5 +1,30 @@
 # Architecture
 
+This maintainer reference describes internal runtime and package boundaries. Builder flow belongs
+in [How an add-on works](../how-an-addon-works.md).
+
+## Request and host boundaries
+
+```text
+Clockify request
+  -> Node / Fetch / Express adapter
+  -> shared request normalization and body limits
+  -> exact router
+  -> Clockify verification wrapper
+  -> application handler
+  -> AddonResponse
+```
+
+Adapters normalize host input and serialize the final `AddonResponse`. Node and Fetch enforce SDK
+body limits; Express leaves parsing and limits with the host. The exact router selects the route,
+then Clockify wrappers verify signature, event, and installation context before application code.
+
+Generated projects preserve a shared `createAddon` versus host bootstrap split. `src/addon.ts`
+builds the manifest and registers routes; runtime-specific `src/index.ts` starts Node with
+`createNodeHttpAddonServer` or exports Worker `fetch()` through `handleFetchRequest`.
+
+## Package subpath boundary
+
 `@apet97/clockify-addon-sdk` is layered so a runtime never imports code for another runtime.
 
 - The root and `/clockify` entrypoints contain manifests, routing, verification, security,

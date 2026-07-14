@@ -1,5 +1,8 @@
 # 1.0 API Migration
 
+This maintainer-facing historical note records the runtime-adapter import change completed before
+the first public release. It is retained for reviewing old examples and migration reports.
+
 Before the public `1.0.0` release, Node-only adapters stopped being re-exported from the root so
 browser and Worker consumers could import the runtime-neutral entrypoint.
 

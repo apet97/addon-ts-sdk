@@ -1,5 +1,9 @@
 # Quality Gates: @apet97/clockify-addon-sdk
 
+This maintainer runbook explains what each repository gate proves and which freshness boundaries
+remain manual. Builders generally need the focused commands in the task guides, not this full gate
+inventory.
+
 The root `npm run ci:verify` script is the canonical local and CI gate. It runs the package checks
 through npm workspaces, includes the package's `prepack` chain, and adds installed-package checks so
 the publishable artifacts are always built and verified from a green tree.
@@ -50,11 +54,11 @@ consumer, audit, or live-schema checks.
 14. **`npm run verify:scaffolds`** — packs both packages, installs the creator tarball into a
     temporary runner, and generates Node minimal, Node all-features, Worker minimal, and
     Worker all-features projects through that installed export. It installs and type-checks each
-    project. It executes their runtime, requests `/manifest`, validates the response with the packed
-    SDK, and asserts exact component/lifecycle/webhook counts. It also probes 404 handling, unsigned
-    component rejection, and production configuration failure, then bundles both Worker entry
-    points with Wrangler dry-runs. This is packed runtime proof, not a source grep or type-check
-    proxy.
+    project. It executes their runtime through Node processes and real `workerd` Worker sessions,
+    requests `/manifest`, validates the response with the packed SDK, and asserts exact
+    component/lifecycle/webhook counts. It also probes 404 handling, unsigned component rejection,
+    and production configuration failure. Separate Wrangler dry-runs bundle both Worker entry
+    points. This is packed runtime proof, not a source grep or type-check proxy.
 15. **`npm audit --omit=dev --json` and `npm audit --json`** — production and full dependency audit;
     both should report 0 vulnerabilities.
 
@@ -87,7 +91,7 @@ run it only for unpublished workspace versions.
 Successful local gates and `release:preflight` establish only that a workspace version is a verified,
 currently unpublished candidate. They do not establish npm publication, exact-registry consumption,
 Marketplace submission, or fresh authenticated Clockify behavior; those require the separate
-post-publish and live receipts described in `docs/release-readiness.md`.
+post-publish and live receipts described in `docs/maintainers/release-readiness.md`.
 
 Dependency freshness:
 

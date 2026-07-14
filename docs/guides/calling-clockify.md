@@ -95,4 +95,4 @@ ambiguous failure.
 - [`ClockifyAddonClient` API](../../addon-sdk/src/client/index.ts)
 - [Token and environment validation](../../addon-sdk/docs/token-validation.md)
 - [Secure server recipe](../../addon-sdk/docs/secure-server-recipe.md)
-- [Marketplace coverage boundary](../marketplace-coverage.md)
+- [Marketplace coverage boundary](../maintainers/marketplace-coverage.md)

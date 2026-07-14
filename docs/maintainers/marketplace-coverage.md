@@ -1,12 +1,16 @@
 # Marketplace Coverage Matrix
 
+This maintainer evidence map connects captured upstream Marketplace material to current SDK
+behavior and recorded proof. It is not a builder tutorial or a claim of fresh Marketplace
+acceptance.
+
 This matrix maps the vendored `MARKETPLACE_DOCS` snapshot to SDK behavior. A row marked
 "application responsibility" is deliberately not hidden behind an SDK success response.
 
 | Marketplace area         | SDK coverage                                                                                                                            | Proof                                               |
 | ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------- |
 | Introduction             | Manifest, runtime, lifecycle, webhook, component, client and UI layers                                                                  | API reference and packed scaffolds                  |
-| Quick start              | Packed creator generates Node/Worker minimal/all with valid manifests, fail-closed paths, and compilable Worker entries                 | executable `verify:scaffolds`                       |
+| Quick start              | Packed Node/Worker minimal/all: valid manifests, fail-closed paths, real `workerd` routes, and compilable Worker entries                | executable `verify:scaffolds`                       |
 | Lifecycle                | Typed payload guards, verified wrappers, encrypted storage, and caller-qualified generation deletes                                     | lifecycle, creator and installation-store suites    |
 | UI components            | Generated component builders and hardened HTML responses                                                                                | builder, security and creator suites                |
 | Webhooks                 | Fixed-token raw verification, exactly-one-source wrappers, signed installation context, 1 MiB limits and owner leases                   | request-verification and webhook-idempotency suites |

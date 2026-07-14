@@ -55,7 +55,7 @@ Clockify request
 | Browser integration    | Hardened HTML/JSON responses and an exact-origin iframe bridge                                 |
 
 Entity-specific Clockify REST APIs remain outside this package. See
-[Product Surface](docs/product-surface.md) for the exact boundary.
+[Product Surface](docs/maintainers/product-surface.md) for the exact boundary.
 
 ## Packages and runtimes
 
@@ -108,8 +108,9 @@ npm run ci:verify
 For a future version, maintainers run `npm run release:verify` before publication and
 `npm run verify:registry` afterward.
 
-See [Quality Gates](docs/quality-gates.md), [Release Evidence](docs/release-readiness.md), and
-[Marketplace Coverage](docs/marketplace-coverage.md) for the proof boundaries.
+See [Quality Gates](docs/maintainers/quality-gates.md),
+[Release Evidence](docs/maintainers/release-readiness.md), and
+[Marketplace Coverage](docs/maintainers/marketplace-coverage.md) for the proof boundaries.
 
 ## Contributing
 

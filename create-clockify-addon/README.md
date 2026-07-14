@@ -141,5 +141,6 @@ node ./create-clockify-addon/bin/create-clockify-addon.mjs ./my-addon
 ```
 
 Repository verification packs both packages, imports the installed creator artifact, generates all
-four variants, installs the packed SDK, executes the scaffolds, and Wrangler-dry-runs both Worker
-entry points. Generated projects do not rely on monorepo source imports.
+four variants, installs the packed SDK, executes the Node scaffolds and real local `workerd` routes,
+and separately Wrangler-dry-runs both Worker entry points. Generated projects do not rely on
+monorepo source imports.
