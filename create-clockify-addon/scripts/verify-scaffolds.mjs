@@ -13,6 +13,12 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
 import { fileURLToPath } from "node:url";
+import { inspectRuntimeJavaScript } from "../../scripts/javascript-runtime-inspection.mjs";
+import {
+  createChildClosePromise,
+  parseWorkerManifest,
+  terminateChildProcessTree,
+} from "./scaffold-runtime-helpers.mjs";
 
 const root = fileURLToPath(new URL("../..", import.meta.url));
 const tsxCli = fileURLToPath(import.meta.resolve("tsx/cli"));
@@ -158,19 +164,6 @@ function captureChildOutput(child) {
   return () => output;
 }
 
-async function terminateChild(child) {
-  if (child.exitCode !== null || child.signalCode !== null) return;
-  const closed = once(child, "close");
-  child.kill("SIGTERM");
-  const graceful = await Promise.race([
-    closed.then(() => true),
-    sleep(5_000).then(() => false),
-  ]);
-  if (graceful) return;
-  child.kill("SIGKILL");
-  await closed;
-}
-
 async function waitForWorker(origin, child, readOutput, readSpawnError) {
   const deadline = Date.now() + 30_000;
   while (Date.now() < deadline) {
@@ -226,10 +219,12 @@ async function verifyWorkerThroughWrangler(directory, variant) {
     ],
     {
       cwd: directory,
+      detached: process.platform !== "win32",
       env: { ...process.env, WRANGLER_SEND_METRICS: "false" },
       stdio: ["ignore", "pipe", "pipe"],
     },
   );
+  const closed = createChildClosePromise(child);
   const readOutput = captureChildOutput(child);
   let spawnError;
   child.once("error", (error) => {
@@ -252,23 +247,15 @@ async function verifyWorkerThroughWrangler(directory, variant) {
 
   try {
     await waitForWorker(origin, child, readOutput, () => spawnError);
-    const manifest = JSON.parse(await request("/manifest", 200));
-    const expectedLifecycle = variant.features === "all" ? 2 : 0;
-    const expectedWebhooks = variant.features === "all" ? 1 : 0;
-    if (
-      (manifest.components?.length ?? 0) !== 1 ||
-      (manifest.lifecycle?.length ?? 0) !== expectedLifecycle ||
-      (manifest.webhooks?.length ?? 0) !== expectedWebhooks
-    ) {
-      throw new Error(`${variant.name}: unexpected workerd manifest shape.`);
-    }
+    const manifestBody = await request("/manifest", 200);
+    parseWorkerManifest(manifestBody, variant, readOutput());
     await request("/missing", 404);
     await request("/component", 401);
     console.log(
       `${variant.name}: real workerd routes returned /manifest 200, /missing 404, /component 401.`,
     );
   } finally {
-    await terminateChild(child);
+    await terminateChildProcessTree(child, closed);
   }
 }
 
@@ -288,17 +275,17 @@ function verifyWorkerBundle(bundleDirectory, variant) {
       `${variant.name}: Wrangler dry-run did not emit a JavaScript bundle.`,
     );
   }
-  const bundle = javascriptFiles
-    .map((file) => readFileSync(file, "utf8"))
-    .join("\n");
-  for (const [description, pattern] of [
-    ["runtime string code generation", /\b(?:eval|new\s+Function)\s*\(/u],
-    ["AJV compileSchema", /\bcompileSchema\b/u],
-    ["AJV CodeGen", /\bCodeGen\b/u],
-  ]) {
-    if (pattern.test(bundle)) {
+  for (const file of javascriptFiles) {
+    const findings = inspectRuntimeJavaScript(readFileSync(file, "utf8"));
+    if (findings.length > 0) {
+      const details = findings
+        .map(
+          (finding) =>
+            `${finding.kind} at ${finding.line}:${finding.column + 1} (${finding.message})`,
+        )
+        .join(", ");
       throw new Error(
-        `${variant.name}: bundled Worker contains ${description}.`,
+        `${variant.name}: bundled Worker contains forbidden runtime syntax in ${file}: ${details}.`,
       );
     }
   }

@@ -1,0 +1,29 @@
+import { existsSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { describe, expect, it } from "vitest";
+
+const safetyModuleUrl = new URL("../scripts/standalone-validator-safety.ts", import.meta.url).href;
+const safetyModuleExists = existsSync(fileURLToPath(safetyModuleUrl));
+
+describe("standalone validator safety", () => {
+  it("provides the codegen safety module", () => {
+    expect(safetyModuleExists).toBe(true);
+  });
+
+  it.each([
+    ["static", 'import runtime from "./runtime.js"; void runtime;'],
+    ["dynamic", 'const runtime = import("./runtime.js"); void runtime;'],
+  ])("rejects %s imports", async (_kind, source) => {
+    if (!safetyModuleExists) return;
+    const { assertStandaloneValidatorSafety } = await import(safetyModuleUrl);
+    expect(() => assertStandaloneValidatorSafety(source)).toThrow(/import/u);
+  });
+
+  it("accepts self-contained validator JavaScript", async () => {
+    if (!safetyModuleExists) return;
+    const { assertStandaloneValidatorSafety } = await import(safetyModuleUrl);
+    expect(() =>
+      assertStandaloneValidatorSafety("export const validate = (value) => value !== null;"),
+    ).not.toThrow();
+  });
+});

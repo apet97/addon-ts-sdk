@@ -32,7 +32,7 @@ function generateInto(outDir: string): string {
 }
 
 describe("generated manifest validators", () => {
-  it("commits self-contained validators with no runtime compiler imports", () => {
+  it("commits self-contained validators with legal provenance and no runtime compiler imports", async () => {
     expect(existsSync(committedValidatorsPath)).toBe(true);
     if (!existsSync(committedValidatorsPath)) return;
 
@@ -43,11 +43,14 @@ describe("generated manifest validators", () => {
     expect(source).toContain("clockifyUnicodeLength");
     expect(source).toContain("clockifyJsonDeepEqual");
     expect(source).toContain("clockifyUriFormat");
-    expect(source).not.toMatch(/\beval\s*\(/u);
-    expect(source).not.toMatch(/\bnew\s+Function\b/u);
-    expect(source).not.toMatch(/\brequire\s*\(/u);
-    expect(source).not.toContain("fast-deep-equal");
+    expect(source.includes("AJV")).toBe(true);
+    expect(source.includes("fast-deep-equal")).toBe(true);
+    expect(source.includes("THIRD_PARTY_NOTICES.md")).toBe(true);
     expect(source).not.toContain("ajv/dist/runtime");
+    const inspectorUrl = new URL("../../scripts/javascript-runtime-inspection.mjs", import.meta.url)
+      .href;
+    const { inspectRuntimeJavaScript } = await import(inspectorUrl);
+    expect(inspectRuntimeJavaScript(source, { forbidImports: true })).toEqual([]);
   });
 
   it("generates byte-identical validators across clean output directories", () => {

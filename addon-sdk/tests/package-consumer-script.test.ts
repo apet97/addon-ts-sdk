@@ -40,6 +40,10 @@ describe("package consumer verification script", () => {
     expect(script).toContain("@ts-expect-error");
     expect(script).toContain("const esmClaims = await new ClockifySignatureParser");
     expect(script).toContain("const cjsClaims = await new sdk.ClockifySignatureParser");
+    expect(script.includes("THIRD_PARTY_NOTICES.md")).toBe(true);
+    expect(script.includes("Copyright (c) 2015-2021 Evgeny Poberezkin")).toBe(true);
+    expect(script.includes("Copyright (c) 2017 Evgeny Poberezkin")).toBe(true);
+    expect(script.includes("ships third-party notices")).toBe(true);
     expect(script).toContain("signs/verifies test tokens");
   });
 });

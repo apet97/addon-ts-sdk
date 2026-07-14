@@ -31,6 +31,7 @@
     "docs",
     "schemas/clockify-manifests",
     "LICENSE",
+    "THIRD_PARTY_NOTICES.md",
     "README.md"
   ],
   "sideEffects": false,

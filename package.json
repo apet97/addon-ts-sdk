@@ -38,5 +38,8 @@
     "audit:prod": "npm audit --omit=dev --json",
     "audit:all": "npm audit --json",
     "ci:verify": "npm run verify:deps && npm run type-check && npm run verify:generated && npm run verify:marketplace-docs && npm run verify:docs && npm run test:coverage && npm run lint && npm run format:check && npm run build && npm run verify:public-api && npm run verify:dist && npm run pack:dry-run && npm run verify:package-lint && npm run verify:package-consumer && npm run verify:scaffolds && npm run audit:prod && npm run audit:all"
+  },
+  "devDependencies": {
+    "acorn": "^8.17.0"
   }
 }

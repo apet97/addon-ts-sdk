@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { cpSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
@@ -49,6 +49,18 @@ function prepareConsumer(name, type, tarball) {
     cwd: dir,
     stdio: "inherit",
   });
+  const notices = readFileSync(
+    join(dir, "node_modules", "@apet97", "clockify-addon-sdk", "THIRD_PARTY_NOTICES.md"),
+    "utf8",
+  );
+  for (const copyright of [
+    "Copyright (c) 2015-2021 Evgeny Poberezkin",
+    "Copyright (c) 2017 Evgeny Poberezkin",
+  ]) {
+    if (!notices.includes(copyright)) {
+      throw new Error(`Packed SDK is missing third-party notice: ${copyright}`);
+    }
+  }
   return dir;
 }
 
@@ -308,7 +320,7 @@ try {
   runTypeScriptConsumer(prepareConsumer("ts-consumer", "module", tarball));
   runCommonJsTypeScriptConsumer(prepareConsumer("cts-consumer", "commonjs", tarball));
   console.log(
-    "verify:package-consumer OK - packed tarball imports in ESM and CJS consumers, signs/verifies test tokens, and type-checks in ESM and CJS TypeScript consumers.",
+    "verify:package-consumer OK - packed tarball ships third-party notices, imports in ESM and CJS consumers, signs/verifies test tokens, and type-checks in ESM and CJS TypeScript consumers.",
   );
 } finally {
   rmSync(workspace, { recursive: true, force: true });

@@ -147,6 +147,7 @@ describe("create-clockify-addon", () => {
         const packageJson = JSON.parse(await readFile(join(directory, "package.json"), "utf8"));
         const source = await readFile(join(directory, "src", "addon.ts"), "utf8");
         const bootstrap = await readFile(join(directory, "src", "index.ts"), "utf8");
+        const readme = await readFile(join(directory, "README.md"), "utf8");
         expect(packageJson.scripts.start).toBe(
           runtime === "node" ? "tsx src/index.ts" : "wrangler dev src/index.ts",
         );
@@ -156,6 +157,21 @@ describe("create-clockify-addon", () => {
         expect(source).toContain("export function createAddon");
         expect(source.includes("ClockifyLifecycleEvent")).toBe(features === "all");
         expect(source.includes("ClockifyWebhook")).toBe(features === "all");
+        expect(readme).toContain(runtime === "node" ? "npm start" : "wrangler dev");
+        expect(readme).toContain(
+          runtime === "node" ? "Node HTTP runtime entry point" : "Fetch/Worker runtime entry point",
+        );
+        if (features === "all") {
+          for (const event of ["INSTALLED", "NEW_TIME_ENTRY", "DELETED"]) {
+            expect(readme).toContain(event);
+          }
+          expect(readme).not.toContain("Lifecycle and webhook routes were not generated");
+        } else {
+          expect(readme).toContain("Lifecycle and webhook routes were not generated");
+          for (const event of ["INSTALLED", "NEW_TIME_ENTRY", "DELETED"]) {
+            expect(readme).not.toContain(event);
+          }
+        }
         expect(source).not.toMatch(/[ \t]+$/m);
         expect(bootstrap).not.toMatch(/[ \t]+$/m);
         expect(source).not.toContain("\n\n\n");
