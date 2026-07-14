@@ -57,7 +57,7 @@ export async function discoverActiveMarkdown(root) {
   return output.sort();
 }
 
-function fenceLine(line) {
+function blockquoteLine(line) {
   let content = line.endsWith("\r") ? line.slice(0, -1) : line;
   let blockquoteDepth = 0;
   while (true) {
@@ -68,17 +68,44 @@ function fenceLine(line) {
   }
 }
 
+function fenceLine(line) {
+  const candidate = blockquoteLine(line);
+  const list = candidate.content.match(
+    /^( {0,3})(?:[-+*]|\d{1,9}[.)])([ \t]+)(.*)$/,
+  );
+  if (list === null) return { ...candidate, listIndent: 0 };
+  return {
+    ...candidate,
+    content: list[3],
+    listIndent: list[0].length - list[3].length,
+  };
+}
+
+function fenceContinuation(line, fence) {
+  const candidate = blockquoteLine(line);
+  if (
+    fence.blockquoteDepth > 0 &&
+    candidate.blockquoteDepth < fence.blockquoteDepth
+  )
+    return null;
+  if (fence.listIndent === 0) return candidate;
+  const indentation = candidate.content.match(/^ */)[0].length;
+  if (candidate.content.trim() !== "" && indentation < fence.listIndent)
+    return null;
+  return {
+    ...candidate,
+    content: candidate.content.slice(fence.listIndent),
+  };
+}
+
 function stripFencedCode(source) {
   let fence;
   return source
     .split("\n")
     .map((line) => {
-      const candidate = fenceLine(line);
       if (fence !== undefined) {
-        if (
-          fence.blockquoteDepth === 0 ||
-          candidate.blockquoteDepth >= fence.blockquoteDepth
-        ) {
+        const candidate = fenceContinuation(line, fence);
+        if (candidate !== null) {
           const closing = candidate.content.match(
             /^ {0,3}(`{3,}|~{3,})[ \t]*$/,
           );
@@ -95,6 +122,7 @@ function stripFencedCode(source) {
         fence = undefined;
       }
 
+      const candidate = fenceLine(line);
       const opening = candidate.content.match(/^ {0,3}(`{3,}|~{3,})(.*)$/);
       if (opening === null) return line;
       const marker = opening[1][0];
@@ -103,6 +131,7 @@ function stripFencedCode(source) {
         marker,
         length: opening[1].length,
         blockquoteDepth: candidate.blockquoteDepth,
+        listIndent: candidate.listIndent,
       };
       return "";
     })
@@ -127,27 +156,16 @@ function maskRange(output, source, start, end) {
   }
 }
 
-function maskHtmlComments(source) {
-  const output = source.split("");
-  let cursor = 0;
-  while (cursor < source.length) {
-    const start = source.indexOf("<!--", cursor);
-    if (start === -1) break;
-    if (isEscaped(source, start)) {
-      cursor = start + 4;
-      continue;
-    }
-    const closing = source.indexOf("-->", start + 4);
-    const end = closing === -1 ? source.length : closing + 3;
-    maskRange(output, source, start, end);
-    cursor = end;
-  }
-  return output.join("");
-}
-
-function maskInlineCode(source) {
+function maskInlineMarkup(source) {
   const output = source.split("");
   for (let cursor = 0; cursor < source.length; cursor++) {
+    if (source.startsWith("<!--", cursor) && !isEscaped(source, cursor)) {
+      const closing = source.indexOf("-->", cursor + 4);
+      const end = closing === -1 ? source.length : closing + 3;
+      maskRange(output, source, cursor, end);
+      cursor = end - 1;
+      continue;
+    }
     if (source[cursor] !== "`" || isEscaped(source, cursor)) continue;
     let openingEnd = cursor + 1;
     while (source[openingEnd] === "`") openingEnd++;
@@ -171,7 +189,7 @@ function maskInlineCode(source) {
 }
 
 function stripNonRendered(source) {
-  return maskInlineCode(maskHtmlComments(stripFencedCode(source)));
+  return maskInlineMarkup(stripFencedCode(source));
 }
 
 const MARKDOWN_ESCAPABLE = new Set("!\"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~");
@@ -341,30 +359,48 @@ function normalizeReferenceLabel(value) {
 
 function referenceDefinitions(source) {
   const definitions = new Map();
+  const lines = source.split("\n");
+  const content = [...lines];
+  const offsets = [];
   let offset = 0;
-  const content = source
-    .split("\n")
-    .map((line) => {
-      const comparable = line.endsWith("\r") ? line.slice(0, -1) : line;
-      const match = comparable.match(/^ {0,3}\[([^\]]+)\]:[ \t]*(.*)$/);
-      if (match === null) {
-        offset += line.length + 1;
-        return line;
+  for (const line of lines) {
+    offsets.push(offset);
+    offset += line.length + 1;
+  }
+
+  for (let index = 0; index < lines.length; index++) {
+    const line = lines[index];
+    const comparable = line.endsWith("\r") ? line.slice(0, -1) : line;
+    const match = comparable.match(/^ {0,3}\[([^\]]+)\]:[ \t]*(.*)$/);
+    if (match === null) continue;
+
+    let destination = match[2];
+    let continuation;
+    if (destination === "") {
+      const next = lines[index + 1]?.replace(/\r$/, "");
+      const indented = next?.match(/^[ \t]+(\S.*)$/);
+      if (indented !== undefined && indented !== null) {
+        destination = indented[1];
+        continuation = index + 1;
       }
-      const href = definitionDestination(match[2]);
-      if (href === null) {
-        offset += line.length + 1;
-        return line;
-      }
-      const label = normalizeReferenceLabel(match[1]);
-      if (label !== "" && !definitions.has(label)) {
-        definitions.set(label, { href, position: offset, used: false });
-      }
-      offset += line.length + 1;
-      return " ".repeat(line.length);
-    })
-    .join("\n");
-  return { content, definitions };
+    }
+    const href = definitionDestination(destination);
+    if (href === null) continue;
+    const label = normalizeReferenceLabel(match[1]);
+    if (label !== "" && !definitions.has(label)) {
+      definitions.set(label, {
+        href,
+        position: offsets[index],
+        used: false,
+      });
+    }
+    content[index] = " ".repeat(line.length);
+    if (continuation !== undefined) {
+      content[continuation] = " ".repeat(lines[continuation].length);
+      index = continuation;
+    }
+  }
+  return { content: content.join("\n"), definitions };
 }
 
 function linkDestination(parsed, label) {
@@ -461,9 +497,16 @@ function markdownLinks(source) {
   return links.sort((left, right) => left.position - right.position);
 }
 
-function headingSlug(value) {
+function headingSlug(value, definitions) {
   return value
     .replace(/<[^>]*>/g, "")
+    .replace(/!?\[([^\]]*)\]\[([^\]]*)\]/g, (match, text, reference) =>
+      definitions?.has(
+        normalizeReferenceLabel(reference === "" ? text : reference),
+      )
+        ? text
+        : match,
+    )
     .replace(/!?\[([^\]]*)\]\([^)]+\)/g, "$1")
     .replace(/[`*_~]/g, "")
     .trim()
@@ -474,8 +517,11 @@ function headingSlug(value) {
 
 function headingAnchors(source) {
   const anchors = new Set();
+  const definitions = referenceDefinitions(
+    stripNonRendered(source),
+  ).definitions;
   const add = (heading) => {
-    const base = headingSlug(heading);
+    const base = headingSlug(heading, definitions);
     let anchor = base;
     let suffix = 0;
     while (anchors.has(anchor)) {
@@ -486,16 +532,15 @@ function headingAnchors(source) {
   };
   const lines = stripFencedCode(source).split("\n");
   for (let index = 0; index < lines.length; index++) {
-    const line = lines[index].endsWith("\r")
-      ? lines[index].slice(0, -1)
-      : lines[index];
+    const line = fenceLine(lines[index]).content;
     const atx = line.match(/^ {0,3}#{1,6}(?:[ \t]+(.*)|[ \t]*)$/);
     if (atx !== null) {
       add((atx[1] ?? "").replace(/[ \t]+#+[ \t]*$/, ""));
       continue;
     }
 
-    const next = lines[index + 1]?.replace(/\r$/, "") ?? "";
+    const next =
+      lines[index + 1] === undefined ? "" : fenceLine(lines[index + 1]).content;
     if (
       line.trim() !== "" &&
       !/^ {4}/.test(line) &&

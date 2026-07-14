@@ -212,6 +212,42 @@ describe("documentation verification", () => {
     ).resolves.toEqual(["docs/README.md: does not link required document docs/guide.md"]);
   });
 
+  it("does not treat an HTML comment opener inside inline code as a comment", async () => {
+    const root = await fixture({
+      "docs/README.md": [
+        "# Docs",
+        "",
+        "<!-- [Comment](missing-comment.md) -->",
+        "`<!--`",
+        "",
+        "[Guide](guide.md)",
+        "",
+      ].join("\n"),
+      "docs/guide.md": "# Guide\n",
+    });
+
+    await expect(
+      collectDocumentationErrors(root, {
+        documents: ["docs/README.md", "docs/guide.md"],
+        requiredFromIndex: ["docs/guide.md"],
+      }),
+    ).resolves.toEqual([]);
+  });
+
+  it("does not treat backticks inside HTML comments as inline code", async () => {
+    const root = await fixture({
+      "docs/README.md": "# Docs\n\n<!-- ` [Comment](missing-comment.md) -->\n[Guide](guide.md)\n",
+      "docs/guide.md": "# Guide\n",
+    });
+
+    await expect(
+      collectDocumentationErrors(root, {
+        documents: ["docs/README.md", "docs/guide.md"],
+        requiredFromIndex: ["docs/guide.md"],
+      }),
+    ).resolves.toEqual([]);
+  });
+
   it("ignores links in blockquoted variable-length fences beside rendered links", async () => {
     const root = await fixture({
       "docs/README.md": [
@@ -237,6 +273,110 @@ describe("documentation verification", () => {
         requiredFromIndex: ["docs/guide.md"],
       }),
     ).resolves.toEqual(["docs/README.md: does not link required document docs/guide.md"]);
+  });
+
+  it("ignores links in an unordered-list-contained fence", async () => {
+    const root = await fixture({
+      "docs/README.md": [
+        "# Docs",
+        "",
+        "- ```",
+        "  [Hidden](missing-unordered.md)",
+        "  ```",
+        "",
+        "[Guide](guide.md)",
+        "",
+      ].join("\n"),
+      "docs/guide.md": "# Guide\n",
+    });
+
+    await expect(
+      collectDocumentationErrors(root, {
+        documents: ["docs/README.md", "docs/guide.md"],
+        requiredFromIndex: ["docs/guide.md"],
+      }),
+    ).resolves.toEqual([]);
+  });
+
+  it("honors variable fence lengths inside an ordered list", async () => {
+    const root = await fixture({
+      "docs/README.md": [
+        "# Docs",
+        "",
+        "1. ````markdown",
+        "   [Hidden](missing-ordered.md)",
+        "   ```",
+        "   [Still hidden](missing-after-short-close.md)",
+        "   ````",
+        "",
+        "[Guide](guide.md)",
+        "",
+      ].join("\n"),
+      "docs/guide.md": "# Guide\n",
+    });
+
+    await expect(
+      collectDocumentationErrors(root, {
+        documents: ["docs/README.md", "docs/guide.md"],
+        requiredFromIndex: ["docs/guide.md"],
+      }),
+    ).resolves.toEqual([]);
+  });
+
+  it("resolves a reference definition destination on the following line", async () => {
+    const root = await fixture({
+      "docs/README.md": "# Docs\n\n[Guide][guide]\n\n[guide]:\n  guide.md\n",
+      "docs/guide.md": "# Guide\n",
+    });
+
+    await expect(
+      collectDocumentationErrors(root, {
+        documents: ["docs/README.md", "docs/guide.md"],
+        requiredFromIndex: ["docs/guide.md"],
+      }),
+    ).resolves.toEqual([]);
+  });
+
+  it("validates a missing multiline reference destination", async () => {
+    const root = await fixture({
+      "docs/README.md": "# Docs\n\n[Guide][guide]\n\n[guide]:\n  missing.md\n",
+    });
+
+    await expect(
+      collectDocumentationErrors(root, {
+        documents: ["docs/README.md"],
+        requiredFromIndex: [],
+      }),
+    ).resolves.toEqual(["docs/README.md: missing link target: missing.md"]);
+  });
+
+  it("discovers an ATX heading inside a blockquote container", async () => {
+    const root = await fixture({
+      "docs/README.md": "# Docs\n\n[Quoted](guide.md#quoted-heading)\n",
+      "docs/guide.md": "> # Quoted heading\n",
+    });
+
+    await expect(
+      collectDocumentationErrors(root, {
+        documents: ["docs/README.md", "docs/guide.md"],
+        requiredFromIndex: ["docs/guide.md"],
+      }),
+    ).resolves.toEqual([]);
+  });
+
+  it("uses rendered reference-link text when discovering heading anchors", async () => {
+    const root = await fixture({
+      "docs/README.md": "# Docs\n\n[Reference heading](guide.md#guide)\n",
+      "docs/guide.md": "## [Guide][g]\n\n[g]: target.md\n",
+      "docs/target.md": "# Target\n",
+    });
+
+    await expect(
+      collectDocumentationErrors(root, {
+        documents: ["docs/README.md", "docs/guide.md", "docs/target.md"],
+        requiredFromIndex: ["docs/guide.md"],
+      }),
+    ).resolves.toEqual([]);
   });
 
   it("rejects file and directory README symlinks that leave the repository", async () => {
