@@ -43,6 +43,9 @@ function normalizeBackendUrl(value: string): URL {
 }
 
 function requestUrl(base: URL, segments: readonly string[]): URL {
+  if (segments.some((segment) => segment === "" || segment === "." || segment === "..")) {
+    throw new Error("Clockify API path segments must be non-empty and must not be '.' or '..'.");
+  }
   const url = new URL(base);
   const suffix = segments.map((segment) => encodeURIComponent(segment)).join("/");
   url.pathname = `${base.pathname}/${suffix}`.replace(/\/{2,}/g, "/");
@@ -86,6 +89,7 @@ export class ClockifyAddonClient {
   }
 
   private async send(segments: readonly string[], init: RequestInit): Promise<Response> {
+    const url = requestUrl(this.backendUrl, segments);
     const method = (init.method ?? "GET").toUpperCase();
     const safeRead = method === "GET" || method === "HEAD";
     for (let attempt = 1; attempt <= this.maxAttempts; attempt += 1) {
@@ -100,7 +104,7 @@ export class ClockifyAddonClient {
       try {
         const headers = new Headers(init.headers);
         headers.set("x-addon-token", this.token);
-        const response = await this.fetch(requestUrl(this.backendUrl, segments), {
+        const response = await this.fetch(url, {
           ...init,
           headers,
           signal: controller.signal,

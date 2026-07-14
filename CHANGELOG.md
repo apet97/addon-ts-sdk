@@ -4,6 +4,7 @@ All notable changes to this SDK are recorded here.
 
 ## Unreleased
 
+- Reject empty, '.', and '..' client path segments that previously collapsed into a different endpoint during URL normalization.
 - Apply the bounded exponential backoff when a retryable response omits the Retry-After header instead of retrying immediately.
 
 ## 1.0.3 - 2026-07-14

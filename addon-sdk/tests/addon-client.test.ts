@@ -75,6 +75,49 @@ describe("ClockifyAddonClient", () => {
     expect(new Headers(init?.headers).has("authorization")).toBe(false);
   });
 
+  it.each(["", ".", ".."])(
+    "rejects exact %j path segments before fetching or sleeping",
+    async (segment) => {
+      const fetch = vi
+        .fn<typeof globalThis.fetch>()
+        .mockResolvedValue(new Response("ok", { status: 200 }));
+      const sleep = vi.fn(async () => undefined);
+      const client = new ClockifyAddonClient({
+        token: "token",
+        backendUrl: "https://api.example/api",
+        fetch,
+        sleep,
+      });
+      const error = new Error(
+        "Clockify API path segments must be non-empty and must not be '.' or '..'.",
+      );
+
+      await expect(client.request([segment])).rejects.toThrowError(error);
+      await expect(client.exchangeUserToken(segment)).rejects.toThrowError(error);
+      expect(fetch).not.toHaveBeenCalled();
+      expect(sleep).not.toHaveBeenCalled();
+    },
+  );
+
+  it("rejects a dot-dot segment before it can escape the configured API base path", async () => {
+    const fetch = vi
+      .fn<typeof globalThis.fetch>()
+      .mockResolvedValue(new Response("ok", { status: 200 }));
+    const sleep = vi.fn(async () => undefined);
+    const client = new ClockifyAddonClient({
+      token: "token",
+      backendUrl: "https://api.example/api",
+      fetch,
+      sleep,
+    });
+
+    await expect(client.request(["..", "admin"])).rejects.toThrowError(
+      new Error("Clockify API path segments must be non-empty and must not be '.' or '..'."),
+    );
+    expect(fetch).not.toHaveBeenCalled();
+    expect(sleep).not.toHaveBeenCalled();
+  });
+
   it("exchanges an installation token for a user token", async () => {
     const fetch = vi
       .fn<typeof globalThis.fetch>()
