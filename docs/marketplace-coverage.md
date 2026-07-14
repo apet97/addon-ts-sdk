@@ -28,6 +28,22 @@ the caller supplies `installedAt`; omitting it intentionally performs unconditio
 cleanup. The generated development scaffold keeps that normal uninstall cleanup and therefore does
 not claim protection from delayed events belonging to an earlier installation.
 
+## 1.0.4 registry-only evidence boundary
+
+Release source commit `0e2fde5a49e8d6860961339b7945ba6d2a177c07` passed the full local release
+gate and SDK CI on Node 22.13.0 and Node 24.x. Both exact public registry artifacts were then
+installed and executed from an isolated empty npm cache:
+
+- `@apet97/clockify-addon-sdk@1.0.4`: npm SHA-1
+  `3442f2cf37f1d058fba8f82ad051227f90647e0a`
+- `create-clockify-addon@1.0.4`: npm SHA-1
+  `879475363645aaa534a60630285d6af3b8f378ee`
+
+This proves registry packaging, SDK ESM/CommonJS/TypeScript consumption, creator API/CLI execution,
+generated-project type-checking, manifest validation, route failures, and production fail-closed
+behavior for 1.0.4. No authenticated Marketplace install was run for this patch, so the 1.0.3 live
+receipt below remains the latest lifecycle evidence and is not inherited by 1.0.4.
+
 ## 1.0.3 evidence boundary
 
 The current receipt proves release source commit `303f9c6a732707b572f418b592e75575811a7447`, the

@@ -4,29 +4,35 @@
 
 The latest registry publication is:
 
-- `@apet97/clockify-addon-sdk@1.0.3`
-- `create-clockify-addon@1.0.3`
+- `@apet97/clockify-addon-sdk@1.0.4`
+- `create-clockify-addon@1.0.4`
 
 Install the SDK with `npm install @apet97/clockify-addon-sdk` or create a project with
 `npm create clockify-addon@latest`. npm versions are immutable: every future release requires a
 version change and explicit npm-owner approval for that exact publish attempt.
 
-## 1.0.4 release candidate
+## 1.0.4 release evidence
 
-The workspace release candidates are:
+Release source commit `0e2fde5a49e8d6860961339b7945ba6d2a177c07` corrects direct-client retry
+fallback when `Retry-After` is missing or blank, rejects empty and dot-only API path segments before
+fetch/retry handling, and aligns direct HTTP loopback configuration with the SDK's canonical-host
+policy while rejecting noncanonical raw spellings. The loopback hostname set is owned by one private
+runtime-neutral helper. No public declaration or creator scaffold contract changed.
 
-- `@apet97/clockify-addon-sdk@1.0.4`
-- `create-clockify-addon@1.0.4`
+Before publication, `npm run release:verify` passed with 39 test files and 335 tests, thresholded
+coverage, package/scaffold execution, live schema parity, zero-vulnerability production and full
+audits, and both publish dry runs. SDK CI run `29305622131` then passed on Node 22.13.0 and Node 24.x.
 
-This patch corrects direct-client retry fallback when `Retry-After` is missing or blank, rejects
-empty and dot-only API path segments before fetch/retry handling, and aligns direct HTTP loopback
-configuration with the SDK's canonical-host policy while rejecting noncanonical raw spellings. The
-loopback hostname set is now owned by one private runtime-neutral helper. No public declaration or
-creator scaffold contract changes.
+The packages were published in SDK-first order and retained the SHA-1 values from the verified dry
+runs:
 
-The authenticated 1.0.3 developer-workspace receipt remains historical evidence for that exact
-release source. This candidate makes no new Marketplace lifecycle claim; npm publication evidence
-must be recorded only after the exact registry artifacts are uploaded and executed.
+- `@apet97/clockify-addon-sdk@1.0.4`: `3442f2cf37f1d058fba8f82ad051227f90647e0a`
+- `create-clockify-addon@1.0.4`: `879475363645aaa534a60630285d6af3b8f378ee`
+
+Post-publication `npm run verify:registry` passed from an isolated empty npm cache and executed both
+exact public versions. Both `latest` tags resolve to 1.0.4. The authenticated 1.0.3
+developer-workspace receipt remains historical evidence for that exact release source; 1.0.4 makes
+no new Marketplace lifecycle claim. No Git tag or Marketplace submission was created.
 
 ## 1.0.3 release evidence
 
