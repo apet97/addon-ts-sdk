@@ -34,8 +34,13 @@ database, or implement its business behavior.
 | Webhook           | `clockify-signature` and `clockify-webhook-event-type` | Verify the signature, expected event, installation context, and stored webhook token before processing. |
 | Outbound API call | `X-Addon-Token` header                                 | Send the stored installation credential only from the server to a claim-derived Clockify service URL.   |
 
-Credential values must remain server-side. Do not log them, copy them into documentation or error
-messages, place them in browser storage, or forward them through unrelated services.
+Clockify places the component `auth_token` transiently in the iframe query URL. Verify it before
+returning component content; it must not be logged, persisted, or re-emitted in HTML, links, or
+redirects.
+
+Installation and webhook credentials remain server-side. Send the stored installation credential
+outbound only as `X-Addon-Token`; do not log or copy these values into browser storage, documentation,
+error messages, or unrelated services.
 
 ## Storage lifecycle
 
@@ -72,7 +77,8 @@ framework middleware with the host application.
 - `400 Bad Request`: the Node adapter rejects a malformed declared content length, and the Fetch
   adapter rejects request-body read failures before routing.
 - `401 Unauthorized`: verified component, lifecycle, and webhook wrappers reject missing, duplicate,
-  invalid, or context-mismatched credentials.
+  invalid, or context-mismatched credentials. Missing expected webhook tokens return this response
+  before the scaffold handler runs.
 - `404 Not Found`: no route is registered for the requested path.
 - `405 Method Not Allowed`: the path exists but not for the requested method; the router includes an
   `Allow` header.
@@ -80,8 +86,8 @@ framework middleware with the host application.
   before dispatch. Express body limits remain the host application's responsibility.
 - `500 Internal Server Error`: the router contains handler or middleware failures, and the Node and
   Fetch adapters contain unexpected adapter failures.
-- `503 Service Unavailable`: the generated scaffold fails closed when required iframe origin,
-  installation storage, cleanup, or webhook processing setup is absent.
+- `503 Service Unavailable`: the generated component and lifecycle handlers fail closed when required
+  iframe parent-origin, installation storage, or deletion cleanup setup is absent.
 
 See [Routing and Middleware](../addon-sdk/docs/routing.md) for dispatch and adapter details and
 [Token Signature Verification](../addon-sdk/docs/token-validation.md) for the credential contracts.

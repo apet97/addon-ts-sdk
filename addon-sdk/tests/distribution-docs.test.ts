@@ -7,23 +7,13 @@ describe("published distribution docs", () => {
   const repoRoot = resolve(packageRoot, "..");
 
   it("provides a builder-first documentation path", () => {
-    const builderDocs = [
-      "docs/README.md",
-      "docs/getting-started.md",
-      "docs/how-an-addon-works.md",
-    ];
+    const builderDocs = ["docs/README.md", "docs/getting-started.md", "docs/how-an-addon-works.md"];
     for (const file of builderDocs) expect(existsSync(resolve(repoRoot, file))).toBe(true);
 
     const rootReadme = readFileSync(resolve(repoRoot, "README.md"), "utf8");
     const index = readFileSync(resolve(repoRoot, "docs/README.md"), "utf8");
-    const gettingStarted = readFileSync(
-      resolve(repoRoot, "docs/getting-started.md"),
-      "utf8",
-    );
-    const lifecycle = readFileSync(
-      resolve(repoRoot, "docs/how-an-addon-works.md"),
-      "utf8",
-    );
+    const gettingStarted = readFileSync(resolve(repoRoot, "docs/getting-started.md"), "utf8");
+    const lifecycle = readFileSync(resolve(repoRoot, "docs/how-an-addon-works.md"), "utf8");
 
     expect(rootReadme).toContain("docs/getting-started.md");
     expect(rootReadme).toContain("npm create clockify-addon@latest");
@@ -38,6 +28,30 @@ describe("published distribution docs", () => {
     for (const stage of ["INSTALLED", "auth_token", "webhook", "X-Addon-Token", "DELETED"]) {
       expect(lifecycle).toContain(stage);
     }
+  });
+
+  it("documents missing webhook tokens at the verification boundary", () => {
+    const lifecycle = readFileSync(resolve(repoRoot, "docs/how-an-addon-works.md"), "utf8");
+    const unavailable = lifecycle.match(/- `503 Service Unavailable`:[\s\S]*?(?=\n\n|$)/)?.[0];
+
+    expect(lifecycle).toContain("Missing expected webhook tokens");
+    expect(lifecycle).toContain("before the scaffold handler runs");
+    expect(unavailable).toBeDefined();
+    expect(unavailable).not.toContain("webhook");
+  });
+
+  it("distinguishes transient component tokens from stored credentials", () => {
+    const lifecycle = readFileSync(resolve(repoRoot, "docs/how-an-addon-works.md"), "utf8");
+
+    expect(lifecycle).toContain("transiently in the iframe query URL");
+    expect(lifecycle).toContain("must not be logged, persisted, or re-emitted");
+    expect(lifecycle).toContain("Installation and webhook credentials remain server-side");
+  });
+
+  it("runs the manifest probe from a second terminal", () => {
+    const gettingStarted = readFileSync(resolve(repoRoot, "docs/getting-started.md"), "utf8");
+
+    expect(gettingStarted).toContain("In a second terminal");
   });
 
   it("ships complete npm release metadata for both packages", () => {

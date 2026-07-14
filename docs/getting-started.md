@@ -52,9 +52,10 @@ Copy `.env.example` to `.env`, replace the manifest key in `src/addon.ts`, and c
   development only. Keep it disabled in production.
 
 Before a real installation, replace the generated in-memory storage seam with durable storage and
-wrap credential persistence with the SDK's encryption helper. The default all-features scaffold
-returns setup errors for installation, deletion, and webhook handling until storage and processing
-are wired or the explicit local-only switch is enabled.
+wrap credential persistence with the SDK's encryption helper. The default all-features scaffold's
+installation and deletion handlers return setup responses until storage and cleanup are wired or the
+explicit local-only switch is enabled. Webhook verification returns `401 Unauthorized` until its
+lookup can return the expected stored token.
 
 ## Run it
 
@@ -64,6 +65,11 @@ For the Node project:
 npm install
 cp .env.example .env
 npm start
+```
+
+In a second terminal, probe the running server:
+
+```bash
 curl http://localhost:8080/manifest
 ```
 
