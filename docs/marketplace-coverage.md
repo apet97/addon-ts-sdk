@@ -9,11 +9,11 @@ This matrix maps the vendored `MARKETPLACE_DOCS` snapshot to SDK behavior. A row
 | Quick start              | Packed creator generates Node/Worker minimal/all with valid manifests, fail-closed paths, and compilable Worker entries | executable `verify:scaffolds`                       |
 | Lifecycle                | Typed payload guards, verified wrappers, encrypted storage, and caller-qualified generation deletes                     | lifecycle, creator and installation-store suites    |
 | UI components            | Generated component builders and hardened HTML responses                                                                | builder, security and creator suites                |
-| Webhooks                 | Exact event/signature/token checks, 1 MiB request limits and owner-specific idempotency leases                          | request-verification and webhook-idempotency suites |
-| Structured settings      | Typed setting builders plus claim-driven GET/PATCH client methods                                                       | settings and add-on-client suites                   |
+| Webhooks                 | Fixed-token raw verification, exactly-one-source wrappers, signed installation context, 1 MiB limits and owner leases   | request-verification and webhook-idempotency suites |
+| Structured settings      | Typed builders plus claim-driven GET/PATCH clients with bounded timeouts and retry-response cancellation                | settings and add-on-client suites                   |
 | Developer account        | Application responsibility; authenticated installation remains outside deterministic repo gates                         | final-SHA `e74e1f7` workspace receipt below         |
 | Authentication           | RS256, issuer/type/subject pinning, expiry profiles and context matching                                                | request-verification suite                          |
-| Environments and regions | Verified URL claims, encoded path segments and fail-closed public origins                                               | request-wire, client and origin suites              |
+| Environments and regions | Absolute HTTPS/canonical loopback claim URLs, credential-free direct clients, encoded segments and fail-closed origins  | request-wire, client and origin suites              |
 | Window events            | Source/origin-checked subscriptions and typed actions                                                                   | UI suite                                            |
 | Development checklist    | Security responses, redaction boundary, package/scaffold/audit gates                                                    | `ci:verify`                                         |
 | Publishing and privacy   | Security and release checklists; no automatic Marketplace submission                                                    | release-readiness and SECURITY                      |
@@ -27,6 +27,14 @@ installation generation. `ClockifyInstallationStore.delete()` rejects a stale ge
 the caller supplies `installedAt`; omitting it intentionally performs unconditional matching-record
 cleanup. The generated development scaffold keeps that normal uninstall cleanup and therefore does
 not claim protection from delayed events belonging to an earlier installation.
+
+## 1.0.3 candidate evidence boundary
+
+The matrix above includes the current 1.0.3 candidate behavior. Repository API, type, unit,
+documentation, package, scaffold, and preflight checks can prove the local candidate, but they do
+not establish npm publication, Marketplace submission, or a fresh authenticated Clockify pass. The
+receipt below remains scoped to its recorded SHA; release closeout must add separate live and exact
+registry evidence for 1.0.3.
 
 ## Final-SHA sanitized live receipt (2026-07-12)
 

@@ -302,7 +302,7 @@ export interface ClockifyWebhookVerificationOptions {
     expectedEventType: string;
     expectedWorkspaceId?: string;
     expectedAddonId?: string;
-    expectedWebhookAuthToken?: string;
+    expectedWebhookAuthToken: string;
 }
 export interface ClockifyTokenVerificationOptions {
     expectedWorkspaceId?: string;
@@ -310,7 +310,7 @@ export interface ClockifyTokenVerificationOptions {
     requireExpiration?: boolean;
 }
 export type ClockifyRequestVerificationFailureReason = "missing-signature" | "ambiguous-signature" | "invalid-signature" | "missing-event-type" | "ambiguous-event-type" | "event-type-mismatch" | "workspace-id-mismatch" | "addon-id-mismatch";
-export type ClockifyWebhookVerificationFailureReason = ClockifyRequestVerificationFailureReason | "missing-expected-event-type" | "webhook-token-mismatch";
+export type ClockifyWebhookVerificationFailureReason = ClockifyRequestVerificationFailureReason | "missing-expected-event-type" | "missing-expected-webhook-auth-token" | "missing-installation-context" | "webhook-token-mismatch";
 export type ClockifyTokenVerificationFailureReason = "ambiguous-token" | "missing-token" | "invalid-token" | "missing-expiration" | "workspace-id-mismatch" | "addon-id-mismatch";
 export type ClockifyRequestVerificationResult = {
     ok: true;
@@ -3073,7 +3073,7 @@ export interface ClockifyWebhookVerificationOptions {
     expectedEventType: string;
     expectedWorkspaceId?: string;
     expectedAddonId?: string;
-    expectedWebhookAuthToken?: string;
+    expectedWebhookAuthToken: string;
 }
 export interface ClockifyTokenVerificationOptions {
     expectedWorkspaceId?: string;
@@ -3081,7 +3081,7 @@ export interface ClockifyTokenVerificationOptions {
     requireExpiration?: boolean;
 }
 export type ClockifyRequestVerificationFailureReason = "missing-signature" | "ambiguous-signature" | "invalid-signature" | "missing-event-type" | "ambiguous-event-type" | "event-type-mismatch" | "workspace-id-mismatch" | "addon-id-mismatch";
-export type ClockifyWebhookVerificationFailureReason = ClockifyRequestVerificationFailureReason | "missing-expected-event-type" | "webhook-token-mismatch";
+export type ClockifyWebhookVerificationFailureReason = ClockifyRequestVerificationFailureReason | "missing-expected-event-type" | "missing-expected-webhook-auth-token" | "missing-installation-context" | "webhook-token-mismatch";
 export type ClockifyTokenVerificationFailureReason = "ambiguous-token" | "missing-token" | "invalid-token" | "missing-expiration" | "workspace-id-mismatch" | "addon-id-mismatch";
 export type ClockifyRequestVerificationResult = {
     ok: true;

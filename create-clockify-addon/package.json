@@ -1,6 +1,6 @@
 {
   "name": "create-clockify-addon",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Create production-safe Node and Worker Clockify add-on projects",
   "type": "module",
   "license": "MIT",

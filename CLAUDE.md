@@ -2,19 +2,23 @@
 
 Quick reference for Claude Code and other contributors working in this repository.
 
-## Current hardening checkpoint (2026-07-13)
+## Current hardening checkpoint (2026-07-14)
 
 - The root SDK entrypoint is runtime-neutral. Import Node, Express, and Fetch integration from the
   granular adapter subpaths; never reintroduce `node:*` through the root.
 - Browser-facing responses use the SDK security helpers. Production public origins require explicit
   HTTPS configuration, and the UI bridge requires an exact parent origin and source.
-- Component and lifecycle JWTs require expiration. Webhook signatures may be non-expiring but still
-  require RS256, issuer/type/subject, event, installation context, and stored-token checks.
+- Component and lifecycle JWTs require expiration. Raw webhook verification requires a fixed stored
+  token plus nonblank signed workspace/add-on installation context; the wrapper requires exactly one
+  fixed or lookup token source and checks signature, event, and context before any lookup.
 - Installation credentials, including nested webhook copies, are encrypted at rest. The store's
   generation guard applies only when a delete caller supplies `installedAt`. Clockify's `DELETED`
   payload has no generation, so the generated unqualified uninstall cleanup is unconditional.
-- Outbound mutations replay only a confirmed 429. Safe reads may retry transient failures; caller
-  aborts are terminal.
+- Outbound mutations replay only a confirmed 429. Safe reads may retry transient failures; discarded
+  retry response bodies are cancelled before backoff, cancellation failures do not replace the
+  intended retry, and caller aborts are terminal.
+- `ClockifyAddonClient` accepts only integer `timeoutMs` values from 1 through 2,147,483,647 and
+  rejects credential-bearing `backendUrl` values.
 - Draft-04 manifest validation covers vendored schema versions 1.2-1.5. The creator package emits
   fail-closed Node and Worker projects in minimal and all-feature modes; ephemeral installation
   storage is local-development-only.
@@ -33,12 +37,10 @@ Quick reference for Claude Code and other contributors working in this repositor
   installs the exact published artifacts, and executes a generated Node minimal project. Both depend
   on registry state and stay outside deterministic `ci:verify`; run `release:verify` only before
   publication because its dry run correctly rejects immutable published versions.
-- A sanitized 2026-07-12 authenticated Firefox pass at final runtime commit `e74e1f7` installed the
-  packed Node all-features scaffold, observed successful manifest, `INSTALLED`, component,
-  `NEW_TIME_ENTRY`, and `DELETED` requests, and confirmed exact-origin iframe enforcement in the
-  developer workspace. It proves that SHA only; rerun the pass after relevant runtime changes.
-- CodeRabbit was unavailable for that pass. Local package, cycle, API-surface, security-boundary,
-  and diff reviews were used; do not describe this as a CodeRabbit-reviewed release.
+- `docs/release-readiness.md` is the canonical publication record and
+  `docs/marketplace-coverage.md` is the canonical live/Marketplace evidence record. Historical
+  receipts prove only their recorded SHA; local, CI, and dry-run checks are not fresh live,
+  registry, or Marketplace proof.
 
 - Keep Node `http` and Fetch body-limit semantics aligned on every HTTP method: declared
   `content-length` values above `maxBodyBytes` must fail before routing, and streamed bodies must
@@ -86,15 +88,18 @@ Quick reference for Claude Code and other contributors working in this repositor
   token/settings transport, storage contracts, secure UI messaging, and schema validation. The
   separate `clockify-ts-sdk` owns entity-specific REST APIs, CLI, and MCP behavior.
 - Clockify-signed tokens are verified as `RS256` JWTs with `iss=clockify`, `type=addon`, and
-  `sub=<manifest key>`. Webhooks should use `verifyClockifyWebhookRequest()` with
-  `expectedEventType`; lifecycle routes should use `X-Addon-Lifecycle-Token`; Clockify API calls use
-  `X-Addon-Token`.
+  `sub=<manifest key>`. Raw webhook verification requires `expectedEventType`, a fixed
+  `expectedWebhookAuthToken`, and nonblank signed `workspaceId`/`addonId`; the wrapper requires
+  exactly one fixed token or `getExpectedWebhookAuthToken`. Lifecycle routes use
+  `X-Addon-Lifecycle-Token`; Clockify API calls use `X-Addon-Token`.
 - `jose@6` is ESM-only. Keep SDK runtime references to `jose` behind dynamic imports so the CommonJS
   build and installed CJS consumer smoke stay clean.
-- Do not hardcode Clockify API/report/location/screenshot hosts. Use verified token claims such as
-  `backendUrl`, `reportsUrl`, `locationsUrl`, and `screenshotsUrl`.
-- Encode every caller-provided URL path segment. Use `X-Addon-Token`, never `Authorization`, and do
-  not log outbound query strings or credentials.
+- Do not hardcode Clockify API/report/location/screenshot hosts. Claim-derived base URL resolvers
+  accept only absolute HTTPS or canonical loopback HTTP URLs without credentials, query strings, or
+  fragments; an invalid nonblank preferred `apiUrl` must not fall back to `backendUrl`.
+- Direct `ClockifyAddonClient` configuration rejects credentials in `backendUrl`. Encode every
+  caller-provided path segment, use `X-Addon-Token` rather than `Authorization`, and do not log
+  outbound query strings or credentials.
 - Node `http` and Fetch adapters enforce `DEFAULT_MAX_BODY_BYTES` (`1_048_576`) before dispatch and
   return 413 for oversized bodies. Invalid `maxBodyBytes` values should throw configuration errors.
   Express body limits are configured by the host app, not the SDK.
@@ -115,7 +120,7 @@ Quick reference for Claude Code and other contributors working in this repositor
 | `npm run verify:generated`                 | Checks schema provenance, generates to a temporary directory, compares against committed generated files, and leaves tracked files untouched.                                                                                                         |
 | `npm run test`                             | vitest suite.                                                                                                                                                                                                                                         |
 | `npm run test:coverage`                    | Enforced Vitest V8 coverage over handwritten `src/**/*.ts`, excluding generated models: 97% statements, 92% branches, 98% functions, and 98% lines.                                                                                                   |
-| `npm run lint`                             | Check-only ESLint over the package and every root release tool through the shared configuration.                                                                                                                                                     |
+| `npm run lint`                             | Check-only ESLint over the package and every root release tool through the shared configuration.                                                                                                                                                      |
 | `npm run format:check`                     | Check-only Prettier over the package and root release tools.                                                                                                                                                                                          |
 | `npm run build`                            | ESM + CJS output.                                                                                                                                                                                                                                     |
 | `npm run verify:public-api`                | Compares built declaration surfaces for root, Clockify, adapters, client, UI, and testing entrypoints against `addon-sdk/public-api.snapshot.md`.                                                                                                     |
@@ -124,8 +129,8 @@ Quick reference for Claude Code and other contributors working in this repositor
 | `npm run verify:package-lint`              | Packs both artifacts with scripts ignored, then runs `publint --strict` and Are The Types Wrong: Node16 for the dual-format SDK and `esm-only` for the creator. Node10 findings are outside the supported runtime policy.                             |
 | `npm run verify:package-consumer`          | Packs the already-built package with scripts ignored, installs it into temporary runtime ESM/CJS and TypeScript ESM/CJS consumers, imports public subpaths, signs/verifies test tokens, type-checks declarations, and serves `/manifest`.             |
 | `npm run verify:scaffolds`                 | Packs the creator and SDK; generates Node/Worker minimal/all through the installed creator; installs, type-checks, and executes each; validates manifests/counts and failure paths; dry-runs both Worker entry points with Wrangler.                  |
-| `npm run release:preflight`                | Manual one-shot network gate: fails unless both exact workspace versions are absent from the configured npm registry.                                                                                                                                |
-| `npm run verify:registry`                  | Manual post-publish gate: waits up to 30 seconds only for absent exact versions, then installs them into a disposable consumer and checks ESM/CJS/TypeScript/creator plus a generated Node minimal project.                                          |
+| `npm run release:preflight`                | Manual one-shot network gate: fails unless both exact workspace versions are absent from the configured npm registry.                                                                                                                                 |
+| `npm run verify:registry`                  | Manual post-publish gate: waits up to 30 seconds only for absent exact versions, then installs them into a disposable consumer and checks ESM/CJS/TypeScript/creator plus a generated Node minimal project.                                           |
 | `npm run audit:prod` / `npm run audit:all` | Production and full dependency audits; both should report 0 vulnerabilities.                                                                                                                                                                          |
 
 GitHub Actions runs `npm run ci:verify` on Node 22.13.0 and 24.x for pushes to `main` and `codex/**`,

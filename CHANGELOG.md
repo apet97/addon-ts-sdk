@@ -4,6 +4,20 @@ All notable changes to this SDK are recorded here.
 
 ## Unreleased
 
+## 1.0.3 - 2026-07-14
+
+- Fail closed when raw webhook verification lacks a fixed stored token or nonblank signed
+  installation context, and require wrappers to configure exactly one fixed or lookup token source.
+  Callers that previously omitted a token source must now pass `expectedWebhookAuthToken` to the raw
+  verifier or configure one fixed/lookup source on the wrapper.
+- Validate `ClockifyAddonClient` `timeoutMs` as an integer from 1 through 2,147,483,647.
+- Accept claim-derived API/report URLs only when they are absolute HTTPS URLs or canonical loopback
+  HTTP URLs without credentials, query strings, or fragments; reject embedded credentials in direct
+  client `backendUrl` configuration.
+- Cancel discarded retry response bodies before backoff without letting cleanup failures replace the
+  intended retry.
+- Refresh `typescript-eslint` to 8.64 while retaining TypeScript 6 and Node 22 ambient types.
+
 ## 1.0.2 - 2026-07-13
 
 - Add deterministic root release-tool lint, formatting, and focused registry verification tests.

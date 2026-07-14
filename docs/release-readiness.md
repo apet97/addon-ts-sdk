@@ -2,7 +2,7 @@
 
 ## Published versions
 
-The public npm releases are:
+The latest registry publication confirmed before the current release candidate remains:
 
 - `@apet97/clockify-addon-sdk@1.0.2`
 - `create-clockify-addon@1.0.2`
@@ -10,6 +10,19 @@ The public npm releases are:
 Install the SDK with `npm install @apet97/clockify-addon-sdk` or create a project with
 `npm create clockify-addon@latest`. npm versions are immutable: every future release requires a
 version change and explicit npm-owner approval for that exact publish attempt.
+
+## 1.0.3 release candidate (not published)
+
+The workspace manifests and lockfile are prepared for these candidate versions:
+
+- `@apet97/clockify-addon-sdk@1.0.3`
+- `create-clockify-addon@1.0.3`
+
+This candidate hardens webhook token/context verification, client timeout and URL boundaries, and
+discarded retry-response cleanup, and includes the `typescript-eslint` 8.64 maintenance update. It
+is not yet an npm publication, Git tag, Marketplace submission, or fresh authenticated
+developer-workspace result. The final-SHA receipt below remains historical evidence for its recorded
+SHA only; the release closeout must record new registry and live evidence separately.
 
 ## Future release checklist
 
@@ -112,9 +125,9 @@ The creator dry-run package should include only its npm-generated `package.json`
 Neither package should include `node_modules`, `coverage`, temporary tarballs, workspace root files,
 or generated proof artifacts.
 
-## 1.0.2 maintenance completion
+## Historical 1.0.2 maintenance record
 
-The deferred non-security maintenance queue was completed for this release:
+The deferred non-security maintenance queue was completed in the published 1.0.2 release:
 
 - The canonical lint and format gates now cover every root release tool, with focused tests for
   registry behavior and command boundaries.

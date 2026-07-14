@@ -30,7 +30,9 @@ consumer, audit, or live-schema checks.
 9. **`npm run verify:public-api`** — compares the built ESM declaration surface for the root,
    `/clockify`, `/adapters`, `/client`, `/ui`, and `/testing` entry points against
    `addon-sdk/public-api.snapshot.md`. Intentional public API changes must run
-   `npm run build && npm run verify:public-api -- --update` and include the snapshot diff.
+   `npm run build` and then
+   `npm run verify:public-api -w @apet97/clockify-addon-sdk -- --update` from the repository root and
+   include the snapshot diff.
 10. **`npm run verify:dist`** — imports the **built** ESM and CJS and boots the README quick-start; a
     green `build` alone does not prove the package imports.
 11. **`npm run pack:dry-run`** — confirms the SDK tarball contains its built output, docs, vendored
@@ -81,6 +83,11 @@ Both commands depend on registry state and therefore remain outside `ci:verify`,
 and normal pull-request CI. Run the preflight immediately before publishing and the registry
 consumer verification immediately afterward. Because `release:verify` ends with `release:dry-run`,
 run it only for unpublished workspace versions.
+
+Successful local gates and `release:preflight` establish only that a workspace version is a verified,
+currently unpublished candidate. They do not establish npm publication, exact-registry consumption,
+Marketplace submission, or fresh authenticated Clockify behavior; those require the separate
+post-publish and live receipts described in `docs/release-readiness.md`.
 
 Dependency freshness:
 
