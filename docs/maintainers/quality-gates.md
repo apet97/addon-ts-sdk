@@ -20,38 +20,42 @@ consumer, audit, or live-schema checks.
 3. **`npm run verify:generated`** — verifies schema provenance, generates fresh output in a temporary
    directory, compares it with committed `src/clockify/generated/**`, and removes the temporary files
    before exit.
-4. **`npm run test:coverage`** — the full `vitest` suite plus enforced handwritten-code floors of
+4. **`npm run verify:docs`** — checks active authored Markdown links and anchors, required builder
+   navigation, the synchronized `AGENTS.md`/`CLAUDE.md` body, and configured stale claims. Captured
+   upstream snapshots, generated evidence, historical plans, archives, and ignored local execution
+   notes remain outside the active-doc set.
+5. **`npm run test:coverage`** — the full `vitest` suite plus enforced handwritten-code floors of
    97% statements, 92% branches, 98% functions, and 98% lines.
    - **`npm run test:replay`** — focused local Clockify replay coverage for component auth-token,
      installed lifecycle, stored-token webhook verification, and negative token/workspace cases.
-5. **`npm run test`** — a focused non-coverage unit-test shortcut for local development.
-6. **`npm run lint`** — check-only ESLint over the package plus every root `scripts/*.mjs` release
+6. **`npm run test`** — a focused non-coverage unit-test shortcut for local development.
+7. **`npm run lint`** — check-only ESLint over the package plus every root `scripts/*.mjs` release
    tool through the shared flat configuration.
-7. **`npm run format:check`** — check-only Prettier over the package and root release tools. Vendored
+8. **`npm run format:check`** — check-only Prettier over the package and root release tools. Vendored
    Marketplace docs, manifest schemas, generated Clockify models, build output, coverage, and
    tarballs are ignored.
-8. **`npm run build`** — emits the ESM and CJS outputs with type declarations.
-9. **`npm run verify:public-api`** — compares the built ESM declaration surface for the root,
-   `/clockify`, `/adapters`, `/client`, `/ui`, and `/testing` entry points against
-   `addon-sdk/public-api.snapshot.md`. Intentional public API changes must run
-   `npm run build` and then
-   `npm run verify:public-api -w @apet97/clockify-addon-sdk -- --update` from the repository root and
-   include the snapshot diff.
-10. **`npm run verify:dist`** — imports the **built** ESM and CJS and boots the README quick-start; a
+9. **`npm run build`** — emits the ESM and CJS outputs with type declarations.
+10. **`npm run verify:public-api`** — compares the built ESM declaration surface for the root,
+    `/clockify`, `/adapters`, `/client`, `/ui`, and `/testing` entry points against
+    `addon-sdk/public-api.snapshot.md`. Intentional public API changes must run
+    `npm run build` and then
+    `npm run verify:public-api -w @apet97/clockify-addon-sdk -- --update` from the repository root and
+    include the snapshot diff.
+11. **`npm run verify:dist`** — imports the **built** ESM and CJS and boots the README quick-start; a
     green `build` alone does not prove the package imports.
-11. **`npm run pack:dry-run`** — confirms the SDK tarball contains its built output, docs, vendored
+12. **`npm run pack:dry-run`** — confirms the SDK tarball contains its built output, docs, vendored
     schemas, license, and README, while the creator tarball contains its bin, typed source export,
     license, and README.
-12. **`npm run verify:package-lint`** — packs both artifacts with `--ignore-scripts`, then runs
+13. **`npm run verify:package-lint`** — packs both artifacts with `--ignore-scripts`, then runs
     `publint --strict` and Are The Types Wrong against each tarball. The dual-format SDK uses the
     Node16 profile; the ESM-only creator uses the `esm-only` profile. Node10 findings are not release
     blockers because both packages support Node 22+.
-13. **`npm run verify:package-consumer`** — packs the already-built package with `--ignore-scripts`,
+14. **`npm run verify:package-consumer`** — packs the already-built package with `--ignore-scripts`,
     installs that tarball into temporary runtime ESM/CJS and TypeScript ESM/CJS consumers, imports
     the root and subpath entry points, checks `generated.v1_5`, type-checks declarations without
     requiring Express types, signs/verifies JWTs through `jose@6` dynamic imports, and boots a
     `/manifest` server smoke from the installed package.
-14. **`npm run verify:scaffolds`** — packs both packages, installs the creator tarball into a
+15. **`npm run verify:scaffolds`** — packs both packages, installs the creator tarball into a
     temporary runner, and generates Node minimal, Node all-features, Worker minimal, and
     Worker all-features projects through that installed export. It installs and type-checks each
     project. It executes their runtime through Node processes and real `workerd` Worker sessions,
@@ -59,7 +63,7 @@ consumer, audit, or live-schema checks.
     component/lifecycle/webhook counts. It also probes 404 handling, unsigned component rejection,
     and production configuration failure. Separate Wrangler dry-runs bundle both Worker entry
     points. This is packed runtime proof, not a source grep or type-check proxy.
-15. **`npm audit --omit=dev --json` and `npm audit --json`** — production and full dependency audit;
+16. **`npm audit --omit=dev --json` and `npm audit --json`** — production and full dependency audit;
     both should report 0 vulnerabilities.
 
 Manual freshness check:
@@ -70,6 +74,12 @@ Manual freshness check:
   depend on Clockify network availability. `.github/workflows/schema-live.yml` runs this check on a
   Monday schedule and on manual dispatch; failures should be triaged as possible upstream schema
   drift or network outages, not as deterministic SDK regressions.
+
+Documentation-only maintenance against unchanged published workspace versions runs
+`npm run ci:verify` and `npm run verify:schema-live` as separate checks. Do not run
+`npm run release:verify` for that case: its final publish dry-run must reject npm's immutable
+published versions. These checks prove the repository and live schema boundary only; they do not
+create new registry or authenticated Marketplace evidence.
 
 Manual registry boundary checks:
 

@@ -2,162 +2,125 @@
 
 Conventions for anyone (human or agent) working in this repository.
 
-## Current hardening checkpoint (2026-07-14)
+## How an add-on works
 
-- The root SDK entrypoint is runtime-neutral. Import Node, Express, and Fetch integration from the
-  granular adapter subpaths; never reintroduce `node:*` through the root.
-- Browser-facing responses use the SDK security helpers. Production public origins require explicit
-  HTTPS configuration, and the UI bridge requires an exact parent origin and source.
-- Component and lifecycle JWTs require expiration. Raw webhook verification requires a fixed stored
-  token plus nonblank signed workspace/add-on installation context; the wrapper requires exactly one
-  fixed or lookup token source and checks signature, event, and context before any lookup.
-- Installation credentials, including nested webhook copies, are encrypted at rest. The store's
-  generation guard applies only when a delete caller supplies `installedAt`. Clockify's `DELETED`
-  payload has no generation, so the generated unqualified uninstall cleanup is unconditional.
-- Outbound mutations replay only a confirmed 429. Safe reads may retry transient failures; discarded
-  retry response bodies are cancelled before backoff, missing or blank `Retry-After` values use the
-  bounded exponential fallback, cancellation failures do not replace the intended retry, and caller
-  aborts are terminal.
-- `ClockifyAddonClient` accepts only integer `timeoutMs` values from 1 through 2,147,483,647 and
-  rejects credential-bearing `backendUrl` values. Direct HTTP configuration accepts only exact
-  canonical loopback spellings, and empty or dot-only path segments fail before fetch/retry logic.
-- Draft-04 manifest validation covers vendored schema versions 1.2-1.5. The creator package emits
-  fail-closed Node and Worker projects in minimal and all-feature modes; ephemeral installation
-  storage is local-development-only.
-- Registration accepts schema-valid manifests that omit optional component, lifecycle, or webhook
-  arrays. A `register*` call initializes its missing array only after the route binds successfully;
-  conflicts leave both the router and manifest unchanged.
-- `verify:scaffolds` packs both packages, generates all four runtime/feature variants through the
-  installed creator artifact, installs the packed SDK, executes Node and real `workerd` Worker
-  routes, validates their exact manifests and failure paths, and separately compiles Worker entry
-  points with a Wrangler dry-run. This is not a substitute for a fresh authenticated Clockify
-  developer-workspace pass before release.
-- The SDK and creator are public npm packages. Consumers install with
-  `npm install @apet97/clockify-addon-sdk` or scaffold with `npm create clockify-addon@latest`;
-  `docs/maintainers/release-readiness.md` is the canonical exact-version record.
-- `release:preflight` and `verify:registry` read both workspace versions dynamically. The former
-  fails unless exact versions are unpublished; the latter waits briefly for normal npm propagation,
-  installs the exact published artifacts, and executes a generated Node minimal project. Both depend
-  on registry state and stay outside deterministic `ci:verify`; run `release:verify` only before
-  publication because its dry run correctly rejects immutable published versions.
-- `docs/maintainers/release-readiness.md` is the canonical publication record and
-  `docs/maintainers/marketplace-coverage.md` is the canonical live/Marketplace evidence record.
-  Historical receipts prove only their recorded SHA; local, CI, and dry-run checks are not fresh
-  live, registry, or Marketplace proof.
+Clockify loads `GET /manifest`, then calls the registered lifecycle, component, and webhook routes.
+The SDK owns manifest construction and static validation, exact routing, signed-request
+verification, runtime adapters, storage contracts, browser-response helpers, and
+Marketplace-specific add-on transport. The application owns durable persistence, secret handling,
+business logic, public-origin configuration, deployment, and operational policy.
 
-- Keep Node `http` and Fetch body-limit semantics aligned on every HTTP method: declared
-  `content-length` values above `maxBodyBytes` must fail before routing, and streamed bodies must
-  still fail once the byte counter crosses the limit. Malformed declared lengths return 400 without
-  invoking `onError`. The Node adapter and the Express structural fallback must preserve leading
-  slashes in origin-form request targets; `//host/path` is a path, not an alternate authority.
-  Express body limits stay with the host app.
-- Published-package runtime support starts at Node 22, while source development requires Node
-  22.13.0 or newer. Keep `@types/node` on `^22` unless the runtime contract changes.
-- The SDK-tooling Dependabot lane accepts minor and patch updates only. Keep TypeScript on major 6
-  and Node ambient types on major 22 until each next major receives a deliberate compatibility pass.
-- Discarded commit `623fbdc` was reviewed during the July 2026 plan pass. Do not restore its
-  benchmark, scaffold, fuzz, or broad parity files wholesale; reintroduce only pieces that have
-  current-code proof and a clear maintenance payoff.
+For `INSTALLED`, verify the signed request and matched payload before storing its `authToken` and
+`apiUrl`; retain the verified signed `backendUrl` separately for `ClockifyAddonClient`. Treat the
+component `auth_token` as transient. Verify webhook event, signed installation context, and the
+stored expected webhook token before handling a delivery. Process `DELETED` cleanup with the
+documented unconditional lifecycle semantics. Entity-specific Clockify REST resources, CLI, and MCP
+behavior belong to the separate `clockify-ts-sdk`.
+
+## Commands
+
+Run commands from the repository root unless noted otherwise.
+
+| Command                                                          | Purpose                                                                                                                 |
+| ---------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| `npm ci`                                                         | Install the locked workspace dependencies.                                                                              |
+| `npm test -w @apet97/clockify-addon-sdk -- tests/<file>.test.ts` | Run a focused Vitest file while developing.                                                                             |
+| `npm run verify:fast`                                            | Type-check, check generated drift, replay local Clockify fixtures, build, and verify built imports.                     |
+| `npm run verify:docs`                                            | Check active documentation links, anchors, required navigation, paired agent contracts, and configured stale claims.    |
+| `npm run verify:generated`                                       | Check schema provenance and compare fresh temporary generation with committed output.                                   |
+| `npm run verify:scaffolds`                                       | Pack both packages and execute generated Node and real `workerd` Worker projects, plus Wrangler dry-runs.               |
+| `npm run ci:verify`                                              | Run the deterministic full local/CI gate, including docs, coverage, package, scaffold, and audit checks.                |
+| `npm run verify:schema-live`                                     | Manually compare vendored schemas with Clockify's live schema endpoint; this is intentionally outside deterministic CI. |
+| `npm run release:preflight`                                      | Confirm proposed workspace versions are absent from npm immediately before an authorized publish.                       |
+| `npm run release:verify`                                         | Run CI, live-schema, and publish dry-run checks only for new unpublished workspace versions.                            |
+| `npm run verify:registry`                                        | Verify both exact public artifacts from a disposable consumer after publication.                                        |
+
+Intentional public declaration changes require a build, an explicit
+`npm run verify:public-api -w @apet97/clockify-addon-sdk -- --update`, and review of the snapshot
+diff. Intentional schema/model changes start from the vendored schema or generator, followed by
+`npm run generate -w @apet97/clockify-addon-sdk` and generated-drift verification.
+
+## Documentation ownership
+
+- `docs/getting-started.md`, `docs/how-an-addon-works.md`, and `docs/guides/**` are the builder
+  journey. Keep them task-oriented and application-facing.
+- `addon-sdk/README.md`, `addon-sdk/docs/**`, and `create-clockify-addon/README.md` are package and
+  API references. The creator's generated project README is owned by the template source in
+  `create-clockify-addon/src/index.mjs`.
+- `docs/maintainers/**` owns architecture, product boundaries, quality gates, publication records,
+  live Marketplace evidence, migration, and Java-parity evidence. Exact published versions belong
+  only in `docs/maintainers/release-readiness.md`.
+- `MARKETPLACE_DOCS/**` is captured upstream material with provenance; numbered snapshots are not
+  authored builder documentation.
+- `addon-sdk/src/clockify/generated/**` and `addon-sdk/public-api.snapshot.md` are generated evidence.
+  Change their owning inputs or explicit update command, never their contents by hand.
+- `docs/superpowers/**` and `docs/archive/**` are historical evidence. Ignored local files such as
+  `.superpowers/**`, `GOAL.md`, and `verification_report.md` are execution notes, not repository
+  documentation.
+
+Run `npm run verify:docs` after authored Markdown changes. Its active-document gate checks local
+links and anchors, the builder index, the shared agent body, and configured stale claims while
+respecting the upstream, generated, historical, and ignored-local boundaries above.
+
+## Stable engineering rules
+
+- Keep the root SDK entrypoint runtime-neutral. Runtime-specific Node, Express, and Fetch behavior
+  belongs behind adapter subpaths; never introduce `node:*` through portable entrypoints.
+- Use Web Crypto for portable cryptography. Keep `jose` behind dynamic imports so installed ESM and
+  CommonJS consumers remain valid.
+- Registration is atomic: initialize an omitted manifest descriptor array only after its route binds;
+  an identical declaration may be reused, but a conflict must leave router and manifest unchanged.
+- Verify Clockify JWT algorithm, issuer, type, subject, expiration profile, event, and installation
+  context at the correct boundary. A webhook route must configure exactly one fixed or lookup source
+  for its stored expected token. Browser messaging must match the exact trusted origin and source.
+- Keep installation and webhook credentials server-side and encrypted at rest. Ephemeral stores are
+  local-development aids only. Never expose installation credentials to generated UI or logs.
+- Keep Node and Fetch body-limit semantics aligned for declared and streamed bodies. Express body
+  limits remain the host application's responsibility. Reject malformed sizes before application
+  error handling and oversized bodies before dispatch.
+- Safe reads may retry transient failures; mutations may replay only after a confirmed `429`.
+  Caller aborts are terminal, timeout bounds stay validated, and discarded retry bodies are
+  cancelled before backoff without replacing the intended result.
+- Never hardcode Clockify service hosts. Build `/v1` entity bases from the documented verified
+  inputs, retain signed `backendUrl` for Marketplace `/addon/...` calls, encode every dynamic path
+  segment, and reject empty or dot-only segments before transport.
+- Use `X-Addon-Token`, not `Authorization`, for Clockify add-on calls. Never log tokens, signatures,
+  private keys, outbound query strings, or unsanitized credentials.
+- Runtime manifest validation uses generated static Draft-04 validators; do not add a runtime AJV
+  compiler or string code generation. Preserve `addon-sdk/THIRD_PARTY_NOTICES.md` and its packed
+  consumer check when validator generation changes.
+- Never hand-edit generated models, validators, or the public API snapshot. Change the owning
+  schema, generator, or source; update schema provenance deliberately and include focused regression
+  coverage plus the generated diff.
 
 ## Layout
 
-- `addon-sdk/` — the published SDK package workspace (`@apet97/clockify-addon-sdk`). All SDK code,
-  schemas, examples, and tests live here. Run package commands from this directory.
-- `create-clockify-addon/` — the published ESM-only creator package with a typed programmatic export. Its
-  Node/Worker minimal/all projects must be generated through the packed creator, install the packed
-  SDK, type-check, and execute without workspace-source imports.
-- Root npm scripts proxy the package gates through npm workspaces; use `npm run ci:verify` from the
-  repo root for the full local/CI verification chain.
+- `addon-sdk/src/` — portable SDK source, runtime adapters, Clockify modules, client, UI, and testing
+  exports; generated manifest code lives under `src/clockify/generated/`.
+- `addon-sdk/docs/`, `addon-sdk/examples/`, `addon-sdk/schemas/`, `addon-sdk/tests/`, and
+  `addon-sdk/scripts/` — package reference, runnable examples, vendored schemas/provenance, tests,
+  and package build/verification tools.
+- `create-clockify-addon/src/` — creator API and generated project templates, including the project
+  README; `bin/` is the CLI and `scripts/verify-scaffolds.mjs` owns packed scaffold proof.
+- `docs/` — builder and maintainer documentation; `MARKETPLACE_DOCS/` — captured upstream sources.
+- `scripts/` — repository documentation, release, registry, and Marketplace verification tools;
+  `.github/workflows/` owns deterministic CI and scheduled/manual live-schema checks.
 
-## Source of truth
+## Delivery
 
-- Behaviour mirrors the upstream Clockify add-on Java SDK; the TypeScript port stays faithful to it.
-- Manifest schemas are vendored under `addon-sdk/schemas/clockify-manifests/*.json`: 1.2–1.4 are
-  byte-identical to the Clockify add-on Java SDK's bundled resources, 1.5 is taken verbatim from the
-  live schema endpoint (modulo a trailing newline), and all are structurally identical to the live
-  API (which serves them minified). Supported versions: **1.2, 1.3, 1.4, 1.5** (`?version=1.6`
-  returns HTTP 400).
-- `addon-sdk/schemas/clockify-manifests/provenance.json` records the supported schema list, source
-  labels, and raw SHA-256 hashes. `npm run verify:generated` must fail if a supported schema is
-  missing, changed without updating provenance, if the supported version set drifts, or if a fresh
-  temporary generation differs from committed generated output.
-- `addon-sdk/src/clockify/generated/**` is generated from those schemas. **Never edit it by hand** —
-  change the schema or the generator, then `npm run generate`. Public generated interfaces include
-  schema descriptions as JSDoc; keep that documentation in the generator, not in generated files.
-- Builder step order follows each schema's `required` array (matching the upstream processor).
-  Required array fields keep Java-parity empty-array defaults but must still throw at runtime when
-  their setter was never called.
-- Marketplace coverage is tracked in `docs/maintainers/marketplace-coverage.md`. The SDK owns
-  add-on-specific token/settings transport, storage contracts, secure UI messaging, and schema
-  validation. The separate `clockify-ts-sdk` owns entity-specific REST APIs, CLI, and MCP behavior.
-- Clockify-signed tokens are verified as `RS256` JWTs with `iss=clockify`, `type=addon`, and
-  `sub=<manifest key>`. Raw webhook verification requires `expectedEventType`, a fixed
-  `expectedWebhookAuthToken`, and nonblank signed `workspaceId`/`addonId`; the wrapper requires
-  exactly one fixed token or `getExpectedWebhookAuthToken`. Lifecycle routes use
-  `X-Addon-Lifecycle-Token`; Clockify API calls use `X-Addon-Token`.
-- `jose@6` is ESM-only. Keep SDK runtime references to `jose` behind dynamic imports so the CommonJS
-  build and installed CJS consumer smoke stay clean.
-- Do not hardcode Clockify API/report/location/screenshot hosts. Claim-derived base URL resolvers
-  accept only absolute HTTPS or canonical loopback HTTP URLs without credentials, query strings, or
-  fragments; an invalid nonblank preferred `apiUrl` must not fall back to `backendUrl`.
-- Direct `ClockifyAddonClient` configuration rejects credentials in `backendUrl` and noncanonical
-  HTTP loopback spellings. Reject empty, `.`, and `..` caller-provided path segments before retry
-  handling; encode every accepted segment, use `X-Addon-Token` rather than `Authorization`, and do
-  not log outbound query strings or credentials.
-- Node `http` and Fetch adapters enforce `DEFAULT_MAX_BODY_BYTES` (`1_048_576`) before dispatch and
-  return 413 for oversized bodies. Invalid `maxBodyBytes` values should throw configuration errors.
-  Express body limits are configured by the host app, not the SDK.
-- Express remains an optional peer. Keep the adapter structurally typed so root imports and non-Express
-  consumers do not need Express types installed.
-- Published-package runtime support starts at Node 22. CI verifies the source-development floor at
-  Node 22.13.0 and the current Node 24 line.
-- Source-build tooling uses TypeScript 6, Vitest 4, Vite 8, and ESLint 10. Keep package runtime
-  support at `>=22` even though the accepted source toolchain has a narrower patch-level floor.
-
-## Gates
-
-| Command                                    | Checks                                                                                                                                                                                                                                                |
-| ------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `npm run ci:verify`                        | Canonical root gate: workspace dependency tree, type-check, generated drift, thresholded coverage, lint, format check, build, public API snapshot, dist import smoke, pack dry-run, package lint, installed-consumer and scaffold smokes, and audits. |
-| `npm run verify:deps`                      | Confirms the npm workspace dependency tree resolves at depth 0 before the heavier package gates.                                                                                                                                                      |
-| `npm run type-check`                       | `src`, generator, examples, and the type-state probes. A weakened builder must fail this.                                                                                                                                                             |
-| `npm run verify:generated`                 | Checks schema provenance, generates to a temporary directory, compares against committed generated files, and leaves tracked files untouched.                                                                                                         |
-| `npm run test`                             | vitest suite.                                                                                                                                                                                                                                         |
-| `npm run test:coverage`                    | Enforced Vitest V8 coverage over handwritten `src/**/*.ts`, excluding generated models: 97% statements, 92% branches, 98% functions, and 98% lines.                                                                                                   |
-| `npm run lint`                             | Check-only ESLint over the package and every root release tool through the shared configuration.                                                                                                                                                      |
-| `npm run format:check`                     | Check-only Prettier over the package and root release tools.                                                                                                                                                                                          |
-| `npm run build`                            | ESM + CJS output.                                                                                                                                                                                                                                     |
-| `npm run verify:public-api`                | Compares built declaration surfaces for root, Clockify, adapters, client, UI, and testing entrypoints against `addon-sdk/public-api.snapshot.md`.                                                                                                     |
-| `npm run verify:dist`                      | Imports the **built** ESM and CJS and boots the quick-start. A green `build` alone does not prove the package imports.                                                                                                                                |
-| `npm run pack:dry-run`                     | SDK tarball contents (`dist` + `docs` + schemas + license/readme) and the separate creator tarball (`bin` + `src` + license/readme).                                                                                                                  |
-| `npm run verify:package-lint`              | Packs both artifacts with scripts ignored, then runs `publint --strict` and Are The Types Wrong: Node16 for the dual-format SDK and `esm-only` for the creator. Node10 findings are outside the supported runtime policy.                             |
-| `npm run verify:package-consumer`          | Packs the already-built package with scripts ignored, installs it into temporary runtime ESM/CJS and TypeScript ESM/CJS consumers, imports public subpaths, signs/verifies test tokens, type-checks declarations, and serves `/manifest`.             |
-| `npm run verify:scaffolds`                 | Packs installed creator/SDK; generates, installs, and type-checks Node/Worker minimal/all; executes Node and real `workerd` routes; validates manifests/failures; Wrangler-dry-runs Worker entries.                                                   |
-| `npm run release:preflight`                | Manual one-shot network gate: fails unless both exact workspace versions are absent from the configured npm registry.                                                                                                                                 |
-| `npm run verify:registry`                  | Manual post-publish gate: waits up to 30 seconds only for absent exact versions, then installs them into a disposable consumer and checks ESM/CJS/TypeScript/creator plus a generated Node minimal project.                                           |
-| `npm run audit:prod` / `npm run audit:all` | Production and full dependency audits; both should report 0 vulnerabilities.                                                                                                                                                                          |
-
-GitHub Actions runs `npm run ci:verify` on Node 22.13.0 and 24.x for pushes to `main` and `codex/**`,
-pull requests, and manual dispatches. A separate scheduled/manual `Live Schema Drift` workflow runs
-`npm run verify:schema-live` on Node 24.x so normal PR CI stays deterministic.
-
-Linting and formatting are check-only CI gates. ESLint and Prettier intentionally ignore
-`node_modules`, `dist`, `coverage`, `*.tgz`, vendored Marketplace docs, manifest schemas, and
-generated Clockify models.
-
-## Git / publish workflow
-
-- npm versions are immutable. Every future publish requires a version change, a successful
-  `npm run release:preflight`, `npm run release:verify`, a successful `npm whoami`, and explicit
-  npm-owner approval for the exact packages and versions.
-- When both packages change, publish the SDK first. Publish the creator only after the SDK succeeds,
-  then run `npm run verify:registry` to smoke-test both exact versions from the public registry in a
-  fresh temporary consumer.
-- For direct `main` publishes, run the full gate, fetch `origin`, confirm `origin/main` is an ancestor,
-  commit the branch, push `origin main` without force, and verify `origin/main...main` is `0 0`.
-- Do not open a PR when the user explicitly asks to push to `main`.
-- Do not push generated drift, a stale `dist/`, or a dry-run `.tgz` artifact.
-
-## Notes
-
-- Independent, unofficial project — not affiliated with Clockify or CAKE.com.
+- Preserve unrelated working-tree changes and keep each commit limited to the requested task. Run
+  focused tests while editing, then the applicable docs/generated/public-API checks and
+  `npm run ci:verify` before handoff.
+- Update user-visible docs with behavior changes. A green local gate is not fresh npm registry,
+  authenticated Clockify, or Marketplace submission evidence; record those only in their canonical
+  maintainer documents after the corresponding live check.
+- Do not change CI, authentication, security policy, package versions, or publication settings
+  without explicit authority. Do not run `release:verify` against unchanged published versions; its
+  publish dry-run must reject immutable versions.
+- Commit when requested. Push only when explicitly requested, and publish only with explicit
+  npm-owner approval for the exact packages and versions. When both packages are authorized, publish
+  the SDK first and the creator second, then run `npm run verify:registry`.
+- Before a direct `main` push, fetch `origin`, confirm `origin/main` is an ancestor of the commit,
+  push without force, and verify the remote and local tips match. Never force-push or amend a pushed
+  commit, and never redirect this repository's history to a similarly named project.
+- This is an independent, unofficial project and is not affiliated with Clockify or CAKE.com.

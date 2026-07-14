@@ -4,6 +4,12 @@ All notable changes to this SDK are recorded here.
 
 ## Unreleased
 
+- Reorganized active documentation into a builder-first journey with separate SDK reference and
+  maintainer ownership boundaries.
+- Added runtime- and feature-aware README output to generated creator projects.
+- Added a repository documentation verifier for active links and anchors, required builder
+  navigation, paired agent guidance, and configured stale claims.
+
 ## 1.0.4 - 2026-07-14
 
 - Accept `http://127.0.0.1` and `http://[::1]` `backendUrl` values in

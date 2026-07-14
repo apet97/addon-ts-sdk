@@ -26,6 +26,13 @@
 Every generated project also includes a runtime- and feature-aware README with its local commands,
 configuration, request flow, and production storage checklist.
 
+## Contributing and security
+
+- [Contributor guide](../CONTRIBUTING.md) — setup, focused verification, generated-file boundaries,
+  documentation ownership, commit scope, and publication restrictions.
+- [Security policy](../SECURITY.md) — private reporting, supported releases, application-owned
+  controls, and security guidance.
+
 ## Maintainers
 
 - [Maintainer documentation](maintainers/README.md) — architecture, product boundaries, quality
@@ -41,3 +48,8 @@ configuration, request flow, and production storage checklist.
   builder journey.
 - Ignored local working notes such as `GOAL.md` and `verification_report.md` are not repository
   documentation and are not part of this index.
+
+Run `npm run verify:docs` after active authored Markdown changes. It checks local links and anchors,
+required builder navigation, documentation ownership contracts, and configured stale claims without
+treating upstream snapshots, generated evidence, historical material, or ignored local notes as
+active documentation.

@@ -351,11 +351,26 @@ describe("published distribution docs", () => {
     expect(evidenceMap).toContain("token exchange, settings, and generic authenticated transport");
   });
 
-  it("keeps AGENTS.md and CLAUDE.md synchronized after their introductions", () => {
-    const agents = readFileSync(resolve(repoRoot, "AGENTS.md"), "utf8").split("\n").slice(4);
-    const claude = readFileSync(resolve(repoRoot, "CLAUDE.md"), "utf8").split("\n").slice(4);
+  it("keeps AGENTS.md and CLAUDE.md synchronized with stable shared sections", () => {
+    const agentsSource = readFileSync(resolve(repoRoot, "AGENTS.md"), "utf8");
+    const claudeSource = readFileSync(resolve(repoRoot, "CLAUDE.md"), "utf8");
+    const agents = agentsSource.split("\n").slice(4);
+    const claude = claudeSource.split("\n").slice(4);
 
     expect(agents).toEqual(claude);
+    for (const heading of [
+      "## How an add-on works",
+      "## Commands",
+      "## Documentation ownership",
+      "## Stable engineering rules",
+      "## Layout",
+      "## Delivery",
+    ]) {
+      expect(agentsSource).toContain(heading);
+    }
+    expect(agentsSource).toContain("npm run verify:docs");
+    expect(agentsSource).not.toContain("Current hardening checkpoint");
+    expect(agentsSource).not.toContain("Discarded commit");
   });
 
   it("documents the secure server installation and webhook token recipe", () => {

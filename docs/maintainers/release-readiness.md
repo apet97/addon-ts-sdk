@@ -14,6 +14,21 @@ Install the SDK with `npm install @apet97/clockify-addon-sdk` or create a projec
 `npm create clockify-addon@latest`. npm versions are immutable: every future release requires a
 version change and explicit npm-owner approval for that exact publish attempt.
 
+## Documentation-only maintenance boundary
+
+When a documentation-only pass leaves the already published workspace versions unchanged, run the
+deterministic gate and the live schema check separately:
+
+```bash
+npm run ci:verify
+npm run verify:schema-live
+```
+
+Do not run `npm run release:verify` for that pass. It ends with `release:dry-run`, whose registry
+check must reject immutable versions that are already published. Documentation verification does
+not create a new release candidate, registry receipt, authenticated Clockify receipt, or Marketplace
+submission evidence.
+
 ## 1.0.4 release evidence
 
 Release source commit `0e2fde5a49e8d6860961339b7945ba6d2a177c07` corrects direct-client retry
