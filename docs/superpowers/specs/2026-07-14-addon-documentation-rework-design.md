@@ -105,8 +105,6 @@ The rewrite will handle existing material by purpose:
 - `addon-sdk/docs/java-migration.md` and the Java-to-TypeScript API map remain consumer migration
   reference. Internal parity checklists, evidence maps, and adversarial-review history move to a
   clearly labeled maintainer evidence area.
-- `GOAL.md` becomes a concise current product contract. Its completed implementation playbook is
-  preserved under `docs/archive/`.
 - `AGENTS.md` and `CLAUDE.md` retain concise operational commands, stable architecture, ownership,
   and non-obvious constraints. Dated release narration moves to release evidence. Their shared
   sections remain synchronized.
@@ -118,7 +116,9 @@ The rewrite will handle existing material by purpose:
 - `addon-sdk/public-api.snapshot.md` remains generated and is never hand-edited.
 - `docs/superpowers/**` remains historical implementation evidence and is not part of beginner
   navigation.
-- The ignored local `verification_report.md` is not promoted into active documentation.
+- The ignored local `GOAL.md` and `verification_report.md` working notes remain untouched and are
+  not promoted into tracked documentation. The root README, product-surface reference, and agent
+  guidance carry the current tracked product contract.
 
 File moves will preserve useful content and Git history. Redirect stubs will be used only where a
 published or externally referenced path has a credible compatibility need; otherwise links are
