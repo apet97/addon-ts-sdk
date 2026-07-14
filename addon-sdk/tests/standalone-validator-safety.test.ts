@@ -22,6 +22,10 @@ describe("standalone validator safety", () => {
   it.each([
     ["indirect eval", '(0, eval)("return true");'],
     ["aliased Function constructor", 'const Factory = Function; new Factory("return true");'],
+    [
+      "forward Function alias",
+      'function compile(){ return Factory("return true") } const Factory = Function; compile();',
+    ],
   ])("rejects %s string code generation", async (_kind, source) => {
     if (!safetyModuleExists) return;
     const { assertStandaloneValidatorSafety } = await import(safetyModuleUrl);

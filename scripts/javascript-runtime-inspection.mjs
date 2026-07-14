@@ -40,23 +40,101 @@ function staticMemberName(node) {
   return undefined;
 }
 
-function executableReferenceKind(node, aliases) {
+function forEachChild(node, callback) {
+  for (const [key, value] of Object.entries(node)) {
+    if (key === "loc" || key === "start" || key === "end") continue;
+    if (Array.isArray(value)) {
+      for (const child of value) callback(child);
+    } else {
+      callback(value);
+    }
+  }
+}
+
+function createScope(parent, kind) {
+  return { parent, kind, bindings: new Map() };
+}
+
+function defineBinding(scope, name, binding = {}) {
+  scope.bindings.set(name, binding);
+}
+
+function definePatternBindings(scope, pattern, binding = {}) {
+  if (!isNode(pattern)) return;
+  if (pattern.type === "Identifier") {
+    defineBinding(scope, pattern.name, binding);
+  } else if (pattern.type === "RestElement") {
+    definePatternBindings(scope, pattern.argument, binding);
+  } else if (pattern.type === "AssignmentPattern") {
+    definePatternBindings(scope, pattern.left, binding);
+  } else if (pattern.type === "ArrayPattern") {
+    for (const element of pattern.elements) {
+      definePatternBindings(scope, element, binding);
+    }
+  } else if (pattern.type === "ObjectPattern") {
+    for (const property of pattern.properties) {
+      definePatternBindings(
+        scope,
+        property.type === "RestElement" ? property.argument : property.value,
+        binding,
+      );
+    }
+  }
+}
+
+function nearestVariableScope(scope) {
+  let current = scope;
+  while (current.kind !== "function" && current.kind !== "program") {
+    current = current.parent;
+  }
+  return current;
+}
+
+function findBinding(scope, name) {
+  let current = scope;
+  while (current !== null) {
+    const binding = current.bindings.get(name);
+    if (binding !== undefined) return binding;
+    current = current.parent;
+  }
+  return undefined;
+}
+
+function executableReferenceKind(node, scope, resolvingBindings = new Set()) {
   if (!isNode(node)) return undefined;
   if (node.type === "ChainExpression") {
-    return executableReferenceKind(node.expression, aliases);
+    return executableReferenceKind(node.expression, scope, resolvingBindings);
   }
   if (node.type === "SequenceExpression") {
-    return executableReferenceKind(node.expressions.at(-1), aliases);
+    return executableReferenceKind(
+      node.expressions.at(-1),
+      scope,
+      resolvingBindings,
+    );
   }
   if (node.type === "Identifier") {
+    const binding = findBinding(scope, node.name);
+    if (binding !== undefined) {
+      if (binding.aliasExpression === undefined) return undefined;
+      if (resolvingBindings.has(binding)) return undefined;
+      resolvingBindings.add(binding);
+      const kind = executableReferenceKind(
+        binding.aliasExpression,
+        binding.referenceScope,
+        resolvingBindings,
+      );
+      resolvingBindings.delete(binding);
+      return kind;
+    }
     if (node.name === "eval") return "eval-call";
     if (node.name === "Function") return "function-constructor";
-    return aliases.get(node.name);
+    return undefined;
   }
   if (
     node.type === "MemberExpression" &&
     node.object.type === "Identifier" &&
-    node.object.name === "globalThis"
+    node.object.name === "globalThis" &&
+    findBinding(scope, "globalThis") === undefined
   ) {
     const memberName = staticMemberName(node);
     if (memberName === "eval") return "eval-call";
@@ -82,7 +160,99 @@ export function inspectRuntimeJavaScript(source, options = {}) {
     sourceType: "module",
   });
   const findings = [];
-  const executableAliases = new Map();
+  const scopeByNode = new WeakMap();
+  const programScope = createScope(null, "program");
+
+  const collectFunctionScope = (node, parentScope) => {
+    const functionScope = createScope(parentScope, "function");
+    scopeByNode.set(node, functionScope);
+    if (node.type === "FunctionExpression" && node.id?.type === "Identifier") {
+      defineBinding(functionScope, node.id.name);
+    }
+    for (const parameter of node.params) {
+      definePatternBindings(functionScope, parameter);
+    }
+    for (const parameter of node.params)
+      collectScopes(parameter, functionScope);
+    collectScopes(node.body, functionScope);
+  };
+
+  // Collect every lexical binding before calls are classified, so aliases are
+  // independent of declaration traversal order and cannot leak across scopes.
+  const collectScopes = (node, scope) => {
+    if (!isNode(node)) return;
+    scopeByNode.set(node, scope);
+
+    if (node.type === "Program") {
+      for (const statement of node.body) collectScopes(statement, scope);
+      return;
+    }
+    if (node.type === "BlockStatement") {
+      const blockScope = createScope(scope, "block");
+      scopeByNode.set(node, blockScope);
+      for (const statement of node.body) collectScopes(statement, blockScope);
+      return;
+    }
+    if (node.type === "FunctionDeclaration") {
+      if (node.id?.type === "Identifier") defineBinding(scope, node.id.name);
+      collectFunctionScope(node, scope);
+      return;
+    }
+    if (
+      node.type === "FunctionExpression" ||
+      node.type === "ArrowFunctionExpression"
+    ) {
+      collectFunctionScope(node, scope);
+      return;
+    }
+    if (node.type === "CatchClause") {
+      const catchScope = createScope(scope, "block");
+      scopeByNode.set(node, catchScope);
+      definePatternBindings(catchScope, node.param);
+      collectScopes(node.param, catchScope);
+      collectScopes(node.body, catchScope);
+      return;
+    }
+    if (node.type === "VariableDeclaration") {
+      const bindingScope =
+        node.kind === "var" ? nearestVariableScope(scope) : scope;
+      for (const declaration of node.declarations) {
+        if (node.kind === "const" && declaration.id.type === "Identifier") {
+          defineBinding(bindingScope, declaration.id.name, {
+            aliasExpression: declaration.init ?? undefined,
+            referenceScope: scope,
+          });
+        } else {
+          definePatternBindings(bindingScope, declaration.id);
+        }
+        collectScopes(declaration.id, scope);
+        collectScopes(declaration.init, scope);
+      }
+      return;
+    }
+    if (node.type === "ImportDeclaration") {
+      for (const specifier of node.specifiers) {
+        defineBinding(scope, specifier.local.name);
+      }
+      return;
+    }
+    if (node.type === "ClassDeclaration" || node.type === "ClassExpression") {
+      if (node.type === "ClassDeclaration" && node.id?.type === "Identifier") {
+        defineBinding(scope, node.id.name);
+      }
+      const classScope = createScope(scope, "block");
+      if (node.id?.type === "Identifier") {
+        defineBinding(classScope, node.id.name);
+      }
+      collectScopes(node.superClass, scope);
+      collectScopes(node.body, classScope);
+      return;
+    }
+
+    forEachChild(node, (child) => collectScopes(child, scope));
+  };
+
+  collectScopes(root, programScope);
 
   const report = (node, kind, message) => {
     findings.push({ kind, message, ...locationOf(node) });
@@ -103,18 +273,7 @@ export function inspectRuntimeJavaScript(source, options = {}) {
 
   const visit = (node) => {
     if (!isNode(node)) return;
-
-    if (node.type === "VariableDeclaration" && node.kind === "const") {
-      for (const declaration of node.declarations) {
-        if (declaration.id.type !== "Identifier") continue;
-        const kind = executableReferenceKind(
-          declaration.init,
-          executableAliases,
-        );
-        if (kind !== undefined)
-          executableAliases.set(declaration.id.name, kind);
-      }
-    }
+    const scope = scopeByNode.get(node) ?? programScope;
 
     if (node.type === "ImportDeclaration") {
       inspectImport(node, "static-import");
@@ -122,13 +281,12 @@ export function inspectRuntimeJavaScript(source, options = {}) {
       inspectImport(node, "dynamic-import");
     } else if (
       node.type === "CallExpression" &&
-      executableReferenceKind(node.callee, executableAliases) === "eval-call"
+      executableReferenceKind(node.callee, scope) === "eval-call"
     ) {
       report(node, "eval-call", "calls eval");
     } else if (
       (node.type === "CallExpression" || node.type === "NewExpression") &&
-      executableReferenceKind(node.callee, executableAliases) ===
-        "function-constructor"
+      executableReferenceKind(node.callee, scope) === "function-constructor"
     ) {
       report(
         node,
@@ -183,14 +341,7 @@ export function inspectRuntimeJavaScript(source, options = {}) {
       );
     }
 
-    for (const [key, value] of Object.entries(node)) {
-      if (key === "loc" || key === "start" || key === "end") continue;
-      if (Array.isArray(value)) {
-        for (const child of value) visit(child);
-      } else {
-        visit(value);
-      }
-    }
+    forEachChild(node, visit);
   };
 
   visit(root);

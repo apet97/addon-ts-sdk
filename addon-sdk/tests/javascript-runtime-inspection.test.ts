@@ -72,6 +72,62 @@ require("left-pad");
     ]);
   });
 
+  it("resolves a Function alias declared after a closing-over function", async () => {
+    const findings = await inspect(
+      'function compile(){ return Factory("return true") } const Factory = Function; compile();',
+    );
+
+    expect(findings.map((finding: { readonly kind: string }) => finding.kind)).toEqual([
+      "function-constructor",
+    ]);
+  });
+
+  it("does not leak an outer Function alias through a shadowing parameter", async () => {
+    const findings = await inspect(
+      'const Factory = Function; function safe(Factory){ return Factory("value") } safe((value) => value);',
+    );
+
+    expect(findings).toEqual([]);
+  });
+
+  it.each([
+    [
+      "parameter",
+      'function safe(globalThis){ return globalThis.eval("value") } safe({ eval: (value) => value });',
+    ],
+    [
+      "local binding",
+      'const globalThis = { Function: (value) => value }; globalThis.Function("value");',
+    ],
+  ])("does not treat a shadowed globalThis %s as the intrinsic", async (_description, source) => {
+    expect(await inspect(source)).toEqual([]);
+  });
+
+  it("does not leak an outer Function alias through a local const shadow", async () => {
+    const findings = await inspect(
+      'const Factory = Function; { const Factory = (value) => value; Factory("value"); }',
+    );
+
+    expect(findings).toEqual([]);
+  });
+
+  it.each([
+    [
+      "function parameters",
+      'function safe(Function){ Function("value"); } safe((value) => value);',
+    ],
+    ["a block const", '{ const Function = (value) => value; Function("value"); }'],
+    [
+      "a catch parameter",
+      'try { throw (value) => value; } catch (Function) { Function("value"); }',
+    ],
+    ["a function declaration", 'function Function(value){ return value; } Function("value");'],
+    ["a class declaration", "class Function {} new Function();"],
+    ["a var declaration", 'var Function = (value) => value; Function("value");'],
+  ])("does not flag intrinsic names shadowed by %s", async (_description, source) => {
+    expect(await inspect(source)).toEqual([]);
+  });
+
   it("detects imported and executable AJV compiler markers", async () => {
     const findings = await inspect(`
 import Ajv from "ajv";
