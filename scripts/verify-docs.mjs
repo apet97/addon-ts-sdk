@@ -497,17 +497,36 @@ function markdownLinks(source) {
   return links.sort((left, right) => left.position - right.position);
 }
 
+function renderedHeadingText(value, definitions) {
+  const parsed = { content: value, definitions: definitions ?? new Map() };
+  const output = [];
+  let start = 0;
+  for (let cursor = 0; cursor < value.length; cursor++) {
+    const image =
+      value[cursor] === "!" &&
+      value[cursor + 1] === "[" &&
+      !isEscaped(value, cursor);
+    const bracketStart = image
+      ? cursor + 1
+      : value[cursor] === "["
+        ? cursor
+        : -1;
+    if (bracketStart === -1) continue;
+    const label = bracket(value, bracketStart);
+    if (label === null) continue;
+    const destination = linkDestination(parsed, label);
+    if (destination === null) continue;
+    output.push(value.slice(start, cursor), label.value);
+    start = destination.end + 1;
+    cursor = destination.end;
+  }
+  output.push(value.slice(start));
+  return output.join("");
+}
+
 function headingSlug(value, definitions) {
-  return value
+  return renderedHeadingText(value, definitions)
     .replace(/<[^>]*>/g, "")
-    .replace(/!?\[([^\]]*)\]\[([^\]]*)\]/g, (match, text, reference) =>
-      definitions?.has(
-        normalizeReferenceLabel(reference === "" ? text : reference),
-      )
-        ? text
-        : match,
-    )
-    .replace(/!?\[([^\]]*)\]\([^)]+\)/g, "$1")
     .replace(/[`*_~]/g, "")
     .trim()
     .toLowerCase()
@@ -530,20 +549,26 @@ function headingAnchors(source) {
     }
     anchors.add(anchor);
   };
-  const lines = stripFencedCode(source).split("\n");
-  for (let index = 0; index < lines.length; index++) {
-    const line = fenceLine(lines[index]).content;
-    const atx = line.match(/^ {0,3}#{1,6}(?:[ \t]+(.*)|[ \t]*)$/);
+  const sourceLines = stripFencedCode(source).split("\n");
+  const visibleLines = stripNonRendered(source).split("\n");
+  for (let index = 0; index < sourceLines.length; index++) {
+    const line = fenceLine(sourceLines[index]).content;
+    const visibleLine = fenceLine(visibleLines[index]).content;
+    const atx = visibleLine.match(/^ {0,3}#{1,6}(?:[ \t]+(.*)|[ \t]*)$/);
     if (atx !== null) {
-      add((atx[1] ?? "").replace(/[ \t]+#+[ \t]*$/, ""));
+      const sourceAtx = line.match(/^ {0,3}#{1,6}(?:[ \t]+(.*)|[ \t]*)$/);
+      if (sourceAtx !== null)
+        add((sourceAtx[1] ?? "").replace(/[ \t]+#+[ \t]*$/, ""));
       continue;
     }
 
     const next =
-      lines[index + 1] === undefined ? "" : fenceLine(lines[index + 1]).content;
+      visibleLines[index + 1] === undefined
+        ? ""
+        : fenceLine(visibleLines[index + 1]).content;
     if (
-      line.trim() !== "" &&
-      !/^ {4}/.test(line) &&
+      visibleLine.trim() !== "" &&
+      !/^ {4}/.test(visibleLine) &&
       /^ {0,3}(?:=+|-+)[ \t]*$/.test(next)
     ) {
       add(line.trim());

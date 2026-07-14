@@ -379,6 +379,51 @@ describe("documentation verification", () => {
     ).resolves.toEqual([]);
   });
 
+  it("ignores headings inside HTML comments beside rendered headings", async () => {
+    const root = await fixture({
+      "docs/README.md":
+        "# Docs\n\n[Hidden](guide.md#comment-heading)\n[Visible](guide.md#visible-heading)\n",
+      "docs/guide.md": "<!--\n# Comment heading\n-->\n# Visible heading\n",
+    });
+
+    await expect(
+      collectDocumentationErrors(root, {
+        documents: ["docs/README.md", "docs/guide.md"],
+        requiredFromIndex: ["docs/guide.md"],
+      }),
+    ).resolves.toEqual(["docs/README.md: missing anchor in docs/guide.md: #comment-heading"]);
+  });
+
+  it("ignores headings inside multiline code spans beside rendered headings", async () => {
+    const root = await fixture({
+      "docs/README.md":
+        "# Docs\n\n[Hidden](guide.md#code-heading)\n[Visible](guide.md#visible-heading)\n",
+      "docs/guide.md": "`code span\n# Code heading\ncontinues`\n# Visible heading\n",
+    });
+
+    await expect(
+      collectDocumentationErrors(root, {
+        documents: ["docs/README.md", "docs/guide.md"],
+        requiredFromIndex: ["docs/guide.md"],
+      }),
+    ).resolves.toEqual(["docs/README.md: missing anchor in docs/guide.md: #code-heading"]);
+  });
+
+  it("uses inline-link text with balanced destinations for heading anchors", async () => {
+    const root = await fixture({
+      "docs/README.md": "# Docs\n\n[Valid](guide.md#guide)\n[Missing](guide.md#absent)\n",
+      "docs/guide.md": "# [Guide](target(one).md)\n",
+      "docs/target(one).md": "# Target\n",
+    });
+
+    await expect(
+      collectDocumentationErrors(root, {
+        documents: ["docs/README.md", "docs/guide.md", "docs/target(one).md"],
+        requiredFromIndex: ["docs/guide.md"],
+      }),
+    ).resolves.toEqual(["docs/README.md: missing anchor in docs/guide.md: #absent"]);
+  });
+
   it("rejects file and directory README symlinks that leave the repository", async () => {
     const outsideRoot = await mkdtemp(join(tmpdir(), "clockify-docs-outside-"));
     temporaryRoots.push(outsideRoot);
