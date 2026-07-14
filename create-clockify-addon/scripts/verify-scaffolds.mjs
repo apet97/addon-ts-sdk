@@ -1,7 +1,17 @@
-import { execFileSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { execFileSync, spawn } from "node:child_process";
+import { once } from "node:events";
+import {
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
+import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { setTimeout as sleep } from "node:timers/promises";
 import { fileURLToPath } from "node:url";
 
 const root = fileURLToPath(new URL("../..", import.meta.url));
@@ -123,6 +133,180 @@ ${runtimeProbe}
 `;
 }
 
+async function availablePort() {
+  const server = createServer();
+  server.listen(0, "127.0.0.1");
+  await once(server, "listening");
+  const address = server.address();
+  if (!address || typeof address === "string") {
+    server.close();
+    throw new Error("Could not reserve a local port for Wrangler.");
+  }
+  await new Promise((resolve, reject) => {
+    server.close((error) => (error ? reject(error) : resolve()));
+  });
+  return address.port;
+}
+
+function captureChildOutput(child) {
+  let output = "";
+  const append = (chunk) => {
+    output = `${output}${chunk}`.slice(-32_000);
+  };
+  child.stdout.setEncoding("utf8").on("data", append);
+  child.stderr.setEncoding("utf8").on("data", append);
+  return () => output;
+}
+
+async function terminateChild(child) {
+  if (child.exitCode !== null || child.signalCode !== null) return;
+  const closed = once(child, "close");
+  child.kill("SIGTERM");
+  const graceful = await Promise.race([
+    closed.then(() => true),
+    sleep(5_000).then(() => false),
+  ]);
+  if (graceful) return;
+  child.kill("SIGKILL");
+  await closed;
+}
+
+async function waitForWorker(origin, child, readOutput, readSpawnError) {
+  const deadline = Date.now() + 30_000;
+  while (Date.now() < deadline) {
+    const spawnError = readSpawnError();
+    if (spawnError) throw spawnError;
+    if (child.exitCode !== null || child.signalCode !== null) {
+      throw new Error(
+        `Wrangler exited before becoming ready.\n${readOutput()}`,
+      );
+    }
+    try {
+      await fetch(`${origin}/manifest`, { signal: AbortSignal.timeout(1_000) });
+      return;
+    } catch {
+      await sleep(100);
+    }
+  }
+  throw new Error(
+    `Timed out waiting for Wrangler at ${origin}.\n${readOutput()}`,
+  );
+}
+
+async function verifyWorkerThroughWrangler(directory, variant) {
+  const port = await availablePort();
+  const origin = `http://127.0.0.1:${port}`;
+  const wrangler = join(
+    directory,
+    "node_modules",
+    "wrangler",
+    "bin",
+    "wrangler.js",
+  );
+  const child = spawn(
+    process.execPath,
+    [
+      wrangler,
+      "dev",
+      "src/index.ts",
+      "--ip",
+      "127.0.0.1",
+      "--port",
+      String(port),
+      "--compatibility-date",
+      "2026-07-12",
+      "--var",
+      "PUBLIC_BASE_URL:https://generated-addon.example",
+      "--var",
+      "CLOCKIFY_PARENT_ORIGIN:https://app.clockify.me",
+      "--var",
+      "ALLOW_LOCAL_REQUEST_ORIGIN:false",
+      "--var",
+      "ALLOW_EPHEMERAL_STORAGE:false",
+    ],
+    {
+      cwd: directory,
+      env: { ...process.env, WRANGLER_SEND_METRICS: "false" },
+      stdio: ["ignore", "pipe", "pipe"],
+    },
+  );
+  const readOutput = captureChildOutput(child);
+  let spawnError;
+  child.once("error", (error) => {
+    spawnError = error;
+  });
+
+  const request = async (path, expectedStatus) => {
+    const response = await fetch(`${origin}${path}`, {
+      signal: AbortSignal.timeout(5_000),
+    });
+    const body = await response.text();
+    if (response.status !== expectedStatus) {
+      throw new Error(
+        `${variant.name} ${path}: expected HTTP ${expectedStatus}, received ${response.status}.\n` +
+          `Body: ${body}\nWrangler output:\n${readOutput()}`,
+      );
+    }
+    return body;
+  };
+
+  try {
+    await waitForWorker(origin, child, readOutput, () => spawnError);
+    const manifest = JSON.parse(await request("/manifest", 200));
+    const expectedLifecycle = variant.features === "all" ? 2 : 0;
+    const expectedWebhooks = variant.features === "all" ? 1 : 0;
+    if (
+      (manifest.components?.length ?? 0) !== 1 ||
+      (manifest.lifecycle?.length ?? 0) !== expectedLifecycle ||
+      (manifest.webhooks?.length ?? 0) !== expectedWebhooks
+    ) {
+      throw new Error(`${variant.name}: unexpected workerd manifest shape.`);
+    }
+    await request("/missing", 404);
+    await request("/component", 401);
+    console.log(
+      `${variant.name}: real workerd routes returned /manifest 200, /missing 404, /component 401.`,
+    );
+  } finally {
+    await terminateChild(child);
+  }
+}
+
+function filesRecursively(directory) {
+  return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+    const fullPath = join(directory, entry.name);
+    return entry.isDirectory() ? filesRecursively(fullPath) : [fullPath];
+  });
+}
+
+function verifyWorkerBundle(bundleDirectory, variant) {
+  const javascriptFiles = filesRecursively(bundleDirectory).filter((file) =>
+    file.endsWith(".js"),
+  );
+  if (javascriptFiles.length === 0) {
+    throw new Error(
+      `${variant.name}: Wrangler dry-run did not emit a JavaScript bundle.`,
+    );
+  }
+  const bundle = javascriptFiles
+    .map((file) => readFileSync(file, "utf8"))
+    .join("\n");
+  for (const [description, pattern] of [
+    ["runtime string code generation", /\b(?:eval|new\s+Function)\s*\(/u],
+    ["AJV compileSchema", /\bcompileSchema\b/u],
+    ["AJV CodeGen", /\bCodeGen\b/u],
+  ]) {
+    if (pattern.test(bundle)) {
+      throw new Error(
+        `${variant.name}: bundled Worker contains ${description}.`,
+      );
+    }
+  }
+  console.log(
+    `${variant.name}: bundled Worker contains no runtime AJV compiler or string eval.`,
+  );
+}
+
 try {
   const tarball = packWorkspace("@apet97/clockify-addon-sdk");
   const creatorTarball = packWorkspace("create-clockify-addon");
@@ -150,6 +334,7 @@ try {
       stdio: "inherit",
     });
     if (variant.runtime === "worker") {
+      const bundleDirectory = join(directory, ".wrangler-verify-bundle");
       execFileSync(
         "npm",
         [
@@ -162,6 +347,8 @@ try {
           variant.name,
           "--compatibility-date",
           "2026-07-12",
+          "--outdir",
+          bundleDirectory,
           "--dry-run",
         ],
         {
@@ -170,6 +357,8 @@ try {
           stdio: "inherit",
         },
       );
+      verifyWorkerBundle(bundleDirectory, variant);
+      await verifyWorkerThroughWrangler(directory, variant);
     }
     const probe = join(directory, "verify-runtime.mjs");
     writeFileSync(probe, runtimeProbeSource(variant));
@@ -180,7 +369,7 @@ try {
   }
 
   console.log(
-    "verify:scaffolds OK - packed creator and SDK execute Node/Worker minimal/all projects with valid manifests, Worker dry-runs, and fail-closed routes.",
+    "verify:scaffolds OK - packed creator and SDK execute Node/Worker minimal/all projects with valid manifests, real workerd routes, Worker dry-runs, and fail-closed routes.",
   );
 } finally {
   rmSync(temp, { recursive: true, force: true });

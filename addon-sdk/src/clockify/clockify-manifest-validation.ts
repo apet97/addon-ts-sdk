@@ -1,7 +1,10 @@
-import Ajv from "ajv-draft-04";
-import type { AnySchema, ErrorObject, ValidateFunction } from "ajv";
-import { clockifyManifestSchemas } from "./generated/manifest-schemas";
 import type { ClockifyManifest, ClockifySchemaVersion } from "./clockify-manifest";
+import {
+  validateManifest1_2,
+  validateManifest1_3,
+  validateManifest1_4,
+  validateManifest1_5,
+} from "./generated/manifest-validators";
 
 /** A normalized manifest-validation issue suitable for logs and developer tooling. */
 export interface ClockifyManifestValidationIssue {
@@ -27,39 +30,36 @@ export class ClockifyManifestValidationError extends Error {
   }
 }
 
-const ajv = new Ajv({ allErrors: true, strict: false });
-ajv.addFormat("uri", {
-  type: "string",
-  validate(value: string) {
-    try {
-      new URL(value);
-      return true;
-    } catch {
-      return false;
-    }
-  },
-});
-const validators = new Map<ClockifySchemaVersion, ValidateFunction>();
+interface GeneratedManifestValidationError {
+  readonly instancePath: string;
+  readonly schemaPath: string;
+  readonly keyword: string;
+  readonly message?: string;
+}
+
+interface GeneratedManifestValidator {
+  (value: unknown): boolean;
+  readonly errors?: readonly GeneratedManifestValidationError[] | null;
+}
+
+const validatorsByVersion: Readonly<Record<ClockifySchemaVersion, GeneratedManifestValidator>> = {
+  "1.2": validateManifest1_2 as GeneratedManifestValidator,
+  "1.3": validateManifest1_3 as GeneratedManifestValidator,
+  "1.4": validateManifest1_4 as GeneratedManifestValidator,
+  "1.5": validateManifest1_5 as GeneratedManifestValidator,
+};
 
 function isSchemaVersion(value: unknown): value is ClockifySchemaVersion {
   return value === "1.2" || value === "1.3" || value === "1.4" || value === "1.5";
 }
 
-function normalizeIssue(error: ErrorObject): ClockifyManifestValidationIssue {
+function normalizeIssue(error: GeneratedManifestValidationError): ClockifyManifestValidationIssue {
   return {
     instancePath: error.instancePath,
     schemaPath: error.schemaPath,
     keyword: error.keyword,
     message: error.message ?? "schema validation failed",
   };
-}
-
-function validatorFor(version: ClockifySchemaVersion): ValidateFunction {
-  const existing = validators.get(version);
-  if (existing) return existing;
-  const validator = ajv.compile(clockifyManifestSchemas[version] as AnySchema);
-  validators.set(version, validator);
-  return validator;
 }
 
 /** Validates an unknown value against the schema named by its `schemaVersion` field. */
@@ -93,7 +93,7 @@ export function validateClockifyManifest(value: unknown): ClockifyManifestValida
     };
   }
 
-  const validator = validatorFor(version);
+  const validator = validatorsByVersion[version];
   if (validator(value))
     return { ok: true, value: value as ClockifyManifest<ClockifySchemaVersion> };
   return { ok: false, issues: (validator.errors ?? []).map(normalizeIssue) };
