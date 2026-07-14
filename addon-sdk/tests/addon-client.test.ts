@@ -242,6 +242,61 @@ describe("ClockifyAddonClient", () => {
     await expect(timed.getSettings("w1")).rejects.toThrow(/timed out/i);
   });
 
+  it.each([
+    ["missing", undefined],
+    ["empty", ""],
+    ["whitespace-only", " \t "],
+  ])("uses bounded default backoff when retry-after is %s", async (_label, retryAfter) => {
+    let attempt = 0;
+    const fetch = vi.fn<typeof globalThis.fetch>().mockImplementation(async () => {
+      attempt += 1;
+      if (attempt < 7) {
+        return new Response("busy", {
+          status: 503,
+          headers: retryAfter === undefined ? undefined : { "retry-after": retryAfter },
+        });
+      }
+      return new Response("{}", { status: 200 });
+    });
+    const delays: number[] = [];
+    const client = new ClockifyAddonClient({
+      token: "token",
+      backendUrl: "https://api.example/api",
+      fetch,
+      maxAttempts: 7,
+      sleep: async (delay) => {
+        delays.push(delay);
+      },
+    });
+
+    await client.getSettings("w1");
+
+    expect(fetch).toHaveBeenCalledTimes(7);
+    expect(delays).toEqual([100, 200, 400, 800, 1_600, 2_000]);
+  });
+
+  it("honors a zero retry-after header", async () => {
+    const fetch = vi
+      .fn<typeof globalThis.fetch>()
+      .mockResolvedValueOnce(new Response("busy", { status: 503, headers: { "retry-after": "0" } }))
+      .mockResolvedValueOnce(new Response("{}", { status: 200 }));
+    const delays: number[] = [];
+    const client = new ClockifyAddonClient({
+      token: "token",
+      backendUrl: "https://api.example/api",
+      fetch,
+      maxAttempts: 2,
+      sleep: async (delay) => {
+        delays.push(delay);
+      },
+    });
+
+    await client.getSettings("w1");
+
+    expect(fetch).toHaveBeenCalledTimes(2);
+    expect(delays).toEqual([0]);
+  });
+
   it("aborts an in-flight request when the caller aborts", async () => {
     const controller = new AbortController();
     const fetch = vi.fn<typeof globalThis.fetch>(

@@ -4,6 +4,8 @@ All notable changes to this SDK are recorded here.
 
 ## Unreleased
 
+- Apply the bounded exponential backoff when a retryable response omits the Retry-After header instead of retrying immediately.
+
 ## 1.0.3 - 2026-07-14
 
 - Fail closed when raw webhook verification lacks a fixed stored token or nonblank signed

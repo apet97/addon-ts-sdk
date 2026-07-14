@@ -50,7 +50,8 @@ function requestUrl(base: URL, segments: readonly string[]): URL {
 }
 
 function retryDelay(response: Response, attempt: number): number {
-  const seconds = Number(response.headers.get("retry-after"));
+  const header = response.headers.get("retry-after");
+  const seconds = header === null || header.trim() === "" ? Number.NaN : Number(header);
   if (Number.isFinite(seconds) && seconds >= 0) return Math.min(seconds * 1000, 30_000);
   return Math.min(100 * 2 ** (attempt - 1), 2_000);
 }
