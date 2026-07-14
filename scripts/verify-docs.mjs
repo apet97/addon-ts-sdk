@@ -14,6 +14,12 @@ export const BUILDER_DOCS = Object.freeze([
   "docs/guides/troubleshooting.md",
 ]);
 
+export const STALE_CLAIMS = Object.freeze([
+  "does not add a Clockify REST client",
+  "No REST client or token exchange client is included",
+  "not published to the npm registry",
+]);
+
 const SKIP_DIRECTORIES = new Set([
   ".git",
   ".superpowers",
@@ -630,6 +636,7 @@ export async function collectDocumentationErrors(
     index = "docs/README.md",
     requiredFromIndex = BUILDER_DOCS,
     repositoryContracts = false,
+    staleClaims = [],
   } = {},
 ) {
   const absoluteRoot = path.resolve(root);
@@ -643,6 +650,11 @@ export async function collectDocumentationErrors(
     contents.set(file, await requiredText(absoluteRoot, file));
 
   for (const [sourceFile, source] of contents) {
+    for (const claim of staleClaims) {
+      if (source.includes(claim)) {
+        errors.push(`${sourceFile}: stale claim: ${claim}`);
+      }
+    }
     const targets = new Set();
     for (const link of markdownLinks(source)) {
       const { href } = link;
@@ -752,6 +764,7 @@ async function main() {
   const errors = await collectDocumentationErrors(root, {
     documents,
     repositoryContracts: true,
+    staleClaims: STALE_CLAIMS,
   });
   if (errors.length > 0) {
     console.error("Documentation verification failed:");

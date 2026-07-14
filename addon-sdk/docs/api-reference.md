@@ -5,19 +5,23 @@ layered SDK for Clockify add-ons. It includes Marketplace token/settings transpo
 contracts, secure UI messaging, and runtime manifest validation without duplicating the separate
 Clockify entity REST SDK.
 
+The SDK is published on npm and installs with `npm install @apet97/clockify-addon-sdk`. This page
+highlights the stable boundaries and commonly used symbols; the generated
+[public API snapshot](../public-api.snapshot.md) is the exhaustive declaration record.
+
 ## Entry Points
 
-| Import path                                   | Purpose                                                                |
-| --------------------------------------------- | ---------------------------------------------------------------------- |
-| `@apet97/clockify-addon-sdk`                  | Runtime-neutral request/response, Clockify, validation and client APIs |
-| `@apet97/clockify-addon-sdk/clockify`         | Clockify-only builders, models, lifecycle types, and verification      |
-| `@apet97/clockify-addon-sdk/adapters`         | Node `http`, Express-like, Fetch, and body-limit adapter helpers       |
-| `@apet97/clockify-addon-sdk/adapters/node`    | Node `http` adapter only                                               |
-| `@apet97/clockify-addon-sdk/adapters/express` | Structurally typed Express adapter                                     |
-| `@apet97/clockify-addon-sdk/adapters/fetch`   | Fetch/Worker adapter only                                              |
-| `@apet97/clockify-addon-sdk/client`           | Add-on token exchange, settings, and authenticated transport           |
-| `@apet97/clockify-addon-sdk/ui`               | Exact-origin browser bridge and preference helpers                     |
-| `@apet97/clockify-addon-sdk/testing`          | RS256 test-key and token-signing helpers                               |
+| Import path                                   | Purpose                                                                   |
+| --------------------------------------------- | ------------------------------------------------------------------------- |
+| `@apet97/clockify-addon-sdk`                  | Runtime-neutral shared routing, Clockify, client, and `testing` namespace |
+| `@apet97/clockify-addon-sdk/clockify`         | Clockify-only builders, models, lifecycle types, and verification         |
+| `@apet97/clockify-addon-sdk/adapters`         | Legacy Node-oriented aggregate of all adapters and body-limit helpers     |
+| `@apet97/clockify-addon-sdk/adapters/node`    | Node `http` adapter only                                                  |
+| `@apet97/clockify-addon-sdk/adapters/express` | Structurally typed Express adapter                                        |
+| `@apet97/clockify-addon-sdk/adapters/fetch`   | Fetch/Worker adapter only                                                 |
+| `@apet97/clockify-addon-sdk/client`           | Add-on token exchange, settings, and authenticated transport              |
+| `@apet97/clockify-addon-sdk/ui`               | Exact-origin browser bridge and preference helpers                        |
+| `@apet97/clockify-addon-sdk/testing`          | RS256 test-key and token-signing helpers                                  |
 
 ## Core Runtime
 
@@ -103,7 +107,8 @@ Clockify entity REST SDK.
 ## Validation, Security, Storage, and Client
 
 - `validateClockifyManifest()` and `assertClockifyManifest()` use the embedded draft-04 schema named
-  by `schemaVersion`.
+  by `schemaVersion`. Validation dispatches to generated static validators for 1.2-1.5; it does
+  not compile AJV schemas or generate code at request time, so the same path runs under Workers.
 - `buildClockifySecurityHeaders()`, `createClockifyHtmlResponse()`, and
   `createClockifyJsonResponse()` supply no-store browser response defaults.
 - `resolveClockifyPublicOrigin()` requires configured HTTPS except for explicit localhost opt-in.
@@ -114,5 +119,6 @@ Clockify entity REST SDK.
 - `ClockifyIdempotencyLeaseStore` and `runClockifyIdempotentWebhook()` define owner-specific webhook
   processing.
 - `ClockifyAddonClient` uses `X-Addon-Token`, encoded path segments, abort/timeout handling,
-  safe-read retries, and mutation replay only after confirmed HTTP 429.
+  safe-read retries, and mutation replay only after confirmed HTTP 429. Its public operations are
+  `exchangeUserToken()`, `getSettings()`, `updateSettings()`, and generic `request()`.
 - `/ui` exports `createClockifyBridge()`, preference application, and locale-aware date formatting.

@@ -4,6 +4,22 @@ This package ships both ESM and CommonJS entry points. The `verify:dist` gate im
 formats and boots the README quick start, so dependency upgrades must preserve those package-format
 guarantees.
 
+## Published dependency boundary
+
+The published package currently declares `jose`, `ajv`, and `ajv-draft-04` as direct
+dependencies. Express is a separate optional peer. Consumers therefore install the three declared
+dependencies even though their runtime roles differ:
+
+- Signing and verification paths dynamically import ESM-only `jose@6`.
+- Repository code generation uses AJV Draft-04 and AJV standalone output to create the committed
+  schema 1.2-1.5 validators.
+- Runtime manifest validation imports those static generated validators. It does not import an AJV
+  compiler, call `eval` or `Function`, or generate code at request time, which keeps the validation
+  path compatible with Workers that prohibit string code generation.
+
+Do not describe the package as dependency-free or as loading AJV at runtime. Dependency placement is
+a package decision separate from the Worker-safe runtime implementation.
+
 ## `jose`
 
 SDK 1.x uses `jose@6` while preserving CommonJS support. `jose@6` is ESM-only (`"type": "module"`
@@ -11,18 +27,13 @@ with no `require` export condition), so SDK runtime code must not statically imp
 also build to CommonJS. Use dynamic `import("jose")` inside the signing and verification paths
 instead.
 
-The public SDK no longer exposes `jose`'s removed `KeyLike` type. Use the SDK-owned aliases
+The public SDK does not expose `jose`'s removed `KeyLike` type. Use the SDK-owned aliases
 `ClockifyCryptoKey`, `ClockifyPublicKeyInput`, and `ClockifyPrivateKeyInput`, which map to the key
 inputs accepted by `jose@6`.
 
-Spike result on 2026-06-23:
-
-- `npm run type-check`, `npm run build`, `npm run verify:public-api`, `npm run verify:dist`,
-  `npm run verify:package-lint`, and `npm run verify:package-consumer` passed with `jose@6.2.3`.
-- Direct `require("jose")` still emits an experimental warning on Node 22.12.0 and is clean on
-  Node 22.13.0.
-- The packed SDK's installed ESM/CJS runtime consumers and TypeScript ESM/CJS consumers passed under
-  Node 22.12.0 and Node 22.13.0 because the SDK uses dynamic imports internally.
+`npm run verify:package-consumer` installs the packed SDK into runtime and TypeScript ESM/CJS
+consumers and exercises the signing and verification path. Source development starts at Node
+22.13.0; the published package runtime contract remains Node 22 or newer.
 
 Do not reintroduce static `jose` runtime imports in CJS-built SDK files unless the package drops its
 CommonJS build or raises its runtime floor with explicit owner approval.

@@ -367,6 +367,27 @@ describe("published distribution docs", () => {
     expect(recipe).toContain("getExpectedWebhookAuthToken");
     expect(recipe).toContain("X-Addon-Token");
     expect(recipe).toContain("server-side");
-    expect(recipe).toContain("does not add a Clockify REST client");
+    expect(recipe).toContain("ClockifyAddonClient");
+    expect(recipe).toContain("Marketplace-specific");
+    expect(recipe).toContain("entity-specific");
+    expect(recipe).not.toContain("does not add a Clockify REST client");
+  });
+
+  it("documents current routing and manifest-builder reference behavior", () => {
+    const routing = readFileSync(resolve(packageRoot, "docs", "routing.md"), "utf8");
+    const manifestBuilders = readFileSync(
+      resolve(packageRoot, "docs", "manifest-builders.md"),
+      "utf8",
+    );
+    const javaMigration = readFileSync(resolve(packageRoot, "docs", "java-migration.md"), "utf8");
+    const typeScriptMigration = javaMigration.split("### TypeScript")[1];
+
+    expect(routing).toContain("An unknown path returns `404 Not Found`");
+    expect(routing).toContain(
+      "A known path requested with the wrong method returns `405 Method Not Allowed`",
+    );
+    expect(manifestBuilders).toContain("ClockifyManifest.v1_5Builder()");
+    expect(typeScriptMigration).toContain("ClockifyManifest.v1_5Builder()");
+    expect(typeScriptMigration).toContain("ClockifyComponent.v1_5Builder()");
   });
 });

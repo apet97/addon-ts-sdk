@@ -464,6 +464,51 @@ describe("documentation verification", () => {
     expect(errors.join("\n")).toContain("docs/unlinked.md");
   });
 
+  it("exports the active stale documentation claims", async () => {
+    const verifier = (await import("../../scripts/verify-docs.mjs")) as {
+      readonly STALE_CLAIMS?: readonly string[];
+    };
+
+    expect(verifier.STALE_CLAIMS).toEqual([
+      "does not add a Clockify REST client",
+      "No REST client or token exchange client is included",
+      "not published to the npm registry",
+    ]);
+  });
+
+  it("reports a configured stale claim in an active document", async () => {
+    const root = await fixture({
+      "docs/README.md": "# Docs\n",
+      "docs/guide.md": "# Guide\n\nThis SDK does not add a Clockify REST client.\n",
+    });
+
+    await expect(
+      collectDocumentationErrors(root, {
+        documents: ["docs/README.md", "docs/guide.md"],
+        requiredFromIndex: [],
+        staleClaims: ["does not add a Clockify REST client"],
+      }),
+    ).resolves.toEqual(["docs/guide.md: stale claim: does not add a Clockify REST client"]);
+  });
+
+  it("does not scan excluded historical or upstream documents for stale claims", async () => {
+    const stale = "This SDK does not add a Clockify REST client.\n";
+    const root = await fixture({
+      "docs/README.md": "# Docs\n",
+      "docs/archive/old.md": stale,
+      "docs/superpowers/plan.md": stale,
+      "MARKETPLACE_DOCS/01-upstream.md": stale,
+      ".superpowers/sdd/task.md": stale,
+    });
+
+    await expect(
+      collectDocumentationErrors(root, {
+        requiredFromIndex: [],
+        staleClaims: ["does not add a Clockify REST client"],
+      }),
+    ).resolves.toEqual([]);
+  });
+
   it("excludes local execution metadata from active markdown discovery", async () => {
     const root = await fixture({
       ".superpowers/sdd/task-3-brief.md": "# Task\n\n[Local only](missing.md)\n",

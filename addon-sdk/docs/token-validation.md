@@ -39,11 +39,18 @@ The signature parser checks that:
 2. Issuer is exactly `clockify`.
 3. Subject matches the manifest `key` / `addonKey`.
 4. Type claim is exactly `addon`.
-5. Token has not expired.
+5. An `exp` claim, when present, has not expired.
 
-The parser verifies tokens only. It does not exchange installation tokens, call Clockify APIs, or
-store secrets; add-on backends should keep installation tokens server-side and send API requests
-with the `X-Addon-Token` header described in the Marketplace docs.
+`ClockifySignatureParser.parseClaims()` does not require an `exp` claim by itself.
+`verifyClockifyComponentRequest()` and `verifyClockifyLifecycleRequest()` default
+`requireExpiration` to `true`, so their normal request paths reject a missing expiration as well as
+an expired token. The webhook verifier requires nonblank signed installation context but does not
+add a missing-expiration requirement; an expired `exp`, if supplied, still fails signature parsing.
+Low-level callers can set `requireExpiration` on `verifyClockifyToken()`.
+
+The parser verifies tokens only; it does not store secrets or perform transport. The separate
+`ClockifyAddonClient` uses a server-held installation token for Marketplace-specific token
+exchange, structured settings, and generic authenticated requests with `X-Addon-Token`.
 
 `createClockifySignatureParser(addonKey)` uses Clockify's published platform public key by default.
 Pass `{ publicKey }` only when targeting a non-production Clockify environment with a different
@@ -73,15 +80,15 @@ Use `getClockifyHeader(headers, name)` for case-insensitive request header looku
 easy to miss:
 
 - webhook event header matches the expected event
-- token `workspaceId` matches the request/installation context
-- token `addonId` matches the stored add-on installation
+- signed `workspaceId` and `addonId` are nonblank
+- token context matches `expectedWorkspaceId` and `expectedAddonId` when the caller supplies them
 - required stored webhook `authToken` matches the `clockify-signature` header
 
 Use `verifyClockifyWebhookRequest()` for webhook routes because it requires `expectedEventType`.
 The raw verifier also requires a fixed, nonblank `expectedWebhookAuthToken`; it rejects valid signed
 tokens that do not contain nonblank `workspaceId` and `addonId` installation claims.
 `verifyClockifyRequest()` remains available as a lower-level helper for advanced cases that need a
-custom policy.
+custom signature-header, event, or context policy. It does not require expiration presence.
 Plain JavaScript callers that omit `expectedEventType` or the fixed stored webhook token receive a
 typed failure result rather than an accidentally permissive verification result.
 
@@ -104,7 +111,8 @@ For common route shapes, use the narrower wrappers:
   matches the payload `workspaceId`/`addonId` to the verified claims before the handler runs.
 - `withClockifyVerifiedWebhookRequest()` requires `expectedEventType`; it can also call
   `getExpectedWebhookAuthToken({ workspaceId, addonId, eventType })` after the first JWT pass and
-  installation-context check, then verify the resolved stored token before invoking the handler.
+  event plus nonblank installation-context checks, then verify the resolved stored token before
+  invoking the handler. Invalid or contextless requests do not reach the lookup.
   Configure exactly one token source for every route: either a fixed `expectedWebhookAuthToken` or
   the lookup callback, never neither or both.
 
