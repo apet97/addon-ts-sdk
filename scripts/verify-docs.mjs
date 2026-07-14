@@ -22,7 +22,10 @@ export const STALE_CLAIMS = Object.freeze([
 
 const SKIP_DIRECTORIES = new Set([
   ".git",
+  ".remember",
   ".superpowers",
+  ".worktrees",
+  "addon-java-sdk-main",
   "node_modules",
   "dist",
   "coverage",
@@ -35,6 +38,7 @@ function posix(value) {
 function excluded(relative) {
   return (
     relative === "GOAL.md" ||
+    relative === "NEW_SESSION_PROMPT.md" ||
     relative === "verification_report.md" ||
     relative === "addon-sdk/public-api.snapshot.md" ||
     relative.startsWith("docs/superpowers/") ||

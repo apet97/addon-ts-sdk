@@ -511,7 +511,13 @@ describe("documentation verification", () => {
 
   it("excludes local execution metadata from active markdown discovery", async () => {
     const root = await fixture({
+      ".remember/now.md": "# Local memory\n\n[Local only](missing.md)\n",
       ".superpowers/sdd/task-3-brief.md": "# Task\n\n[Local only](missing.md)\n",
+      ".worktrees/other/docs/guide.md": "# Other worktree\n",
+      "addon-java-sdk-main/readme.md": "# Upstream checkout\n",
+      "GOAL.md": "# Local goal\n",
+      "NEW_SESSION_PROMPT.md": "# Local prompt\n",
+      "verification_report.md": "# Local report\n",
       "docs/README.md": "# Docs\n",
       "docs/guide.md": "# Guide\n",
     });
