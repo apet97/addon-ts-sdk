@@ -106,6 +106,11 @@ export class ClockifyAddonClient {
         });
         const retryable = response.status === 429 || (safeRead && response.status >= 500);
         if (retryable && attempt < this.maxAttempts) {
+          try {
+            await response.body?.cancel();
+          } catch {
+            // Discarded-response cleanup must not replace the intended retry.
+          }
           await this.sleep(retryDelay(response, attempt));
           continue;
         }

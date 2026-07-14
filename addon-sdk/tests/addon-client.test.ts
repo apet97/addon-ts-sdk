@@ -127,6 +127,44 @@ describe("ClockifyAddonClient", () => {
     expect(mutationFetch).toHaveBeenCalledTimes(1);
   });
 
+  it("cancels a discarded retry response before sleeping and ignores cancellation failures", async () => {
+    const events: string[] = [];
+    const discardedBody = new ReadableStream({
+      cancel: () => {
+        events.push("cancel");
+        return Promise.reject(new Error("cleanup failed"));
+      },
+    });
+    const fetch = vi
+      .fn<typeof globalThis.fetch>()
+      .mockImplementationOnce(async () => {
+        events.push("fetch first");
+        return new Response(discardedBody, { status: 429 });
+      })
+      .mockImplementationOnce(async () => {
+        events.push("fetch second");
+        return new Response('{"updated":true}', {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        });
+      });
+    const client = new ClockifyAddonClient({
+      token: "token",
+      backendUrl: "https://api.example/api",
+      fetch,
+      sleep: async () => {
+        events.push("sleep");
+      },
+    });
+
+    await expect(
+      client.updateSettings<{ updated: boolean }>("w1", [{ id: "one", value: true }]),
+    ).resolves.toEqual({ updated: true });
+    events.push("success");
+
+    expect(events).toEqual(["fetch first", "cancel", "sleep", "fetch second", "success"]);
+  });
+
   it("retries a safe network failure and exposes generic authenticated requests", async () => {
     const fetch = vi
       .fn<typeof globalThis.fetch>()
