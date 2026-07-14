@@ -2,27 +2,34 @@
 
 ## Published versions
 
-The latest registry publication confirmed before the current release candidate remains:
+The latest registry publication is:
 
-- `@apet97/clockify-addon-sdk@1.0.2`
-- `create-clockify-addon@1.0.2`
+- `@apet97/clockify-addon-sdk@1.0.3`
+- `create-clockify-addon@1.0.3`
 
 Install the SDK with `npm install @apet97/clockify-addon-sdk` or create a project with
 `npm create clockify-addon@latest`. npm versions are immutable: every future release requires a
 version change and explicit npm-owner approval for that exact publish attempt.
 
-## 1.0.3 release candidate (not published)
+## 1.0.3 release evidence
 
-The workspace manifests and lockfile are prepared for these candidate versions:
+Release source commit `303f9c6a732707b572f418b592e75575811a7447` hardens webhook token/context
+verification, client timeout and URL boundaries, and discarded retry-response cleanup, and includes
+the `typescript-eslint` 8.64 maintenance update. TypeScript remains on major 6.
 
-- `@apet97/clockify-addon-sdk@1.0.3`
-- `create-clockify-addon@1.0.3`
+Before publication, `npm run release:verify` passed with 39 test files and 316 tests, thresholded
+coverage, package/scaffold execution, live schema parity, zero-vulnerability production and full
+audits, and both publish dry runs. SDK CI run `29299563485` then passed on Node 22.13.0 and Node 24.x.
 
-This candidate hardens webhook token/context verification, client timeout and URL boundaries, and
-discarded retry-response cleanup, and includes the `typescript-eslint` 8.64 maintenance update. It
-is not yet an npm publication, Git tag, Marketplace submission, or fresh authenticated
-developer-workspace result. The final-SHA receipt below remains historical evidence for its recorded
-SHA only; the release closeout must record new registry and live evidence separately.
+The exact tarballs used for the authenticated developer-workspace pass were published in SDK-first
+order and retained these npm SHA-1 values:
+
+- `@apet97/clockify-addon-sdk@1.0.3`: `933248cf9f3b4cfc3b66391a61615dcd3518591b`
+- `create-clockify-addon@1.0.3`: `c18c65a9ffcd4fc1003b86cfb7fd0d6d5c1531b7`
+
+Post-publication `npm run verify:registry` installed and executed both exact public versions. The
+fresh live receipt is recorded in `docs/marketplace-coverage.md`. No Git tag or Marketplace
+submission was created.
 
 ## Future release checklist
 

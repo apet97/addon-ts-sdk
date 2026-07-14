@@ -11,7 +11,7 @@ This matrix maps the vendored `MARKETPLACE_DOCS` snapshot to SDK behavior. A row
 | UI components            | Generated component builders and hardened HTML responses                                                                | builder, security and creator suites                |
 | Webhooks                 | Fixed-token raw verification, exactly-one-source wrappers, signed installation context, 1 MiB limits and owner leases   | request-verification and webhook-idempotency suites |
 | Structured settings      | Typed builders plus claim-driven GET/PATCH clients with bounded timeouts and retry-response cancellation                | settings and add-on-client suites                   |
-| Developer account        | Application responsibility; authenticated installation remains outside deterministic repo gates                         | final-SHA `e74e1f7` workspace receipt below         |
+| Developer account        | Application responsibility; authenticated installation remains outside deterministic repo gates                         | 1.0.3 `303f9c6` workspace receipt below             |
 | Authentication           | RS256, issuer/type/subject pinning, expiry profiles and context matching                                                | request-verification suite                          |
 | Environments and regions | Absolute HTTPS/canonical loopback claim URLs, credential-free direct clients, encoded segments and fail-closed origins  | request-wire, client and origin suites              |
 | Window events            | Source/origin-checked subscriptions and typed actions                                                                   | UI suite                                            |
@@ -28,13 +28,50 @@ the caller supplies `installedAt`; omitting it intentionally performs unconditio
 cleanup. The generated development scaffold keeps that normal uninstall cleanup and therefore does
 not claim protection from delayed events belonging to an earlier installation.
 
-## 1.0.3 candidate evidence boundary
+## 1.0.3 evidence boundary
 
-The matrix above includes the current 1.0.3 candidate behavior. Repository API, type, unit,
-documentation, package, scaffold, and preflight checks can prove the local candidate, but they do
-not establish npm publication, Marketplace submission, or a fresh authenticated Clockify pass. The
-receipt below remains scoped to its recorded SHA; release closeout must add separate live and exact
-registry evidence for 1.0.3.
+The current receipt proves release source commit `303f9c6a732707b572f418b592e75575811a7447`, the
+exact packed artifacts identified below, their authenticated developer-workspace behavior, and
+their subsequent installation from the public npm registry. It does not prove a Marketplace
+submission, future source changes, or future package versions.
+
+## 1.0.3 sanitized live and registry receipt (2026-07-14)
+
+The creator tarball generated a disposable Node all-features project, and the project installed the
+SDK tarball from the same clean release source. The packed SDK validated its schema 1.5 manifest
+with exactly one component, two lifecycle hooks, and one webhook. Before installation, runtime
+preflight confirmed an unknown route returned 404, an unsigned component request returned 401, and
+production configuration failed closed without an explicit public origin.
+
+The authenticated Firefox developer workspace accepted the manifest. The signed component rendered
+its expected HTML with CSP present and no `X-Frame-Options` response header. The redacting request
+counter retained only this successful sequence:
+
+```text
+GET  /manifest             200
+POST /lifecycle/installed  204
+GET  /component            200
+POST /webhooks/time-entry  204
+POST /webhooks/time-entry  204
+POST /lifecycle/deleted    204
+```
+
+The two webhook deliveries covered the disposable entry's create/stop updates. The entry was
+deleted, the add-on was uninstalled, and the server, tunnel, proxy, generated project, screenshots,
+packed files, and temporary workspace were removed. The component header check retained booleans
+only. No headers, query strings, request bodies, JWTs, tokens, or tunnel hostname were retained.
+
+The exact live-tested tarballs were then published in SDK-first order and verified from the public
+registry:
+
+- `@apet97/clockify-addon-sdk@1.0.3`: npm SHA-1
+  `933248cf9f3b4cfc3b66391a61615dcd3518591b`
+- `create-clockify-addon@1.0.3`: npm SHA-1
+  `c18c65a9ffcd4fc1003b86cfb7fd0d6d5c1531b7`
+
+`npm run verify:registry` passed exact-version SDK ESM, CommonJS, and TypeScript consumers; creator
+API and CLI execution; installed project generation and type-checking; manifest validation; route
+failures; and production fail-closed behavior.
 
 ## Final-SHA sanitized live receipt (2026-07-12)
 
