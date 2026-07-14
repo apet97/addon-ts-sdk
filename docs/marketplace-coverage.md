@@ -3,21 +3,21 @@
 This matrix maps the vendored `MARKETPLACE_DOCS` snapshot to SDK behavior. A row marked
 "application responsibility" is deliberately not hidden behind an SDK success response.
 
-| Marketplace area         | SDK coverage                                                                                                            | Proof                                               |
-| ------------------------ | ----------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------- |
-| Introduction             | Manifest, runtime, lifecycle, webhook, component, client and UI layers                                                  | API reference and packed scaffolds                  |
-| Quick start              | Packed creator generates Node/Worker minimal/all with valid manifests, fail-closed paths, and compilable Worker entries | executable `verify:scaffolds`                       |
-| Lifecycle                | Typed payload guards, verified wrappers, encrypted storage, and caller-qualified generation deletes                     | lifecycle, creator and installation-store suites    |
-| UI components            | Generated component builders and hardened HTML responses                                                                | builder, security and creator suites                |
-| Webhooks                 | Fixed-token raw verification, exactly-one-source wrappers, signed installation context, 1 MiB limits and owner leases   | request-verification and webhook-idempotency suites |
-| Structured settings      | Typed builders plus claim-driven GET/PATCH clients with bounded timeouts and retry-response cancellation                | settings and add-on-client suites                   |
-| Developer account        | Application responsibility; authenticated installation remains outside deterministic repo gates                         | 1.0.3 `303f9c6` workspace receipt below             |
-| Authentication           | RS256, issuer/type/subject pinning, expiry profiles and context matching                                                | request-verification suite                          |
-| Environments and regions | Absolute HTTPS/canonical loopback claim URLs, credential-free direct clients, encoded segments and fail-closed origins  | request-wire, client and origin suites              |
-| Window events            | Source/origin-checked subscriptions and typed actions                                                                   | UI suite                                            |
-| Development checklist    | Security responses, redaction boundary, package/scaffold/audit gates                                                    | `ci:verify`                                         |
-| Publishing and privacy   | Security and release checklists; no automatic Marketplace submission                                                    | release-readiness and SECURITY                      |
-| Private add-ons          | Same manifest/runtime contract; workspace whitelisting remains a portal responsibility                                  | deployment guide                                    |
+| Marketplace area         | SDK coverage                                                                                                                            | Proof                                               |
+| ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------- |
+| Introduction             | Manifest, runtime, lifecycle, webhook, component, client and UI layers                                                                  | API reference and packed scaffolds                  |
+| Quick start              | Packed creator generates Node/Worker minimal/all with valid manifests, fail-closed paths, and compilable Worker entries                 | executable `verify:scaffolds`                       |
+| Lifecycle                | Typed payload guards, verified wrappers, encrypted storage, and caller-qualified generation deletes                                     | lifecycle, creator and installation-store suites    |
+| UI components            | Generated component builders and hardened HTML responses                                                                                | builder, security and creator suites                |
+| Webhooks                 | Fixed-token raw verification, exactly-one-source wrappers, signed installation context, 1 MiB limits and owner leases                   | request-verification and webhook-idempotency suites |
+| Structured settings      | Typed builders plus claim-driven GET/PATCH clients with bounded timeouts, bounded retry fallback, and response cleanup                  | settings and add-on-client suites                   |
+| Developer account        | Application responsibility; authenticated installation remains outside deterministic repo gates                                         | 1.0.3 `303f9c6` workspace receipt below             |
+| Authentication           | RS256, issuer/type/subject pinning, expiry profiles and context matching                                                                | request-verification suite                          |
+| Environments and regions | Absolute HTTPS/canonical loopback URLs, exact direct-client loopback spellings, encoded nondegenerate segments, and fail-closed origins | request-wire, client and origin suites              |
+| Window events            | Source/origin-checked subscriptions and typed actions                                                                                   | UI suite                                            |
+| Development checklist    | Security responses, redaction boundary, package/scaffold/audit gates                                                                    | `ci:verify`                                         |
+| Publishing and privacy   | Security and release checklists; no automatic Marketplace submission                                                                    | release-readiness and SECURITY                      |
+| Private add-ons          | Same manifest/runtime contract; workspace whitelisting remains a portal responsibility                                                  | deployment guide                                    |
 
 The source URLs and capture markers remain in each vendored document. Network-dependent schema and
 documentation freshness checks stay outside deterministic PR verification.

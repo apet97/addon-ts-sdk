@@ -11,6 +11,23 @@ Install the SDK with `npm install @apet97/clockify-addon-sdk` or create a projec
 `npm create clockify-addon@latest`. npm versions are immutable: every future release requires a
 version change and explicit npm-owner approval for that exact publish attempt.
 
+## 1.0.4 release candidate
+
+The workspace release candidates are:
+
+- `@apet97/clockify-addon-sdk@1.0.4`
+- `create-clockify-addon@1.0.4`
+
+This patch corrects direct-client retry fallback when `Retry-After` is missing or blank, rejects
+empty and dot-only API path segments before fetch/retry handling, and aligns direct HTTP loopback
+configuration with the SDK's canonical-host policy while rejecting noncanonical raw spellings. The
+loopback hostname set is now owned by one private runtime-neutral helper. No public declaration or
+creator scaffold contract changes.
+
+The authenticated 1.0.3 developer-workspace receipt remains historical evidence for that exact
+release source. This candidate makes no new Marketplace lifecycle claim; npm publication evidence
+must be recorded only after the exact registry artifacts are uploaded and executed.
+
 ## 1.0.3 release evidence
 
 Release source commit `303f9c6a732707b572f418b592e75575811a7447` hardens webhook token/context

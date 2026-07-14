@@ -15,10 +15,12 @@ Quick reference for Claude Code and other contributors working in this repositor
   generation guard applies only when a delete caller supplies `installedAt`. Clockify's `DELETED`
   payload has no generation, so the generated unqualified uninstall cleanup is unconditional.
 - Outbound mutations replay only a confirmed 429. Safe reads may retry transient failures; discarded
-  retry response bodies are cancelled before backoff, cancellation failures do not replace the
-  intended retry, and caller aborts are terminal.
+  retry response bodies are cancelled before backoff, missing or blank `Retry-After` values use the
+  bounded exponential fallback, cancellation failures do not replace the intended retry, and caller
+  aborts are terminal.
 - `ClockifyAddonClient` accepts only integer `timeoutMs` values from 1 through 2,147,483,647 and
-  rejects credential-bearing `backendUrl` values.
+  rejects credential-bearing `backendUrl` values. Direct HTTP configuration accepts only exact
+  canonical loopback spellings, and empty or dot-only path segments fail before fetch/retry logic.
 - Draft-04 manifest validation covers vendored schema versions 1.2-1.5. The creator package emits
   fail-closed Node and Worker projects in minimal and all-feature modes; ephemeral installation
   storage is local-development-only.
@@ -97,9 +99,10 @@ Quick reference for Claude Code and other contributors working in this repositor
 - Do not hardcode Clockify API/report/location/screenshot hosts. Claim-derived base URL resolvers
   accept only absolute HTTPS or canonical loopback HTTP URLs without credentials, query strings, or
   fragments; an invalid nonblank preferred `apiUrl` must not fall back to `backendUrl`.
-- Direct `ClockifyAddonClient` configuration rejects credentials in `backendUrl`. Encode every
-  caller-provided path segment, use `X-Addon-Token` rather than `Authorization`, and do not log
-  outbound query strings or credentials.
+- Direct `ClockifyAddonClient` configuration rejects credentials in `backendUrl` and noncanonical
+  HTTP loopback spellings. Reject empty, `.`, and `..` caller-provided path segments before retry
+  handling; encode every accepted segment, use `X-Addon-Token` rather than `Authorization`, and do
+  not log outbound query strings or credentials.
 - Node `http` and Fetch adapters enforce `DEFAULT_MAX_BODY_BYTES` (`1_048_576`) before dispatch and
   return 413 for oversized bodies. Invalid `maxBodyBytes` values should throw configuration errors.
   Express body limits are configured by the host app, not the SDK.
