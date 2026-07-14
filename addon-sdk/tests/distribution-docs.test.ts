@@ -1,10 +1,44 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
 describe("published distribution docs", () => {
   const packageRoot = process.cwd();
   const repoRoot = resolve(packageRoot, "..");
+
+  it("provides a builder-first documentation path", () => {
+    const builderDocs = [
+      "docs/README.md",
+      "docs/getting-started.md",
+      "docs/how-an-addon-works.md",
+    ];
+    for (const file of builderDocs) expect(existsSync(resolve(repoRoot, file))).toBe(true);
+
+    const rootReadme = readFileSync(resolve(repoRoot, "README.md"), "utf8");
+    const index = readFileSync(resolve(repoRoot, "docs/README.md"), "utf8");
+    const gettingStarted = readFileSync(
+      resolve(repoRoot, "docs/getting-started.md"),
+      "utf8",
+    );
+    const lifecycle = readFileSync(
+      resolve(repoRoot, "docs/how-an-addon-works.md"),
+      "utf8",
+    );
+
+    expect(rootReadme).toContain("docs/getting-started.md");
+    expect(rootReadme).toContain("npm create clockify-addon@latest");
+    expect(index).toContain("getting-started.md");
+    expect(index).toContain("how-an-addon-works.md");
+    expect(gettingStarted).toContain("GET /manifest");
+    expect(gettingStarted).toContain("PUBLIC_BASE_URL");
+    expect(gettingStarted).toContain("CLOCKIFY_PARENT_ORIGIN");
+    for (const owner of ["Clockify", "SDK", "Add-on application"]) {
+      expect(lifecycle).toContain(owner);
+    }
+    for (const stage of ["INSTALLED", "auth_token", "webhook", "X-Addon-Token", "DELETED"]) {
+      expect(lifecycle).toContain(stage);
+    }
+  });
 
   it("ships complete npm release metadata for both packages", () => {
     const packageJson = JSON.parse(readFileSync(resolve(packageRoot, "package.json"), "utf8"));
