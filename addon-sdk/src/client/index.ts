@@ -39,6 +39,10 @@ function normalizeBackendUrl(value: string): URL {
     /^[a-z][a-z\d+.-]*:\/\/(\[[^?/#\\]+\]|[^:/?#\\]+)(?::[^/?#\\]*)?(?:[/?#\\]|$)/i.exec(
       value.trim(),
     )?.[1];
+  // Not using the shared isHttpsOrLoopbackHttp predicate here: this call site
+  // additionally requires the raw input string's hostname to match the
+  // parsed URL's hostname, guarding against a parsing quirk letting a
+  // non-loopback input resolve to a loopback URL.hostname.
   const loopback = rawHostname === url.hostname && isCanonicalLoopbackHostname(url.hostname);
   if (url.protocol !== "https:" && !(url.protocol === "http:" && loopback)) {
     throw new Error("Clockify backendUrl must use HTTPS outside canonical loopback hosts.");

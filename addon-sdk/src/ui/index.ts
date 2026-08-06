@@ -1,4 +1,4 @@
-import { isCanonicalLoopbackHostname } from "../shared/loopback";
+import { isHttpsOrLoopbackHttp } from "../shared/loopback";
 
 /** The supported message envelope sent by Clockify to an iframe component. */
 export interface ClockifyWindowMessage {
@@ -47,8 +47,7 @@ export interface ClockifyBridge {
 function assertParentOrigin(value: string): string {
   if (value === "*") throw new Error("A specific Clockify parent origin is required.");
   const url = new URL(value);
-  const local = isCanonicalLoopbackHostname(url.hostname);
-  if (url.protocol !== "https:" && !(local && url.protocol === "http:")) {
+  if (!isHttpsOrLoopbackHttp(url)) {
     throw new Error("Clockify parent origin must use HTTPS outside localhost.");
   }
   if (url.origin !== value) throw new Error("Clockify parent origin must not include a path.");

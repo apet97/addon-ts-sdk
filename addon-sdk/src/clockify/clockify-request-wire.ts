@@ -1,4 +1,4 @@
-import { isCanonicalLoopbackHostname } from "../shared/loopback";
+import { isHttpsOrLoopbackHttp } from "../shared/loopback";
 import type { AddonRequest } from "../shared/request";
 import type { ClockifyAddonClaims } from "./clockify-signature-parser";
 
@@ -81,8 +81,7 @@ function normalizeClockifyVersionedBaseUrl(value: unknown): string | undefined {
     return undefined;
   }
 
-  const loopback = isCanonicalLoopbackHostname(url.hostname);
-  if (url.protocol !== "https:" && !(url.protocol === "http:" && loopback)) return undefined;
+  if (!isHttpsOrLoopbackHttp(url)) return undefined;
   if (url.username !== "" || url.password !== "" || url.search !== "" || url.hash !== "") {
     return undefined;
   }
