@@ -129,26 +129,10 @@ export async function verifyClockifyWebhookRequest(
   }
 
   const signatureHeader = options.signatureHeader ?? ClockifyHeaders.SIGNATURE;
-  const signature = getSingleClockifyHeader(
-    request.headers,
-    signatureHeader,
-    "ambiguous-signature",
-  );
 
-  if (!signature.ok) {
-    return signature;
-  }
-
-  const token = signature.value;
-
-  if (!token) {
-    return { ok: false, reason: "missing-signature" };
-  }
-
-  if (token !== options.expectedWebhookAuthToken) {
-    return { ok: false, reason: "webhook-token-mismatch" };
-  }
-
+  // Verify the signed JWT before comparing the stored webhook token. Comparing
+  // first would let an attacker probe for the correct token with an arbitrary
+  // unsigned string, never needing a request Clockify actually signed.
   const result = await verifyClockifyRequest(parser, request, {
     signatureHeader,
     eventHeader: options.eventHeader,
@@ -168,6 +152,12 @@ export async function verifyClockifyWebhookRequest(
   if (contextMismatch) {
     return { ok: false, reason: contextMismatch };
   }
+
+  const token = getClockifyHeaderValues(request.headers, signatureHeader)[0];
+  if (token !== options.expectedWebhookAuthToken) {
+    return { ok: false, reason: "webhook-token-mismatch" };
+  }
+
   return { ok: true, claims: result.claims, eventType: result.eventType! };
 }
 

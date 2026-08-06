@@ -28,6 +28,7 @@ import {
   verifyClockifyRequest,
   verifyClockifyWebhookRequest,
 } from "./clockify-request-verifiers";
+import { ClockifyHeaders, getClockifyHeaderValues } from "./clockify-request-wire";
 
 function unauthorizedResponse(): AddonResponse {
   return { status: 401, body: "Unauthorized" };
@@ -231,19 +232,18 @@ export function withClockifyVerifiedWebhookRequest(
       return unauthorizedResponse();
     }
 
-    const verified = await verifyClockifyWebhookRequest(parser, request, {
-      ...firstPassOptions,
-      expectedWorkspaceId: workspaceId,
-      expectedAddonId: addonId,
-      expectedWebhookAuthToken,
-    });
-    if (!verified.ok) {
+    // firstPass already verified the JWT and confirmed the signature header is
+    // unambiguous, so the raw token can be read directly instead of paying for
+    // a second full verifyClockifyWebhookRequest (and its second JWT verify).
+    const signatureHeader = firstPassOptions.signatureHeader ?? ClockifyHeaders.SIGNATURE;
+    const token = getClockifyHeaderValues(request.headers, signatureHeader)[0];
+    if (token !== expectedWebhookAuthToken) {
       return unauthorizedResponse();
     }
 
-    return handler(request, verified.claims, {
-      claims: verified.claims,
-      eventType: verified.eventType,
+    return handler(request, firstPass.claims, {
+      claims: firstPass.claims,
+      eventType,
     });
   };
 }

@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll } from "vitest";
+import { describe, it, expect, beforeAll, vi } from "vitest";
 import { generateKeyPair, SignJWT } from "jose";
 import {
   AddonRequest,
@@ -301,6 +301,23 @@ describe("Marketplace request verification helpers", () => {
         },
       ),
     ).resolves.toEqual({ ok: false, reason: "webhook-token-mismatch" });
+
+    // An unsigned string that happens to equal the stored expected token must
+    // still fail as an invalid signature, not a token mismatch — the JWT is
+    // verified before the token is ever compared, closing the probing oracle.
+    await expect(
+      verifyClockifyWebhookRequest(
+        parser(),
+        request({
+          [ClockifyHeaders.SIGNATURE]: "not-a-jwt-but-matches-stored-token",
+          [ClockifyHeaders.WEBHOOK_EVENT_TYPE]: "EXPENSE_CREATED",
+        }),
+        {
+          expectedEventType: "EXPENSE_CREATED",
+          expectedWebhookAuthToken: "not-a-jwt-but-matches-stored-token",
+        },
+      ),
+    ).resolves.toEqual({ ok: false, reason: "invalid-signature" });
 
     await expect(
       verifyClockifyWebhookRequest(
@@ -896,8 +913,10 @@ describe("Marketplace request verification helpers", () => {
     const token = await validToken();
     const lookups: Array<{ workspaceId: string; addonId: string; eventType: string }> = [];
     let handled = false;
+    const clockifyParser = parser();
+    const parseClaimsSpy = vi.spyOn(clockifyParser, "parseClaims");
     const handler = withClockifyVerifiedWebhookRequest(
-      parser(),
+      clockifyParser,
       {
         expectedEventType: "EXPENSE_CREATED",
         getExpectedWebhookAuthToken(input) {
@@ -928,6 +947,10 @@ describe("Marketplace request verification helpers", () => {
       { workspaceId: WORKSPACE_ID, addonId: ADDON_ID, eventType: "EXPENSE_CREATED" },
     ]);
     expect(handled).toBe(true);
+    // The lookup path must verify the JWT exactly once: the stored-token
+    // comparison reuses firstPass's already-verified claims and raw header
+    // value instead of re-running verifyClockifyWebhookRequest.
+    expect(parseClaimsSpy).toHaveBeenCalledTimes(1);
 
     handled = false;
     const missingStoredToken = withClockifyVerifiedWebhookRequest(
