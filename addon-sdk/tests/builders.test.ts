@@ -66,6 +66,19 @@ describe("Builders", () => {
     expect(manifest.minimalSubscriptionPlan).toBe("FREE");
   });
 
+  it("exposes ClockifyManifest.builder() as the canonical alias for the current schema version", () => {
+    expect(ClockifyManifest.builder).toBe(ClockifyManifest.v1_5Builder);
+
+    const manifest = ClockifyManifest.builder()
+      .key("canonical")
+      .name("Canonical")
+      .baseUrl("https://example.com/addon")
+      .requireFreePlan()
+      .build();
+
+    expect(manifest.schemaVersion).toBe("1.5");
+  });
+
   it("should build v1.5 component and settings tab", () => {
     const component = ClockifyComponent.v1_5Builder()
       .invoicesAction()

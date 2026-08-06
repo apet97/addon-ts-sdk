@@ -21,10 +21,15 @@ const manifest = ClockifyManifest.v1_5Builder()
   .build();
 ```
 
-Schema 1.5 is the main path for new manifests. The explicit `v1_2Builder()`,
+Schema 1.5 is the main path for new manifests. `ClockifyManifest.builder()` is a canonical alias
+for `v1_5Builder()`; use whichever name reads better. The explicit `v1_2Builder()`,
 `v1_3Builder()`, and `v1_4Builder()` factories remain available for compatibility. Root model
 type parameters and convenience enum aliases still default to 1.4 for Java parity, so use the
-explicit 1.5 builder and `generated.v1_5` types when new code needs the schema 1.5 surface.
+explicit 1.5 builder (or `builder()`) and `generated.v1_5` types when new code needs the schema 1.5
+surface.
+
+A missing required field raises `Error("Required field '<name>' is missing.")` from `build()`
+before an incomplete manifest is ever constructed.
 
 ## Enum Helper Methods
 
