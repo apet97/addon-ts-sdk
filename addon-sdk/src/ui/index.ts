@@ -128,14 +128,23 @@ export function applyClockifyLanguage(
   language: string | undefined,
   root: Pick<ClockifyDocumentRoot, "lang">,
 ): void {
-  root.lang = (language?.trim() || "EN").toLowerCase().replace("_", "-");
+  root.lang = (language?.trim() || "EN").toLowerCase().replaceAll("_", "-");
 }
 
-/** Formats a date using the user's locale while permitting explicit timezone policy. */
+/**
+ * Formats a date using the user's locale while permitting explicit timezone policy. Falls back to
+ * `"en"` if `locale` is not a well-formed BCP 47 tag `Intl.DateTimeFormat` accepts.
+ */
 export function formatClockifyDate(
   value: Date | number,
   locale: string,
   options: Intl.DateTimeFormatOptions = {},
 ): string {
-  return new Intl.DateTimeFormat(locale, { dateStyle: "medium", ...options }).format(value);
+  let formatter: Intl.DateTimeFormat;
+  try {
+    formatter = new Intl.DateTimeFormat(locale, { dateStyle: "medium", ...options });
+  } catch {
+    formatter = new Intl.DateTimeFormat("en", { dateStyle: "medium", ...options });
+  }
+  return formatter.format(value);
 }

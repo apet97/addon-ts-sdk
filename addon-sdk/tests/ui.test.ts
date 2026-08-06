@@ -103,6 +103,25 @@ describe("Clockify UI bridge", () => {
     expect(root.lang).toBe("en");
   });
 
+  it("converts every underscore in a multi-part language tag, not only the first", () => {
+    const root = { dataset: {} as Record<string, string>, lang: "" };
+    applyClockifyLanguage("ZH_HANS_CN", root);
+    expect(root.lang).toBe("zh-hans-cn");
+  });
+
+  it("falls back to English formatting for a locale Intl.DateTimeFormat rejects", () => {
+    expect(() =>
+      formatClockifyDate(new Date("2026-01-02T00:00:00Z"), "not a locale!", { timeZone: "UTC" }),
+    ).not.toThrow();
+    expect(
+      formatClockifyDate(new Date("2026-01-02T00:00:00Z"), "not a locale!", { timeZone: "UTC" }),
+    ).toBe(
+      new Intl.DateTimeFormat("en", { dateStyle: "medium", timeZone: "UTC" }).format(
+        new Date("2026-01-02T00:00:00Z"),
+      ),
+    );
+  });
+
   it("unsubscribes and disposes its listener", () => {
     const parent = { postMessage: vi.fn() };
     let listener: ((event: { origin: string; source: unknown; data: unknown }) => void) | undefined;
