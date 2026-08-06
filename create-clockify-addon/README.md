@@ -108,7 +108,7 @@ await scaffoldClockifyAddon({
 
 Importing `create-clockify-addon` does not run the CLI or touch the file system. Files are created
 only when `scaffoldClockifyAddon()` is called. The optional `sdkSpec` field lets repository tooling
-substitute a packed SDK; normal generated projects use `^1.0.0`.
+substitute a packed SDK; normal generated projects use `^1.1.0`.
 
 ## Before production
 

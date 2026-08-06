@@ -29,6 +29,15 @@ check must reject immutable versions that are already published. Documentation v
 not create a new release candidate, registry receipt, authenticated Clockify receipt, or Marketplace
 submission evidence.
 
+## 1.1.0 release candidate
+
+Workspace versions `@apet97/clockify-addon-sdk@1.1.0` and `create-clockify-addon@1.1.0` are prepared
+on branch `perfect-state-2026-08-06` and staged for release. Publication requires explicit
+npm-owner approval for the exact packages and versions before `npm publish` runs; until that
+approval and the publish itself complete, the "Published versions" section above remains the
+accurate record of what the registry currently serves. This section will gain the same release
+evidence as prior versions once publication happens.
+
 ## 1.0.5 release evidence
 
 Release source commit `d46723956b9b5ff7fb5587bdc03fc8858c90113f` reorganizes the active

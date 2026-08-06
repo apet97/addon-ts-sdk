@@ -292,7 +292,7 @@ export async function scaffoldClockifyAddon(options) {
     if (error?.code !== "ENOENT") throw error;
   }
   await mkdir(resolve(directory, "src"), { recursive: true });
-  const sdkSpec = options.sdkSpec ?? "^1.0.0";
+  const sdkSpec = options.sdkSpec ?? "^1.1.0";
   const manifest = {
     name: packageName(directory),
     version: "0.1.0",
