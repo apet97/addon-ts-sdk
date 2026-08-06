@@ -122,7 +122,12 @@ export abstract class Addon<M> {
 
   registerHandler(path: string, method: string, handler: RequestHandler): void {
     if (!isValidManifestPath(path)) {
-      throw new ValidationException("Url should be an absolute path and not end with a slash.");
+      // The leading sentence matches the Java SDK's exact wording (parity test
+      // asserts on it as a substring); the appended value makes the mistake
+      // actionable without breaking that parity.
+      throw new ValidationException(
+        `Url should be an absolute path and not end with a slash. Got ${JSON.stringify(path)}.`,
+      );
     }
 
     const key = `${method.toUpperCase()}:${path}`;

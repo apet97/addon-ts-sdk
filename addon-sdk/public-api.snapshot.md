@@ -108,6 +108,8 @@ export declare class ValidationException extends Error {
 export declare class IllegalArgumentException extends Error {
     constructor(message: string);
 }
+/** True for the SDK's own registration/input-validation errors (bad wiring), never a runtime verification failure. */
+export declare function isAddonInputError(error: unknown): error is ValidationException | IllegalArgumentException;
 ```
 
 ### clockify/index.d.ts
