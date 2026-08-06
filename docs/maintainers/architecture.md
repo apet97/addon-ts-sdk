@@ -42,3 +42,19 @@ builds the manifest and registers routes; runtime-specific `src/index.ts` starts
 The root entrypoint must continue to bundle for browser/Worker targets without `node:*` imports.
 Persistent implementations may adapt the store and lease interfaces, but distributed claims must be
 atomic; an unguarded read-then-write is not a valid distributed adapter.
+
+## Known bundle-size debt
+
+`clockify-manifest-validation.ts` statically imports all four generated per-schema-version
+validators (`manifest-validators.ts`, ~491 KB unminified in `dist/esm`) so `validateClockifyManifest`
+and `assertClockifyManifest` stay fully synchronous — every consumer pays for validating versions
+1.2–1.4 even when they only ever build a 1.5 manifest. `generated/manifest-schemas.ts` (~48 KB) is
+also always reachable through the root barrel (`generated` namespace), though nothing in the
+runtime validation path reads it.
+
+A real fix needs one of: an async validation API (a breaking change, so a major version), or
+splitting the generator's per-version output into separate subpath exports a consumer can import
+selectively. Both are real design work, not a one-line trim, and were deliberately deferred rather
+than rushed into a minor release. Do not "fix" this by hand-editing `generated/manifest-schemas.ts`
+or `generated/index.ts` — change `scripts/generate-clockify-manifest.ts`, the schema, or the
+validation API surface, then run `npm run generate` and the generated-drift verification.
