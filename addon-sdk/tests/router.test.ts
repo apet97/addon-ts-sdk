@@ -10,6 +10,12 @@ describe("Router", () => {
     .requireBasicPlan()
     .build();
 
+  it("handles an empty request path without throwing (fixes a latent Java empty-URI crash)", async () => {
+    const addon = new ClockifyAddon(mockManifest);
+    const response = await addon.handle({ method: "GET", path: "", headers: {} });
+    expect(response.status).toBe(404);
+  });
+
   it("should auto-register GET /manifest", async () => {
     const addon = new ClockifyAddon(mockManifest);
     const response = await addon.handle({
