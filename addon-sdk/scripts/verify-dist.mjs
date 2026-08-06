@@ -7,6 +7,7 @@
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import * as path from "node:path";
+import { readFileSync } from "node:fs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const dist = path.join(here, "..", "dist");
@@ -22,6 +23,32 @@ const expectFn = (label, v) => {
 const expectObj = (label, v) => {
   if (v === null || typeof v !== "object") fail(`${label} is not an object (got ${typeof v})`);
 };
+
+// --- 0. The portable root entry's transitive graph must never import node:*. ---
+// Walks only relative specifiers from dist/esm/index.js; a node:* import
+// anywhere in that closure would mean a Worker/browser consumer of the bare
+// package import silently pulls in a Node-only module.
+function assertNoNodeImportsInPortableGraph() {
+  const entry = path.join(dist, "esm", "index.js");
+  const visited = new Set();
+  const stack = [entry];
+  while (stack.length > 0) {
+    const file = stack.pop();
+    if (visited.has(file)) continue;
+    visited.add(file);
+    const source = readFileSync(file, "utf8");
+    for (const match of source.matchAll(/from\s+["']([^"']+)["']/g)) {
+      const specifier = match[1];
+      if (specifier.startsWith("node:")) {
+        fail(`portable entry graph imports '${specifier}' via ${path.relative(dist, file)}`);
+      }
+      if (specifier.startsWith(".")) {
+        stack.push(path.join(path.dirname(file), specifier));
+      }
+    }
+  }
+}
+assertNoNodeImportsInPortableGraph();
 
 // --- 1. The emitted ESM entry must expose the public API as real named exports. ---
 const esm = await import(path.join(dist, "esm", "index.js")).catch((e) =>
