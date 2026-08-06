@@ -97,6 +97,11 @@ export abstract class Addon<M> {
   private readonly options: AddonOptions;
   private readonly requestHandlers = new Map<string, RequestHandler>();
   private readonly middlewares: AddonMiddleware[] = [];
+  // Memoizes the allowed-methods scan per path, since routes are registered
+  // once at startup and then handle() runs on every request. Cleared on any
+  // new registration rather than maintained incrementally — simpler, and the
+  // route count is small enough that a full rescan per distinct path is cheap.
+  private readonly allowedMethodsByPath = new Map<string, readonly string[]>();
 
   constructor(manifest: M, manifestPath: string = Addon.PATH_MANIFEST, options: AddonOptions = {}) {
     this.manifest = manifest;
@@ -127,6 +132,7 @@ export abstract class Addon<M> {
     }
 
     this.requestHandlers.set(key, handler);
+    this.allowedMethodsByPath.clear();
   }
 
   getRegisteredRequests(): Array<{ path: string; method: string }> {
@@ -150,9 +156,13 @@ export abstract class Addon<M> {
       const method = request.method.toUpperCase();
       const key = `${method}:${path}`;
 
-      const allowedMethods = Array.from(this.requestHandlers.keys())
-        .filter((registered) => registered.slice(registered.indexOf(":") + 1) === path)
-        .map((registered) => registered.slice(0, registered.indexOf(":")));
+      let allowedMethods = this.allowedMethodsByPath.get(path);
+      if (!allowedMethods) {
+        allowedMethods = Array.from(this.requestHandlers.keys())
+          .filter((registered) => registered.slice(registered.indexOf(":") + 1) === path)
+          .map((registered) => registered.slice(0, registered.indexOf(":")));
+        this.allowedMethodsByPath.set(path, allowedMethods);
+      }
       if (allowedMethods.length === 0) return { status: 404, body: "Not Found" };
 
       const allow = Array.from(

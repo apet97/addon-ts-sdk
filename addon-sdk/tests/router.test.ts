@@ -85,6 +85,25 @@ describe("Router", () => {
     expect(resPost.body).toBe("post");
   });
 
+  it("reflects a method registered after the allowed-methods cache is already warm", async () => {
+    const addon = new ClockifyAddon(mockManifest);
+    addon.registerHandler("/test", "GET", () => ({ status: 200, body: "get" }));
+
+    // Warms the per-path allowed-methods cache with just GET.
+    const beforePost = await addon.handle({ method: "POST", path: "/test", headers: {} });
+    expect(beforePost.status).toBe(405);
+    expect(beforePost.headers?.allow).toBe("GET, HEAD, OPTIONS");
+
+    addon.registerHandler("/test", "POST", () => ({ status: 200, body: "post" }));
+
+    const afterPost = await addon.handle({ method: "POST", path: "/test", headers: {} });
+    expect(afterPost.status).toBe(200);
+    expect(afterPost.body).toBe("post");
+
+    const options = await addon.handle({ method: "OPTIONS", path: "/test", headers: {} });
+    expect(options.headers?.allow).toBe("GET, POST, HEAD, OPTIONS");
+  });
+
   it("should return 405 Method Not Allowed for unregistered route/method", async () => {
     const addon = new ClockifyAddon(mockManifest);
     const response = await addon.handle({
