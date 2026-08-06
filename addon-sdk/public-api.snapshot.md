@@ -2825,6 +2825,17 @@ export interface ClockifySettingUpdate {
     readonly id: string;
     readonly value: unknown;
 }
+/** Observed just before {@link ClockifyAddonClient} retries a request. */
+export interface ClockifyAddonClientRetryInfo {
+    /** The attempt that just finished (1-indexed); the retry will be `attempt + 1`. */
+    readonly attempt: number;
+    /** The response status that triggered the retry, absent for a network-error retry. */
+    readonly status?: number;
+    /** The response error that triggered the retry, absent for a status-based retry. */
+    readonly error?: unknown;
+    /** Delay before the retry, in milliseconds. */
+    readonly delayMs: number;
+}
 /** Construction options for {@link ClockifyAddonClient}. */
 export interface ClockifyAddonClientOptions {
     readonly token: string;
@@ -2834,6 +2845,8 @@ export interface ClockifyAddonClientOptions {
     readonly timeoutMs?: number;
     readonly maxAttempts?: number;
     readonly sleep?: (milliseconds: number) => Promise<void>;
+    /** Observe retries for metrics/logging. Never affects retry behavior, even if it throws. */
+    readonly onRetry?: (info: ClockifyAddonClientRetryInfo) => void;
 }
 /** HTTP failure returned by a Clockify add-on API call. */
 export declare class ClockifyAddonHttpError extends Error {
@@ -2850,7 +2863,9 @@ export declare class ClockifyAddonClient {
     private readonly timeoutMs;
     private readonly maxAttempts;
     private readonly sleep;
+    private readonly onRetry?;
     constructor(options: ClockifyAddonClientOptions);
+    private notifyRetry;
     private send;
     private expectOk;
     /** Exchanges an installation token for a user-scoped add-on token. */
@@ -5766,6 +5781,17 @@ export interface ClockifySettingUpdate {
     readonly id: string;
     readonly value: unknown;
 }
+/** Observed just before {@link ClockifyAddonClient} retries a request. */
+export interface ClockifyAddonClientRetryInfo {
+    /** The attempt that just finished (1-indexed); the retry will be `attempt + 1`. */
+    readonly attempt: number;
+    /** The response status that triggered the retry, absent for a network-error retry. */
+    readonly status?: number;
+    /** The response error that triggered the retry, absent for a status-based retry. */
+    readonly error?: unknown;
+    /** Delay before the retry, in milliseconds. */
+    readonly delayMs: number;
+}
 /** Construction options for {@link ClockifyAddonClient}. */
 export interface ClockifyAddonClientOptions {
     readonly token: string;
@@ -5775,6 +5801,8 @@ export interface ClockifyAddonClientOptions {
     readonly timeoutMs?: number;
     readonly maxAttempts?: number;
     readonly sleep?: (milliseconds: number) => Promise<void>;
+    /** Observe retries for metrics/logging. Never affects retry behavior, even if it throws. */
+    readonly onRetry?: (info: ClockifyAddonClientRetryInfo) => void;
 }
 /** HTTP failure returned by a Clockify add-on API call. */
 export declare class ClockifyAddonHttpError extends Error {
@@ -5791,7 +5819,9 @@ export declare class ClockifyAddonClient {
     private readonly timeoutMs;
     private readonly maxAttempts;
     private readonly sleep;
+    private readonly onRetry?;
     constructor(options: ClockifyAddonClientOptions);
+    private notifyRetry;
     private send;
     private expectOk;
     /** Exchanges an installation token for a user-scoped add-on token. */

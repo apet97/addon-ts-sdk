@@ -73,6 +73,9 @@ Do not serialize the client, token, or response request metadata into component 
   are ambiguous and are not retried for mutation methods.
 - A caller abort is terminal. Discarded retry response bodies are cancelled before backoff, and
   cancellation cleanup failures do not replace the intended retry.
+- Pass `onRetry` to observe a retry for metrics or logging: it receives `{attempt, delayMs}` plus
+  either `status` (a status-based retry) or `error` (a network-error retry). It never affects retry
+  behavior, even if it throws.
 - An invalid generic path segment fails before fetch; accepted dynamic segments remain within one
   encoded path segment.
 

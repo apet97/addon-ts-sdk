@@ -6,6 +6,18 @@ export interface ClockifySettingUpdate {
   readonly value: unknown;
 }
 
+/** Observed just before {@link ClockifyAddonClient} retries a request. */
+export interface ClockifyAddonClientRetryInfo {
+  /** The attempt that just finished (1-indexed); the retry will be `attempt + 1`. */
+  readonly attempt: number;
+  /** The response status that triggered the retry, absent for a network-error retry. */
+  readonly status?: number;
+  /** The response error that triggered the retry, absent for a status-based retry. */
+  readonly error?: unknown;
+  /** Delay before the retry, in milliseconds. */
+  readonly delayMs: number;
+}
+
 /** Construction options for {@link ClockifyAddonClient}. */
 export interface ClockifyAddonClientOptions {
   readonly token: string;
@@ -15,6 +27,8 @@ export interface ClockifyAddonClientOptions {
   readonly timeoutMs?: number;
   readonly maxAttempts?: number;
   readonly sleep?: (milliseconds: number) => Promise<void>;
+  /** Observe retries for metrics/logging. Never affects retry behavior, even if it throws. */
+  readonly onRetry?: (info: ClockifyAddonClientRetryInfo) => void;
 }
 
 /** HTTP failure returned by a Clockify add-on API call. */
@@ -98,6 +112,7 @@ export class ClockifyAddonClient {
   private readonly timeoutMs: number;
   private readonly maxAttempts: number;
   private readonly sleep: (milliseconds: number) => Promise<void>;
+  private readonly onRetry?: (info: ClockifyAddonClientRetryInfo) => void;
 
   constructor(options: ClockifyAddonClientOptions) {
     if (options.token.trim() === "") throw new Error("Clockify add-on token must not be empty.");
@@ -116,6 +131,15 @@ export class ClockifyAddonClient {
       ((milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds)));
     if (!Number.isInteger(this.maxAttempts) || this.maxAttempts < 1)
       throw new Error("maxAttempts must be a positive integer.");
+    this.onRetry = options.onRetry;
+  }
+
+  private notifyRetry(info: ClockifyAddonClientRetryInfo): void {
+    try {
+      this.onRetry?.(info);
+    } catch {
+      // An observer must never affect retry behavior.
+    }
   }
 
   private async send(segments: readonly string[], init: RequestInit): Promise<Response> {
@@ -146,13 +170,17 @@ export class ClockifyAddonClient {
           } catch {
             // Discarded-response cleanup must not replace the intended retry.
           }
-          await this.sleep(retryDelay(response, attempt));
+          const delayMs = retryDelay(response, attempt);
+          this.notifyRetry({ attempt, status: response.status, delayMs });
+          await this.sleep(delayMs);
           continue;
         }
         return response;
       } catch (error) {
         if (!safeRead || attempt >= this.maxAttempts || this.signal?.aborted) throw error;
-        await this.sleep(Math.min(100 * 2 ** (attempt - 1), 2_000));
+        const delayMs = Math.min(100 * 2 ** (attempt - 1), 2_000);
+        this.notifyRetry({ attempt, error, delayMs });
+        await this.sleep(delayMs);
       } finally {
         clearTimeout(timeout);
         this.signal?.removeEventListener("abort", abort);

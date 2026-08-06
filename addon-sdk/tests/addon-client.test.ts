@@ -263,6 +263,65 @@ describe("ClockifyAddonClient", () => {
     expect(mutationFetch).toHaveBeenCalledTimes(1);
   });
 
+  it("notifies onRetry for both a status-based retry and a network-error retry", async () => {
+    const onRetry = vi.fn();
+    const statusFetch = vi
+      .fn<typeof globalThis.fetch>()
+      .mockResolvedValueOnce(new Response("busy", { status: 429 }))
+      .mockResolvedValueOnce(new Response("{}", { status: 200 }));
+    const statusClient = new ClockifyAddonClient({
+      token: "token",
+      backendUrl: "https://api.example/api",
+      fetch: statusFetch,
+      sleep: async () => undefined,
+      onRetry,
+    });
+    await statusClient.getSettings("w1");
+    expect(onRetry).toHaveBeenCalledExactlyOnceWith({
+      attempt: 1,
+      status: 429,
+      delayMs: expect.any(Number),
+    });
+
+    onRetry.mockClear();
+    const networkError = new TypeError("network down");
+    const errorFetch = vi
+      .fn<typeof globalThis.fetch>()
+      .mockRejectedValueOnce(networkError)
+      .mockResolvedValueOnce(new Response("{}", { status: 200 }));
+    const errorClient = new ClockifyAddonClient({
+      token: "token",
+      backendUrl: "https://api.example/api",
+      fetch: errorFetch,
+      sleep: async () => undefined,
+      onRetry,
+    });
+    await errorClient.getSettings("w1");
+    expect(onRetry).toHaveBeenCalledExactlyOnceWith({
+      attempt: 1,
+      error: networkError,
+      delayMs: expect.any(Number),
+    });
+  });
+
+  it("does not let a throwing onRetry observer affect retry behavior", async () => {
+    const fetch = vi
+      .fn<typeof globalThis.fetch>()
+      .mockResolvedValueOnce(new Response("busy", { status: 429 }))
+      .mockResolvedValueOnce(new Response("{}", { status: 200 }));
+    const client = new ClockifyAddonClient({
+      token: "token",
+      backendUrl: "https://api.example/api",
+      fetch,
+      sleep: async () => undefined,
+      onRetry: () => {
+        throw new Error("observer boom");
+      },
+    });
+    await expect(client.getSettings("w1")).resolves.toEqual({});
+    expect(fetch).toHaveBeenCalledTimes(2);
+  });
+
   it("cancels a discarded retry response before sleeping and ignores cancellation failures", async () => {
     const events: string[] = [];
     const discardedBody = new ReadableStream({
