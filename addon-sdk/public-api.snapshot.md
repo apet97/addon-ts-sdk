@@ -45,6 +45,7 @@ export declare abstract class Addon<M> {
     private readonly options;
     private readonly requestHandlers;
     private readonly middlewares;
+    private readonly allowedMethodsByPath;
     constructor(manifest: M, manifestPath?: string, options?: AddonOptions);
     getManifest(): M;
     registerHandler(path: string, method: string, handler: RequestHandler): void;
@@ -5598,6 +5599,15 @@ export declare const clockifyManifestSchemas: ClockifyEmbeddedManifestSchemas;
 ### adapters/index.d.ts
 
 ```ts
+/**
+ * @deprecated Import a specific runtime subpath instead of this aggregate:
+ * `@apet97/clockify-addon-sdk/adapters/node-http`,
+ * `@apet97/clockify-addon-sdk/adapters/express`, or
+ * `@apet97/clockify-addon-sdk/adapters/fetch`. A Worker or browser bundle
+ * that imports this aggregate pulls in `node:http` transitively even when it
+ * only needs the Fetch adapter. Kept for backward compatibility; scheduled
+ * for removal in a future major version.
+ */
 export * from "./node-http.js";
 export * from "./express.js";
 export * from "./fetch.js";
