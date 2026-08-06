@@ -5724,7 +5724,7 @@ export declare function createNodeHttpAddonServer(addon: Addon<unknown>, options
 ### adapters/express.d.ts
 
 ```ts
-import { Addon } from "../shared/addon.js";
+import { Addon, AddonErrorReporter } from "../shared/addon.js";
 export interface ExpressLikeRequest {
     method?: string;
     path?: string;
@@ -5742,7 +5742,9 @@ export interface ExpressLikeResponse {
     end(): unknown;
 }
 export type ExpressLikeNextFunction = (error?: unknown) => void;
-export declare function createExpressAddonHandler(addon: Addon<unknown>): (req: ExpressLikeRequest, res: ExpressLikeResponse, next?: ExpressLikeNextFunction) => Promise<void>;
+export declare function createExpressAddonHandler(addon: Addon<unknown>, options?: {
+    readonly onError?: AddonErrorReporter;
+}): (req: ExpressLikeRequest, res: ExpressLikeResponse, next?: ExpressLikeNextFunction) => Promise<void>;
 ```
 
 ### adapters/fetch.d.ts
@@ -5826,7 +5828,7 @@ export declare function createNodeHttpAddonServer(addon: Addon<unknown>, options
 ### adapters/express.d.ts
 
 ```ts
-import { Addon } from "../shared/addon.js";
+import { Addon, AddonErrorReporter } from "../shared/addon.js";
 export interface ExpressLikeRequest {
     method?: string;
     path?: string;
@@ -5844,7 +5846,9 @@ export interface ExpressLikeResponse {
     end(): unknown;
 }
 export type ExpressLikeNextFunction = (error?: unknown) => void;
-export declare function createExpressAddonHandler(addon: Addon<unknown>): (req: ExpressLikeRequest, res: ExpressLikeResponse, next?: ExpressLikeNextFunction) => Promise<void>;
+export declare function createExpressAddonHandler(addon: Addon<unknown>, options?: {
+    readonly onError?: AddonErrorReporter;
+}): (req: ExpressLikeRequest, res: ExpressLikeResponse, next?: ExpressLikeNextFunction) => Promise<void>;
 ```
 
 ## client
@@ -5963,7 +5967,10 @@ export interface ClockifyDocumentRoot {
 export declare function applyClockifyTheme(theme: string | undefined, root: Pick<ClockifyDocumentRoot, "dataset">): void;
 /** Applies the verified Clockify user language to a document root. */
 export declare function applyClockifyLanguage(language: string | undefined, root: Pick<ClockifyDocumentRoot, "lang">): void;
-/** Formats a date using the user's locale while permitting explicit timezone policy. */
+/**
+ * Formats a date using the user's locale while permitting explicit timezone policy. Falls back to
+ * `"en"` if `locale` is not a well-formed BCP 47 tag `Intl.DateTimeFormat` accepts.
+ */
 export declare function formatClockifyDate(value: Date | number, locale: string, options?: Intl.DateTimeFormatOptions): string;
 ```
 

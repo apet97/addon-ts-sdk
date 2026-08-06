@@ -621,6 +621,40 @@ describe("Adapters", () => {
     expect(response.headers.get("x-clockify-trace")).toBe("first, second");
   });
 
+  it("reports an Express adapter error via onError before falling through to next()", async () => {
+    // addon.handle() reports errors from inside the handler chain via the
+    // ClockifyAddon-level onError; this covers what happens before dispatch —
+    // here, a malformed absolute-form request target rejected by
+    // parseHttpRequestTarget.
+    const addon = new ClockifyAddon(mockManifest);
+    const onError = vi.fn();
+    const handler = createExpressAddonHandler(addon, { onError });
+
+    const mockReq = {
+      method: "GET",
+      url: "http://evil.example/manifest",
+      headers: {},
+      query: {},
+    };
+    const next = vi.fn();
+    const mockRes = {
+      status: vi.fn().mockReturnThis(),
+      set: vi.fn().mockReturnThis(),
+      json: vi.fn().mockReturnThis(),
+      send: vi.fn().mockReturnThis(),
+      end: vi.fn().mockReturnThis(),
+    };
+
+    await handler(mockReq as any, mockRes as any, next);
+
+    expect(onError).toHaveBeenCalledExactlyOnceWith(
+      expect.any(Error),
+      expect.objectContaining({ source: "router", nativeRequest: mockReq }),
+    );
+    expect(next).toHaveBeenCalledExactlyOnceWith(expect.any(Error));
+    expect(mockRes.status).not.toHaveBeenCalled();
+  });
+
   it("sends Uint8Array response bodies as raw bytes via the Express adapter", async () => {
     const addon = new ClockifyAddon(mockManifest);
     addon.registerHandler("/binary", "POST", () => ({
