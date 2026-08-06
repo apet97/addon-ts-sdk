@@ -98,6 +98,26 @@ the deployed `/manifest` before registering its URL with Clockify.
 - Unexpected handler/router/adapter errors become `500`; use redacted `onError` reporting to retain
   diagnostic context without changing the response contract.
 
+## Public key rotation
+
+`createClockifySignatureParser` verifies every add-on JWT against
+`CLOCKIFY_PLATFORM_PUBLIC_KEY_PEM` by default. `CLOCKIFY_PLATFORM_PUBLIC_KEY_SHA256` pins its
+DER/SPKI fingerprint; both are covered by a test that recomputes the fingerprint from the PEM and
+compares it against the vendored Marketplace authentication docs, so a corrupted or stale key fails
+CI before it ships.
+
+If Clockify ever rotates the platform signing key, do not edit the vendored constant in place —
+the SDK release that carries the new key is the trust boundary, and applications must upgrade to
+it deliberately, not pick it up silently. To roll it out without a verification gap:
+
+1. Pass the new key via `createClockifySignatureParser(key, { publicKey: newKeyPem })` (or a dual
+   verifier trying the new key, then the old one) ahead of the platform's cut-over date, so your
+   deployment already accepts tokens signed by either key.
+2. After Clockify's cut-over, drop the old-key fallback and upgrade to the SDK release that vendors
+   the new default.
+3. Track the exact cut-over date and both fingerprints in your own change log; this SDK's
+   `CLOCKIFY_PLATFORM_PUBLIC_KEY_SHA256` only ever reflects the currently vendored key.
+
 ## Prove it
 
 Verify both generated runtime families from packed artifacts:
