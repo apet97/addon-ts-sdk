@@ -28,13 +28,61 @@ export interface AddonOptions {
   readonly onError?: AddonErrorReporter;
 }
 
+const REDACTED = "__redacted__";
+const SENSITIVE_HEADER_NAMES = new Set([
+  "x-addon-lifecycle-token",
+  "x-addon-token",
+  "clockify-signature",
+  "authorization",
+]);
+
+function redactHeaders(headers: AddonRequest["headers"]): AddonRequest["headers"] {
+  const redacted = { ...headers };
+  for (const name of Object.keys(redacted)) {
+    if (SENSITIVE_HEADER_NAMES.has(name.toLowerCase())) redacted[name] = REDACTED;
+  }
+  return redacted;
+}
+
+function redactQuery(query: AddonRequest["query"]): AddonRequest["query"] {
+  if (!query?.has("auth_token")) return query;
+  const redacted = new URLSearchParams(query);
+  redacted.set("auth_token", REDACTED);
+  return redacted;
+}
+
+function redactBody(body: unknown): unknown {
+  if (body === null || typeof body !== "object") return body;
+  const redacted: Record<string, unknown> = { ...(body as Record<string, unknown>) };
+  if ("authToken" in redacted) redacted.authToken = REDACTED;
+  if (Array.isArray(redacted.webhooks)) {
+    redacted.webhooks = redacted.webhooks.map((webhook: unknown) =>
+      webhook && typeof webhook === "object" ? { ...webhook, authToken: REDACTED } : webhook,
+    );
+  }
+  return redacted;
+}
+
+/** Strips Clockify credentials from a request before an error reporter sees it. */
+export function redactAddonRequest(request: AddonRequest): AddonRequest {
+  return {
+    ...request,
+    headers: redactHeaders(request.headers),
+    query: redactQuery(request.query),
+    body: redactBody(request.body),
+  };
+}
+
 export function reportAddonError(
   reporter: AddonErrorReporter | undefined,
   error: unknown,
   context: AddonErrorContext,
 ): void {
   try {
-    reporter?.(error, context);
+    const redacted = context.request
+      ? { ...context, request: redactAddonRequest(context.request) }
+      : context;
+    reporter?.(error, redacted);
   } catch {
     // Error reporters must not change the response path.
   }

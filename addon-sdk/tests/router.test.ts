@@ -152,6 +152,43 @@ describe("Router", () => {
     );
   });
 
+  it("redacts credentials from the request before an error reporter sees it", async () => {
+    const onError = vi.fn();
+    const addon = new ClockifyAddon(mockManifest, undefined, { onError });
+    addon.registerHandler("/fail", "POST", () => {
+      throw new Error("Reported failure");
+    });
+
+    const query = new URLSearchParams({ auth_token: "secret-token" });
+    const request = {
+      method: "POST",
+      path: "/fail",
+      headers: {
+        "clockify-signature": "jwt.jwt.jwt",
+        "x-addon-token": "installation-secret",
+        "content-type": "application/json",
+      },
+      query,
+      body: { authToken: "body-secret", webhooks: [{ path: "/x", authToken: "hook-secret" }] },
+    };
+
+    await addon.handle(request);
+
+    expect(onError).toHaveBeenCalledOnce();
+    const [, context] = onError.mock.calls[0]!;
+    expect(context.request.headers["clockify-signature"]).toBe("__redacted__");
+    expect(context.request.headers["x-addon-token"]).toBe("__redacted__");
+    expect(context.request.headers["content-type"]).toBe("application/json");
+    expect(context.request.query.get("auth_token")).toBe("__redacted__");
+    expect(context.request.body).toEqual({
+      authToken: "__redacted__",
+      webhooks: [{ path: "/x", authToken: "__redacted__" }],
+    });
+    // The original request object passed to handle() must not be mutated.
+    expect(request.headers["clockify-signature"]).toBe("jwt.jwt.jwt");
+    expect(query.get("auth_token")).toBe("secret-token");
+  });
+
   it("should execute middleware chain in order", async () => {
     const addon = new ClockifyAddon(mockManifest);
     const order: number[] = [];
