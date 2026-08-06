@@ -24,7 +24,7 @@
   "homepage": "https://github.com/apet97/addon-ts-sdk#readme",
   "bugs": "https://github.com/apet97/addon-ts-sdk/issues",
   "engines": {
-    "node": ">=22"
+    "node": ">=22.13.0"
   },
   "files": [
     "dist",

@@ -19,7 +19,7 @@ Install the public package from npm:
 npm install @apet97/clockify-addon-sdk
 ```
 
-Node 22+. Ships ESM and CommonJS builds with type declarations.
+Node 22.13.0+. Ships ESM and CommonJS builds with type declarations.
 
 ## Imports
 

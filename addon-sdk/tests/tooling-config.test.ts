@@ -74,8 +74,8 @@ describe("tooling configuration", () => {
     const dependabot = readFileSync(resolve(repoRoot, ".github", "dependabot.yml"), "utf8");
 
     expect(rootPackageJson.engines?.node).toBe(">=22.13.0");
-    expect(sdkPackageJson.engines.node).toBe(">=22");
-    expect(creatorPackageJson.engines.node).toBe(">=22");
+    expect(sdkPackageJson.engines.node).toBe(">=22.13.0");
+    expect(creatorPackageJson.engines.node).toBe(">=22.13.0");
     expect(sdkPackageJson.devDependencies).toMatchObject({
       "@arethetypeswrong/cli": "^0.18.5",
       "@types/node": "^22.20.1",
