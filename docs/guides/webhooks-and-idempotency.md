@@ -27,6 +27,12 @@ first verifies the signature JWT, event, and nonblank installation context, then
 with verified `workspaceId`, `addonId`, and `eventType`, compares the resolved stored token, and only
 then invokes the handler.
 
+A missing event type, a missing or ambiguous token source, or a non-function lookup are
+configuration mistakes, not verification failures — `withClockifyVerifiedWebhookRequest()` throws
+immediately when called with one, instead of registering a handler that silently 401s every real
+delivery. Pass `onError` to observe a lookup that resolves to no stored token at request time
+(e.g. an unrecognized installation) before the 401 is returned.
+
 The Node and Fetch adapters bound and buffer the request body before route verification. Their
 default maximum is 1 MiB, and an oversized body returns `413` before the webhook handler. Express
 body parsing and limits belong to the host application.

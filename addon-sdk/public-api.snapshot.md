@@ -298,6 +298,7 @@ export declare function withClockifyVerifiedWebhookRequest(parser: ClockifySigna
 ### clockify/clockify-request-types.d.ts
 
 ```ts
+import type { AddonErrorReporter } from "../shared/addon.js";
 import type { AddonRequest } from "../shared/request.js";
 import type { AddonResponse } from "../shared/response.js";
 import type { ClockifyAddonClaims } from "./clockify-signature-parser.js";
@@ -389,9 +390,13 @@ export interface ClockifyWebhookAuthTokenLookupInput {
 export type ClockifyWebhookAuthTokenLookup = (input: ClockifyWebhookAuthTokenLookupInput) => string | undefined | Promise<string | undefined>;
 export type ClockifyVerifiedWebhookRequestOptions = (ClockifyWebhookVerificationOptions & {
     getExpectedWebhookAuthToken?: undefined;
+    /** Observes a misconfigured token lookup (e.g. an empty/missing stored token). */
+    onError?: AddonErrorReporter;
 }) | (Omit<ClockifyWebhookVerificationOptions, "expectedWebhookAuthToken"> & {
     getExpectedWebhookAuthToken: ClockifyWebhookAuthTokenLookup;
     expectedWebhookAuthToken?: never;
+    /** Observes a misconfigured token lookup (e.g. an empty/missing stored token). */
+    onError?: AddonErrorReporter;
 });
 export interface ClockifyVerifiedWebhookRequestContext {
     claims: ClockifyAddonClaims;
@@ -3101,6 +3106,7 @@ export declare function withClockifyVerifiedWebhookRequest(parser: ClockifySigna
 ### clockify/clockify-request-types.d.ts
 
 ```ts
+import type { AddonErrorReporter } from "../shared/addon.js";
 import type { AddonRequest } from "../shared/request.js";
 import type { AddonResponse } from "../shared/response.js";
 import type { ClockifyAddonClaims } from "./clockify-signature-parser.js";
@@ -3192,9 +3198,13 @@ export interface ClockifyWebhookAuthTokenLookupInput {
 export type ClockifyWebhookAuthTokenLookup = (input: ClockifyWebhookAuthTokenLookupInput) => string | undefined | Promise<string | undefined>;
 export type ClockifyVerifiedWebhookRequestOptions = (ClockifyWebhookVerificationOptions & {
     getExpectedWebhookAuthToken?: undefined;
+    /** Observes a misconfigured token lookup (e.g. an empty/missing stored token). */
+    onError?: AddonErrorReporter;
 }) | (Omit<ClockifyWebhookVerificationOptions, "expectedWebhookAuthToken"> & {
     getExpectedWebhookAuthToken: ClockifyWebhookAuthTokenLookup;
     expectedWebhookAuthToken?: never;
+    /** Observes a misconfigured token lookup (e.g. an empty/missing stored token). */
+    onError?: AddonErrorReporter;
 });
 export interface ClockifyVerifiedWebhookRequestContext {
     claims: ClockifyAddonClaims;
