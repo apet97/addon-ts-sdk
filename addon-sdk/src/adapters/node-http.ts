@@ -10,7 +10,7 @@ import {
   parseContentLength,
   resolveMaxBodyBytes,
 } from "./body-limit";
-import { parseHttpRequestTarget } from "./request-target";
+import { InvalidRequestTargetError, parseHttpRequestTarget } from "./request-target";
 
 function contentLengthExceedsLimit(
   headers: IncomingMessage["headers"],
@@ -121,7 +121,7 @@ export function createNodeHttpAddonServer(
       const addonResponse = await addon.handle(addonRequest);
       writeNodeResponse(res, addonResponse);
     } catch (e) {
-      if (e instanceof InvalidContentLengthError) {
+      if (e instanceof InvalidContentLengthError || e instanceof InvalidRequestTargetError) {
         res.statusCode = 400;
         res.setHeader("connection", "close");
         res.end("Bad Request", () => {

@@ -34,6 +34,8 @@ export type AddonErrorReporter = (error: unknown, context: AddonErrorContext) =>
 export interface AddonOptions {
     readonly onError?: AddonErrorReporter;
 }
+/** Strips Clockify credentials from a request before an error reporter sees it. */
+export declare function redactAddonRequest(request: AddonRequest): AddonRequest;
 export declare function reportAddonError(reporter: AddonErrorReporter | undefined, error: unknown, context: AddonErrorContext): void;
 export declare abstract class Addon<M> {
     static readonly PATH_MANIFEST = "/manifest";
@@ -775,7 +777,13 @@ export interface ClockifyIdempotencyLeaseStore {
     complete(key: string, owner: string): Promise<boolean>;
     release(key: string, owner: string): Promise<boolean>;
 }
-/** In-memory lease store for tests and single-process deployments. */
+/**
+ * In-memory lease store for tests and single-process deployments. Completed
+ * entries are retained forever (no TTL) so a replayed webhook is always
+ * recognized as a duplicate; a long-lived process therefore grows this map
+ * without bound. Use a durable store with a TTL on completed entries for
+ * production.
+ */
 export declare class InMemoryClockifyIdempotencyLeaseStore implements ClockifyIdempotencyLeaseStore {
     private readonly leases;
     private readonly now;
@@ -3546,7 +3554,13 @@ export interface ClockifyIdempotencyLeaseStore {
     complete(key: string, owner: string): Promise<boolean>;
     release(key: string, owner: string): Promise<boolean>;
 }
-/** In-memory lease store for tests and single-process deployments. */
+/**
+ * In-memory lease store for tests and single-process deployments. Completed
+ * entries are retained forever (no TTL) so a replayed webhook is always
+ * recognized as a duplicate; a long-lived process therefore grows this map
+ * without bound. Use a durable store with a TTL on completed entries for
+ * production.
+ */
 export declare class InMemoryClockifyIdempotencyLeaseStore implements ClockifyIdempotencyLeaseStore {
     private readonly leases;
     private readonly now;
@@ -5588,6 +5602,7 @@ export * from "./node-http.js";
 export * from "./express.js";
 export * from "./fetch.js";
 export * from "./body-limit.js";
+export * from "./request-target.js";
 ```
 
 ### adapters/node-http.d.ts
@@ -5659,6 +5674,21 @@ export declare class InvalidContentLengthError extends Error {
 export declare function parseContentLength(value: string | undefined | null): number | undefined;
 export declare function resolveMaxBodyBytes(options?: BodyLimitOptions): number;
 export declare function isPayloadTooLargeError(error: unknown): error is PayloadTooLargeError;
+```
+
+### adapters/request-target.d.ts
+
+```ts
+/**
+ * Raised when a Node request-target is not origin-form (`/path`). An origin
+ * server only ever receives origin-form; absolute-form and authority-form
+ * are proxy-only per RFC 7230 and have no business reaching this adapter.
+ */
+export declare class InvalidRequestTargetError extends Error {
+    readonly requestTarget: string;
+    constructor(requestTarget: string);
+}
+export declare function parseHttpRequestTarget(requestTarget: string | undefined): URL;
 ```
 
 ## fetch-adapter

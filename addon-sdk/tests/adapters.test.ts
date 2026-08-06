@@ -3,6 +3,7 @@ import { ClockifyAddon, ClockifyManifest } from "../src";
 import {
   DEFAULT_MAX_BODY_BYTES,
   InvalidContentLengthError,
+  InvalidRequestTargetError,
   PayloadTooLargeError,
   createExpressAddonHandler,
   fromNodeRequest,
@@ -53,6 +54,18 @@ describe("Adapters", () => {
       ),
     ).rejects.toThrow(/positive integer/);
     expect(dispatched).toBe(false);
+  });
+
+  it("rejects an absolute-form Node request-target before it can pick its own host", async () => {
+    // A "/..." or "//..." target is always prefixed with http://localhost, so
+    // it can never resolve to a foreign host. Only a full "scheme://host/..."
+    // target bypasses that prefix entirely.
+    const mockReq = new IncomingMessage(new Socket());
+    mockReq.headers = { host: "localhost" };
+    mockReq.url = "http://evil.example/manifest";
+    mockReq.method = "GET";
+
+    await expect(fromNodeRequest(mockReq)).rejects.toBeInstanceOf(InvalidRequestTargetError);
   });
 
   it("rejects Node HTTP requests with oversized content-length before body parsing", async () => {
