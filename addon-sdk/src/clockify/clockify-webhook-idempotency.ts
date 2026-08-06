@@ -11,7 +11,13 @@ interface Lease {
   readonly completed: boolean;
 }
 
-/** In-memory lease store for tests and single-process deployments. */
+/**
+ * In-memory lease store for tests and single-process deployments. Completed
+ * entries are retained forever (no TTL) so a replayed webhook is always
+ * recognized as a duplicate; a long-lived process therefore grows this map
+ * without bound. Use a durable store with a TTL on completed entries for
+ * production.
+ */
 export class InMemoryClockifyIdempotencyLeaseStore implements ClockifyIdempotencyLeaseStore {
   private readonly leases = new Map<string, Lease>();
   private readonly now: () => number;

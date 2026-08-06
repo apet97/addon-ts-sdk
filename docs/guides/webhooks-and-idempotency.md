@@ -50,6 +50,11 @@ must be atomic and conditional on the current owner; an unguarded read-then-writ
 not sufficient. Keep the business write idempotent or transactional as well—the lease coordinates
 attempts but is not a substitute for a business-data transaction.
 
+`InMemoryClockifyIdempotencyLeaseStore` never expires a completed entry, so a long-lived process
+grows its lease map without bound. It is for tests and short-lived single-process deployments only.
+A production store must put a time-to-live on completed entries — long enough to cover Clockify's
+retry window for a delivery, then evict.
+
 ## Smallest correct path
 
 This stored-token lookup shape is reduced from the secure-server example:
