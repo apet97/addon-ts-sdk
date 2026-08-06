@@ -79,6 +79,20 @@ Do not serialize the client, token, or response request metadata into component 
 - An invalid generic path segment fails before fetch; accepted dynamic segments remain within one
   encoded path segment.
 
+## Pagination and rate limits
+
+`request(pathSegments, init)` reaches any Clockify REST resource behind the verified
+`backendUrl`, including paginated ones. This SDK does not model pagination — it stays at the
+transport boundary. When calling a paginated resource:
+
+- Follow Clockify's own `page`/`page-size` query parameters for that resource; check the entity's
+  API reference, since page-size limits and defaults are resource-specific and subject to change.
+- Keep fetching pages until a page returns fewer than `page-size` results.
+- `ClockifyAddonClient` already retries a confirmed `429` per [Failure behavior](#failure-behavior)
+  above; a pagination loop does not need its own retry logic on top of that.
+- Prefer the separate `clockify-ts-sdk` for typed, paginated entity operations (time entries,
+  projects, reports) — it is the entity model this client intentionally is not.
+
 ## Prove it
 
 Run the complete client contract suite:
