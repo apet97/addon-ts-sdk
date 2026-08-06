@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   InMemoryClockifyInstallationStore,
   createClockifyAesGcmTokenCodec,
@@ -80,6 +80,40 @@ describe("installation stores", () => {
     await expect(
       encrypted.delete({ workspaceId: "workspace-1", addonId: "addon-1", installedAt: 100 }),
     ).resolves.toBe("deleted");
+  });
+
+  it("round-trips the AES-GCM codec without a global Buffer (browser/workerd shape)", async () => {
+    const originalBuffer = globalThis.Buffer;
+    // @ts-expect-error simulating a runtime with no Node Buffer global
+    delete globalThis.Buffer;
+    try {
+      const key = await crypto.subtle.generateKey({ name: "AES-GCM", length: 256 }, false, [
+        "encrypt",
+        "decrypt",
+      ]);
+      const codec = createClockifyAesGcmTokenCodec(key);
+      const encoded = await codec.encode("installation-secret");
+      expect(encoded).not.toContain("installation-secret");
+      await expect(codec.decode(encoded)).resolves.toBe("installation-secret");
+    } finally {
+      globalThis.Buffer = originalBuffer;
+    }
+  });
+
+  it("rejects encoding when Web Crypto's getRandomValues is unavailable", async () => {
+    const key = await crypto.subtle.generateKey({ name: "AES-GCM", length: 256 }, false, [
+      "encrypt",
+      "decrypt",
+    ]);
+    const codec = createClockifyAesGcmTokenCodec(key);
+    // getRandomValues lives on Crypto.prototype, so deleting the instance
+    // property is a no-op; stub the whole global instead.
+    vi.stubGlobal("crypto", { ...globalThis.crypto, getRandomValues: undefined });
+    try {
+      await expect(codec.encode("installation-secret")).rejects.toThrow(/Web Crypto is required/);
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 
   it("fails open-null when encrypted storage is corrupt and rejects empty writes", async () => {
