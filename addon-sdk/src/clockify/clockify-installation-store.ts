@@ -139,6 +139,30 @@ export function createClockifyAesGcmTokenCodec(key: ClockifyAesGcmKey): Clockify
   };
 }
 
+/**
+ * Composes two codecs to support key rotation without a storage migration.
+ * Encodes only with `newCodec`; decodes by trying `newCodec` first, falling
+ * back to `oldCodec` for a row encrypted before the rotation. Once every
+ * stored row has been re-saved (and so re-encrypted with the new key), drop
+ * `oldCodec` and use `newCodec` alone. See the public-key-rotation
+ * deployment guide for the equivalent recipe applied to signature keys.
+ */
+export function createRotatingClockifyTokenCodec(
+  newCodec: ClockifyTokenCodec,
+  oldCodec: ClockifyTokenCodec,
+): ClockifyTokenCodec {
+  return {
+    encode: (token) => newCodec.encode(token),
+    async decode(encoded) {
+      try {
+        return await newCodec.decode(encoded);
+      } catch {
+        return oldCodec.decode(encoded);
+      }
+    },
+  };
+}
+
 function assertNonEmpty(value: string, field: string): void {
   if (value.trim() === "") throw new Error(`Clockify ${field} must not be empty.`);
 }

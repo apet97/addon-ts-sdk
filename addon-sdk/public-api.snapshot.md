@@ -765,6 +765,15 @@ export interface ClockifyTokenCodec {
 }
 /** Creates an AES-256-GCM token codec backed exclusively by Web Crypto. */
 export declare function createClockifyAesGcmTokenCodec(key: ClockifyAesGcmKey): ClockifyTokenCodec;
+/**
+ * Composes two codecs to support key rotation without a storage migration.
+ * Encodes only with `newCodec`; decodes by trying `newCodec` first, falling
+ * back to `oldCodec` for a row encrypted before the rotation. Once every
+ * stored row has been re-saved (and so re-encrypted with the new key), drop
+ * `oldCodec` and use `newCodec` alone. See the public-key-rotation
+ * deployment guide for the equivalent recipe applied to signature keys.
+ */
+export declare function createRotatingClockifyTokenCodec(newCodec: ClockifyTokenCodec, oldCodec: ClockifyTokenCodec): ClockifyTokenCodec;
 /** Wraps a store so installation and nested webhook credentials are encrypted at rest. */
 export declare function wrapClockifyInstallationStoreWithEncryption(store: ClockifyInstallationStore, codec: ClockifyTokenCodec): ClockifyInstallationStore;
 ```
@@ -3557,6 +3566,15 @@ export interface ClockifyTokenCodec {
 }
 /** Creates an AES-256-GCM token codec backed exclusively by Web Crypto. */
 export declare function createClockifyAesGcmTokenCodec(key: ClockifyAesGcmKey): ClockifyTokenCodec;
+/**
+ * Composes two codecs to support key rotation without a storage migration.
+ * Encodes only with `newCodec`; decodes by trying `newCodec` first, falling
+ * back to `oldCodec` for a row encrypted before the rotation. Once every
+ * stored row has been re-saved (and so re-encrypted with the new key), drop
+ * `oldCodec` and use `newCodec` alone. See the public-key-rotation
+ * deployment guide for the equivalent recipe applied to signature keys.
+ */
+export declare function createRotatingClockifyTokenCodec(newCodec: ClockifyTokenCodec, oldCodec: ClockifyTokenCodec): ClockifyTokenCodec;
 /** Wraps a store so installation and nested webhook credentials are encrypted at rest. */
 export declare function wrapClockifyInstallationStoreWithEncryption(store: ClockifyInstallationStore, codec: ClockifyTokenCodec): ClockifyInstallationStore;
 ```

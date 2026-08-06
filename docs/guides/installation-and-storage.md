@@ -33,6 +33,13 @@ handler runs.
 nested webhook credential before delegating to a store. Reads decrypt an intact record and return
 `null` when encrypted data is corrupt.
 
+To rotate the encryption key without a storage migration, wrap both keys with
+`createRotatingClockifyTokenCodec(newCodec, oldCodec)`: it encrypts every new write with the new
+key, and decrypts by trying the new key first, falling back to the old key for a row saved before
+the rotation. Deploy with the rotating codec, let normal application traffic re-save rows (each
+save re-encrypts with the new key), then once every row has been touched, redeploy with
+`createClockifyAesGcmTokenCodec(newKey)` alone.
+
 ## What your application must do
 
 Implement `ClockifyInstallationStore` on durable storage and wrap it with encryption backed by

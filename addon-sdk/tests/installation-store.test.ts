@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   InMemoryClockifyInstallationStore,
   createClockifyAesGcmTokenCodec,
+  createRotatingClockifyTokenCodec,
   wrapClockifyInstallationStoreWithEncryption,
   type ClockifyInstallationContext,
 } from "../src";
@@ -133,5 +134,41 @@ describe("installation stores", () => {
     );
     await raw.save(context(100, "enc:v1:not-valid"));
     await expect(encrypted.load("workspace-1", "addon-1")).resolves.toBeNull();
+  });
+
+  it("rotates encryption keys by decoding old-key rows and encoding new ones with the new key", async () => {
+    const oldKey = await crypto.subtle.generateKey({ name: "AES-GCM", length: 256 }, false, [
+      "encrypt",
+      "decrypt",
+    ]);
+    const newKey = await crypto.subtle.generateKey({ name: "AES-GCM", length: 256 }, false, [
+      "encrypt",
+      "decrypt",
+    ]);
+    const oldCodec = createClockifyAesGcmTokenCodec(oldKey);
+    const newCodec = createClockifyAesGcmTokenCodec(newKey);
+    const rotating = createRotatingClockifyTokenCodec(newCodec, oldCodec);
+
+    // A row encrypted before the rotation must still decode.
+    const legacyEncoded = await oldCodec.encode("pre-rotation-secret");
+    await expect(rotating.decode(legacyEncoded)).resolves.toBe("pre-rotation-secret");
+
+    // A newly encoded row must be decryptable with only the new key, proving
+    // encode() never falls back to the old codec.
+    const rotatedEncoded = await rotating.encode("post-rotation-secret");
+    await expect(newCodec.decode(rotatedEncoded)).resolves.toBe("post-rotation-secret");
+    await expect(oldCodec.decode(rotatedEncoded)).rejects.toThrow();
+
+    const raw = new InMemoryClockifyInstallationStore();
+    const store = wrapClockifyInstallationStoreWithEncryption(raw, rotating);
+    const legacyWebhookEncoded = await oldCodec.encode("webhook-secret");
+    await raw.save({
+      ...context(100, legacyEncoded),
+      webhooks: [{ path: "/expense", webhookType: "ADDON", authToken: legacyWebhookEncoded }],
+    });
+    await expect(store.load("workspace-1", "addon-1")).resolves.toMatchObject({
+      authToken: "pre-rotation-secret",
+      webhooks: [{ authToken: "webhook-secret" }],
+    });
   });
 });
