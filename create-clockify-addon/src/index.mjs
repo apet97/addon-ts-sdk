@@ -272,6 +272,13 @@ function tsconfig(runtime) {
 }
 
 /** Creates a Clockify add-on project without overwriting existing files. */
+function wranglerToml(name) {
+  return `name = "${name}"
+main = "src/index.ts"
+compatibility_date = "2026-07-12"
+`;
+}
+
 export async function scaffoldClockifyAddon(options) {
   if (options.runtime !== "node" && options.runtime !== "worker")
     throw new Error("runtime must be node or worker");
@@ -328,6 +335,9 @@ export async function scaffoldClockifyAddon(options) {
       resolve(directory, "README.md"),
       projectReadme(options.runtime, options.features),
     ),
+    ...(options.runtime === "worker"
+      ? [writeFile(resolve(directory, "wrangler.toml"), wranglerToml(packageName(directory)))]
+      : []),
   ]);
   return directory;
 }
