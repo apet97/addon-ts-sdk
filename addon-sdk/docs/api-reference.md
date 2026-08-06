@@ -108,6 +108,12 @@ highlights the stable boundaries and commonly used symbols; the generated
 - `generateTestKeys()` creates an RS256 key pair for tests.
 - `signTestToken(privateKey, addonKey, claims?, expiresIn?)` signs add-on JWTs that exercise the same
   verification path as Clockify-signed requests.
+- `createTestComponentRequest(token, overrides?)`, `createTestLifecycleRequest(token, payload, overrides?)`,
+  and `createTestWebhookRequest(token, eventType, payload, overrides?)` build ready-to-verify
+  `AddonRequest` values around a signed token, so a handler test does not hand-assemble headers and
+  query params.
+- `buildInstalledPayload(overrides?)` returns a documented `INSTALLED` lifecycle payload with every
+  required field defaulted.
 
 ## Validation, Security, Storage, and Client
 

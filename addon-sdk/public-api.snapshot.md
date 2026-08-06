@@ -2907,12 +2907,22 @@ export declare class ClockifyAddonClient {
 
 ```ts
 import type { ClockifyCryptoKey, ClockifyPrivateKeyInput } from "../clockify/clockify-crypto-key.js";
+import type { ClockifyInstalledLifecyclePayload } from "../clockify/clockify-lifecycle.js";
+import type { AddonRequest } from "../shared/request.js";
 export interface ClockifyTestKeys {
     publicKey: ClockifyCryptoKey;
     privateKey: ClockifyPrivateKeyInput;
     pem: string;
 }
 export declare function generateTestKeys(): Promise<ClockifyTestKeys>;
+/** Builds an `AddonRequest` for a signed component GET request, e.g. `?auth_token=<jwt>`. */
+export declare function createTestComponentRequest(token: string, overrides?: Partial<AddonRequest>): AddonRequest;
+/** Builds an `AddonRequest` for a signed lifecycle POST request carrying `payload`. */
+export declare function createTestLifecycleRequest(token: string, payload: unknown, overrides?: Partial<AddonRequest>): AddonRequest;
+/** Builds an `AddonRequest` for a signed webhook POST delivery carrying `payload`. */
+export declare function createTestWebhookRequest(token: string, eventType: string, payload: unknown, overrides?: Partial<AddonRequest>): AddonRequest;
+/** Builds a documented `INSTALLED` lifecycle payload with sensible test defaults. */
+export declare function buildInstalledPayload(overrides?: Partial<ClockifyInstalledLifecyclePayload>): ClockifyInstalledLifecyclePayload;
 export declare function signTestToken(privateKey: ClockifyPrivateKeyInput, addonKey: string, claims?: Record<string, unknown>, expiresIn?: string): Promise<string>;
 ```
 
@@ -5937,11 +5947,21 @@ export declare function formatClockifyDate(value: Date | number, locale: string,
 
 ```ts
 import type { ClockifyCryptoKey, ClockifyPrivateKeyInput } from "../clockify/clockify-crypto-key.js";
+import type { ClockifyInstalledLifecyclePayload } from "../clockify/clockify-lifecycle.js";
+import type { AddonRequest } from "../shared/request.js";
 export interface ClockifyTestKeys {
     publicKey: ClockifyCryptoKey;
     privateKey: ClockifyPrivateKeyInput;
     pem: string;
 }
 export declare function generateTestKeys(): Promise<ClockifyTestKeys>;
+/** Builds an `AddonRequest` for a signed component GET request, e.g. `?auth_token=<jwt>`. */
+export declare function createTestComponentRequest(token: string, overrides?: Partial<AddonRequest>): AddonRequest;
+/** Builds an `AddonRequest` for a signed lifecycle POST request carrying `payload`. */
+export declare function createTestLifecycleRequest(token: string, payload: unknown, overrides?: Partial<AddonRequest>): AddonRequest;
+/** Builds an `AddonRequest` for a signed webhook POST delivery carrying `payload`. */
+export declare function createTestWebhookRequest(token: string, eventType: string, payload: unknown, overrides?: Partial<AddonRequest>): AddonRequest;
+/** Builds a documented `INSTALLED` lifecycle payload with sensible test defaults. */
+export declare function buildInstalledPayload(overrides?: Partial<ClockifyInstalledLifecyclePayload>): ClockifyInstalledLifecyclePayload;
 export declare function signTestToken(privateKey: ClockifyPrivateKeyInput, addonKey: string, claims?: Record<string, unknown>, expiresIn?: string): Promise<string>;
 ```
