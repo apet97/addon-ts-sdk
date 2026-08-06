@@ -49,8 +49,27 @@ function normalizeBackendUrl(value: string): URL {
   return url;
 }
 
+/**
+ * Rejects an empty, `.`, or `..` segment — including one only reachable by
+ * decoding a caller-supplied percent-encoding once (e.g. `%2e%2e`). Every
+ * segment is still passed through encodeURIComponent below, which already
+ * keeps embedded `/`, `?`, and `#` characters confined to their own opaque
+ * segment; only a segment that resolves to a bare dot or dot-dot is an
+ * actual traversal risk. Malformed percent-encoding is rejected outright.
+ */
+function isBadClockifyPathSegment(segment: string): boolean {
+  if (segment === "" || segment === "." || segment === "..") return true;
+  let decoded: string;
+  try {
+    decoded = decodeURIComponent(segment);
+  } catch {
+    return true;
+  }
+  return decoded === "" || decoded === "." || decoded === "..";
+}
+
 function requestUrl(base: URL, segments: readonly string[]): URL {
-  if (segments.some((segment) => segment === "" || segment === "." || segment === "..")) {
+  if (segments.some(isBadClockifyPathSegment)) {
     throw new Error("Clockify API path segments must be non-empty and must not be '.' or '..'.");
   }
   const url = new URL(base);
