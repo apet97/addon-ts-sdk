@@ -31,6 +31,11 @@ highlights the stable boundaries and commonly used symbols; the generated
 - `ValidationException` and `IllegalArgumentException` mirror the Java SDK's registration errors.
 - `AddonErrorReporter` and `AddonOptions` let host apps observe handled router/adapter errors without
   changing the SDK's quiet default response policy.
+- Return a plain object or array from a handler's `body` to get an `application/json` response.
+  `isJsonBody` recognizes only `{}`-prototype objects and arrays; a class instance — `Map`, `Set`,
+  `Date`, `RegExp`, or your own class — is not JSON-serialized, since `JSON.stringify` silently
+  discards a `Map`'s or `Set`'s entries instead of erroring. Convert to a plain object first, e.g.
+  `Object.fromEntries(myMap)`.
 
 ## Manifest Builders and Models
 
