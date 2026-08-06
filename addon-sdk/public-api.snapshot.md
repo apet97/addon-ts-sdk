@@ -14,7 +14,15 @@ export * from "./shared/response.js";
 export * from "./shared/handler.js";
 export * from "./shared/errors.js";
 export * from "./clockify/index.js";
+/**
+ * @deprecated Import from `@apet97/clockify-addon-sdk/client` instead. Kept here for backward
+ * compatibility; scheduled for removal in a future major version.
+ */
 export * from "./client/index.js";
+/**
+ * @deprecated Import from `@apet97/clockify-addon-sdk/testing` instead. Kept here for backward
+ * compatibility; scheduled for removal in a future major version.
+ */
 export * as testing from "./testing/index.js";
 ```
 
