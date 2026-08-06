@@ -43,7 +43,12 @@ export function getClockifyHeaderValues(headers: AddonRequest["headers"], name: 
     if (Array.isArray(value)) {
       values.push(...value);
     } else if (value !== undefined) {
-      values.push(value);
+      // Node and the Fetch Headers object both fold a client-repeated header into
+      // one comma-joined string instead of an array. None of Clockify's signature,
+      // event-type, or lifecycle-token values ever legitimately contain a comma, so
+      // splitting here surfaces every value the client actually sent for the
+      // ambiguity checks below.
+      values.push(...value.split(","));
     }
   }
 

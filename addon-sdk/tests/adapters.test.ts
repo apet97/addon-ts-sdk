@@ -86,6 +86,45 @@ describe("Adapters", () => {
     await expect(hugePromise).rejects.toBeInstanceOf(InvalidContentLengthError);
   });
 
+  it("rejects Node HTTP requests with a duplicate content-length header", async () => {
+    // Node's IncomingMessage.headers silently keeps only the first content-length
+    // value; the duplicate is only visible on rawHeaders.
+    const mockReq = new IncomingMessage(new Socket());
+    mockReq.headers = { host: "localhost", "content-length": "5" };
+    mockReq.rawHeaders = ["host", "localhost", "content-length", "5", "content-length", "6"];
+    mockReq.url = "/webhook";
+    mockReq.method = "POST";
+
+    const promise = fromNodeRequest(mockReq);
+    mockReq.emit("end");
+
+    await expect(promise).rejects.toBeInstanceOf(InvalidContentLengthError);
+  });
+
+  it("delivers a Fetch request's raw (possibly comma-joined) header value to the handler", async () => {
+    // The Fetch Headers object folds a repeated header into one comma-joined
+    // string before the SDK ever sees it; verifying that duplicate signatures
+    // are rejected as ambiguous is covered in request-verification.test.ts,
+    // against the same comma-joined shape asserted here.
+    const addon = new ClockifyAddon(mockManifest);
+    let receivedSignature: string | string[] | undefined;
+    addon.registerHandler("/component", "GET", (req) => {
+      receivedSignature = req.headers["clockify-signature"];
+      return { status: 200, body: "ok" };
+    });
+
+    const request = new Request("https://example.com/component", {
+      headers: [
+        ["clockify-signature", "jwt1.jwt1.jwt1"],
+        ["clockify-signature", "jwt2.jwt2.jwt2"],
+      ],
+    });
+
+    const response = await handleFetchRequest(addon, request);
+    expect(response.status).toBe(200);
+    expect(receivedSignature).toBe("jwt1.jwt1.jwt1, jwt2.jwt2.jwt2");
+  });
+
   it("rejects Node HTTP requests that stream past maxBodyBytes without content-length", async () => {
     const mockReq = new IncomingMessage(new Socket());
     mockReq.headers = { host: "localhost" };

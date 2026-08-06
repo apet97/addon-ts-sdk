@@ -239,6 +239,23 @@ describe("Marketplace request verification helpers", () => {
     ).resolves.toEqual({ ok: false, reason: "ambiguous-event-type" });
   });
 
+  it("rejects a duplicate signature comma-joined into one header value", async () => {
+    // Node and the Fetch Headers object both fold a client-repeated header into
+    // one "value1, value2" string rather than an array; a real signature must
+    // still be caught as ambiguous in that shape.
+    const token = await validToken();
+
+    await expect(
+      verifyClockifyRequest(
+        parser(),
+        request({
+          [ClockifyHeaders.SIGNATURE]: `${token}, ${token}`,
+          [ClockifyHeaders.WEBHOOK_EVENT_TYPE]: "EXPENSE_CREATED",
+        }),
+      ),
+    ).resolves.toEqual({ ok: false, reason: "ambiguous-signature" });
+  });
+
   it("verifies webhook requests with event, workspace, add-on, and stored webhook token checks", async () => {
     const token = await validToken();
 

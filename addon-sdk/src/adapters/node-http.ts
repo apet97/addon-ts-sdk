@@ -21,6 +21,19 @@ function contentLengthExceedsLimit(
   return (parseContentLength(contentLength) ?? 0) > maxBodyBytes;
 }
 
+/**
+ * Node keeps only the first value of a repeated `content-length` header on
+ * `req.headers`, silently discarding the rest. `req.rawHeaders` preserves every
+ * line the client sent, so it is the only place a duplicate is still visible.
+ */
+function hasDuplicateContentLengthHeader(rawHeaders: readonly string[]): boolean {
+  let count = 0;
+  for (let i = 0; i < rawHeaders.length; i += 2) {
+    if (rawHeaders[i]?.toLowerCase() === "content-length") count += 1;
+  }
+  return count > 1;
+}
+
 async function readBody(req: IncomingMessage, maxBodyBytes: number): Promise<Uint8Array> {
   return new Promise((resolve, reject) => {
     const chunks: Uint8Array[] = [];
@@ -48,6 +61,9 @@ export async function fromNodeRequest(
 ): Promise<AddonRequest> {
   const url = parseHttpRequestTarget(req.url);
   const maxBodyBytes = resolveMaxBodyBytes(options);
+  if (hasDuplicateContentLengthHeader(req.rawHeaders)) {
+    throw new InvalidContentLengthError(String(req.headers["content-length"]));
+  }
   if (contentLengthExceedsLimit(req.headers, maxBodyBytes)) {
     throw new PayloadTooLargeError(maxBodyBytes);
   }
