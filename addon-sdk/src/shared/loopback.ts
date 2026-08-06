@@ -4,5 +4,8 @@ export function isCanonicalLoopbackHostname(hostname: string): boolean {
 
 /** True for HTTPS, or HTTP restricted to a canonical loopback host (local dev). */
 export function isHttpsOrLoopbackHttp(url: URL): boolean {
-  return url.protocol === "https:" || (url.protocol === "http:" && isCanonicalLoopbackHostname(url.hostname));
+  return (
+    url.protocol === "https:" ||
+    (url.protocol === "http:" && isCanonicalLoopbackHostname(url.hostname))
+  );
 }
