@@ -32,11 +32,32 @@ submission evidence.
 ## 1.1.0 release candidate
 
 Workspace versions `@apet97/clockify-addon-sdk@1.1.0` and `create-clockify-addon@1.1.0` are prepared
-on branch `perfect-state-2026-08-06` and staged for release. Publication requires explicit
-npm-owner approval for the exact packages and versions before `npm publish` runs; until that
-approval and the publish itself complete, the "Published versions" section above remains the
-accurate record of what the registry currently serves. This section will gain the same release
-evidence as prior versions once publication happens.
+on branch `perfect-state-2026-08-06`. Publication requires explicit npm-owner approval for the exact
+packages and versions; until that approval and the publish itself complete, the "Published versions"
+section above remains the accurate record of what the registry currently serves.
+
+`npm run release:preflight` confirmed both exact versions are absent from the registry.
+`npm run release:verify` (`ci:verify && verify:schema-live && release:dry-run`) does **not** pass
+end to end, so this release candidate does not yet meet the Publish boundary below:
+
+- `ci:verify` passed through 466 tests, thresholded coverage, lint, format, build, the public API
+  snapshot, `verify:dist`, `pack:dry-run`, package-lint, package-consumer, and all four packed
+  Node/Worker scaffolds (including real `workerd` routes), and `npm audit --omit=dev` (0
+  vulnerabilities; the production dependency tree is `jose` alone). It failed only at the
+  full-tree `npm audit` step, on three pre-existing transitive **dev-tooling** advisories
+  (`brace-expansion`, `fast-uri`, `postcss`) that predate this branch. Fixing them needs separate
+  dependency-update authority and was intentionally not done here.
+- `verify:schema-live` failed: Clockify's live schema endpoint now serves a genuine, distinct
+  schema `1.6` (its own `$schema`/`definitions`, not an echo of `1.5`) where the check expects an
+  HTTP 400 for an unvendored version. This SDK's vendored schema set (`1.2`-`1.5`) is behind the
+  live Marketplace and needs its own vendoring/generation pass before publication; it is a real
+  product-surface gap, not a check-assumption problem.
+- `npm run release:dry-run` (manually re-run after the audit failure short-circuited the chain)
+  passed for both packages; both tarball contents matched the "Expected package shape" section
+  below.
+
+Resolve the schema-1.6 gap (and, separately, decide on the dev-tooling audit advisories) before
+treating this candidate as publish-ready.
 
 ## 1.0.5 release evidence
 
