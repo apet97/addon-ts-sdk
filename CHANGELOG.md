@@ -4,8 +4,50 @@ All notable changes to this SDK are recorded here.
 
 ## Unreleased
 
+## 1.1.0
+
 - Kept documentation verification deterministic by excluding Git-ignored local memory, worktree,
   prompt, and upstream-reference Markdown from the active repository document set.
+- Closed a webhook timing oracle by verifying the signed JWT before comparing the fixed expected
+  token, and removed a redundant second verification on the lookup-token path.
+- Split comma-joined duplicate header values before verification and rejected Node requests with a
+  duplicate `Content-Length` header, closing a request-smuggling class of ambiguity.
+- Rejected client path segments that decode to `.`/`..`, and rejected absolute-form
+  (`scheme://...`) Node request targets.
+- Redacted headers, query strings, and bodies before `onError` reporters see a request; added
+  `onError` support to the Express adapter.
+- Hardened installation-store base64 encode/decode with a `Buffer` fast path and an explicit guard
+  when `globalThis.crypto.getRandomValues` is unavailable; added `createRotatingClockifyTokenCodec`
+  for encryption-key rotation without a forced re-encrypt migration.
+- Made manifest/webhook/lifecycle registration atomic: a route only appears in the manifest after
+  it binds, and an identical re-registration is a no-op instead of a conflict.
+- Moved `ajv`/`ajv-draft-04` to devDependencies; the packed SDK's production dependency tree is now
+  `jose` alone.
+- Memoized per-path allowed methods instead of rescanning every request; dropped an unnecessary
+  Fetch body stream clone.
+- Added `isJsonBody` narrowing that excludes `Map`/`Set`/`Date`/`RegExp` and other class instances
+  from the JSON-body fast path.
+- Added an `onRetry` observer hook to `ClockifyAddonClient` and an `AllowedMethodsByPath` cache
+  cleared on registration.
+- Deprecated the legacy `/adapters` aggregate export in favor of the runtime-specific subpaths.
+- Added `ClockifyManifest.builder()` as a canonical alias for `v1_5Builder()`; the webhook wrapper
+  now fails fast on misconfiguration at construction and reports lookup-token misses through
+  `onError` before returning 401.
+- Expanded `testing/index.ts` with request/payload builder helpers
+  (`createTestComponentRequest`, `createTestLifecycleRequest`, `createTestWebhookRequest`,
+  `buildInstalledPayload`).
+- Added `isAddonInputError` and clarified the absolute-path validation error message.
+- Fixed `applyClockifyLanguage`'s multi-underscore locale conversion and `formatClockifyDate`'s
+  crash on a malformed locale; documented `createClockifyHtmlResponse`'s default
+  `frame-ancestors 'none'` deny-all.
+- Generated a Worker-runtime `wrangler.toml` (`main`, `compatibility_date`, project name) in the
+  creator scaffold so `wrangler dev`/`wrangler deploy` work without extra flags.
+- Aligned the engine floor to Node `>=22.13.0` across both packages and documentation.
+- Documented deferred/out-of-scope findings instead of rushing unjustified changes: bundle-size
+  debt, pagination/rate-limit guidance for `ClockifyAddonClient.request()`, and public-key rotation.
+- Recorded documented Java/TypeScript SDK behavioral divergences in the parity checklist.
+- `verify:dist` now walks the portable ESM entry's relative-import closure to catch a `node:*`
+  leak into the runtime-neutral graph.
 
 ## 1.0.5 - 2026-07-14
 
