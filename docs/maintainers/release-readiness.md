@@ -7,8 +7,8 @@ Historical receipts below prove only the source SHA and environment they name.
 
 The latest registry publication is:
 
-- `@apet97/clockify-addon-sdk@1.0.5`
-- `create-clockify-addon@1.0.5`
+- `@apet97/clockify-addon-sdk@1.1.0`
+- `create-clockify-addon@1.1.0`
 
 Install the SDK with `npm install @apet97/clockify-addon-sdk` or create a project with
 `npm create clockify-addon@latest`. npm versions are immutable: every future release requires a
@@ -29,14 +29,15 @@ check must reject immutable versions that are already published. Documentation v
 not create a new release candidate, registry receipt, authenticated Clockify receipt, or Marketplace
 submission evidence.
 
-## 1.1.0 release candidate
+## 1.1.0 release evidence
 
-Workspace versions `@apet97/clockify-addon-sdk@1.1.0` and `create-clockify-addon@1.1.0` are prepared
-on branch `perfect-state-2026-08-06`. Publication requires explicit npm-owner approval for the exact
-packages and versions; until that approval and the publish itself complete, the "Published versions"
-section above remains the accurate record of what the registry currently serves.
+Branch `perfect-state-2026-08-06` merged into `main` at commit `919639e1c0b7f4bcb4d85a0b32fb37ba4c4b81d7`
+with no conflicts. Before pushing, the merged tree passed `npm ci`, `npm audit --omit=dev` (0
+vulnerabilities), and the full `npm run ci:verify` gate (exit code 0). SDK CI run
+[`31204639564`](https://github.com/apet97/addon-ts-sdk/actions/runs/31204639564) then passed on Node
+22.13.0 and Node 24.x against `main`.
 
-`npm run release:preflight` confirmed both exact versions are absent from the registry.
+`npm run release:preflight` confirmed both exact versions were absent from the registry.
 `npm run release:verify` (`ci:verify && verify:schema-live && release:dry-run`) now **passes end to
 end**:
 
@@ -56,10 +57,10 @@ end**:
 - `npm run release:dry-run` passed for both packages; both tarball contents matched the "Expected
   package shape" section below.
 
-Any future `src/**` change (as opposed to a documentation-only pass) requires a fresh live receipt
-— an authenticated install exercising installation, component authentication, webhook delivery, and
-uninstall cleanup — before that release counts as Marketplace-proven; see the Future release
-checklist below. This candidate does not yet have a 1.1.0 live receipt.
+Before this publish, a cloudflared-tunnel developer-workspace pass against an unpublished-tarball
+scaffold accepted the generated manifest and, per the publisher's confirmation, exercised
+installation, component authentication, webhook delivery, and uninstall cleanup end to end. This
+satisfies the Publish boundary's live-receipt requirement for this candidate.
 
 A later pass on the same branch added `withClockifyHandler()` (a unified additive alternative to
 the `withClockify*` wrappers, P2.6), narrowed generated `Record<string, any>` `options` fields to
@@ -76,6 +77,21 @@ wire-header naming defect in `addon-sdk/docs/api-reference.md`'s P2.6 mapping ta
 the prior pass, and removed `docs/superpowers/**` and an orphaned stale `docs/product-surface.json`
 that were not customer-facing. No `src/**` change; `npm run ci:verify` passed end to end
 afterward.
+
+The exact artifacts were published from `main` commit `919639e1c0b7f4bcb4d85a0b32fb37ba4c4b81d7` in
+SDK-first order with these immutable registry digests:
+
+- `@apet97/clockify-addon-sdk@1.1.0`: SHA-1
+  `7069765c3299de3154aadf100e9253a91ad6c7d7`; SHA-512
+  `sha512-d68r8kdrq0XlQBThR/Ugzia6XUlIO/2y+tQFphPxYy/nO0VIslqDZNXHoN7bgBVdgHH+WAa8OvzIO93yg4L4QA==`
+- `create-clockify-addon@1.1.0`: SHA-1
+  `789af5419ac8444f49d368de8ac88d874351c830`; SHA-512
+  `sha512-jlriOSmcDnGKGsDNK3NZOfK2cLQE7ShkH38l0IW4ldcVANiKM+CmlypJnGzzfjf9N8cQOnXiamkwAXO8KBvscA==`
+
+Post-publication `npm run verify:registry` passed from an isolated empty npm cache and executed both
+exact public versions, including a real `npm create` scaffold that type-checked and served a
+schema-valid manifest. Both `latest` tags resolve to 1.1.0. No Git tag or Marketplace submission was
+created.
 
 ## 1.0.5 release evidence
 

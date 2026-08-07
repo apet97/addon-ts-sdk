@@ -4,7 +4,7 @@ All notable changes to this SDK are recorded here.
 
 ## Unreleased
 
-## 1.1.0
+## 1.1.0 - 2026-08-07
 
 - Kept documentation verification deterministic by excluding Git-ignored local memory, worktree,
   prompt, and upstream-reference Markdown from the active repository document set.
