@@ -62,6 +62,13 @@ export declare abstract class Addon<M> {
         method: string;
     }>;
     use(middleware: AddonMiddleware): void;
+    /**
+     * The `Allow` header (on `204` for `OPTIONS` and `405`) lists synthetic
+     * methods: `HEAD` is synthesized for every registered `GET` route, and
+     * `OPTIONS` for every path. {@link getRegisteredRequests} reflects only
+     * explicitly registered handlers — `Allow` reflects this wider, synthetic
+     * view.
+     */
     handle(request: AddonRequest): Promise<AddonResponse>;
 }
 ```
@@ -156,6 +163,11 @@ import { ClockifyWebhook, ClockifyLifecycleEvent, ClockifyComponent } from "./cl
  * fixture) must still start. Use {@link createValidatedClockifyAddon} instead when the manifest's
  * shape is not statically known (built at runtime from configuration, deserialized JSON) and you
  * want a schema violation to fail fast at startup rather than surface later as a rejected install.
+ *
+ * The default `M` (when constructed without an explicit manifest, which the type inference above
+ * makes unnecessary in practice) is the 1.4 manifest shape, kept only for backward compatibility.
+ * New code should let `M` infer from a real manifest, or parameterize explicitly with
+ * `ClockifyManifest<"1.5">` / `ClockifyManifest<"1.6">`.
  */
 export declare class ClockifyAddon<M extends {
     readonly schemaVersion: ClockifySchemaVersion;
@@ -179,7 +191,12 @@ import * as generated from "./generated/index.js";
 export type ClockifySchemaVersion = "1.2" | "1.3" | "1.4" | "1.5" | "1.6";
 export type ClockifyManifest<V extends ClockifySchemaVersion = "1.4"> = V extends "1.2" ? generated.v1_2.ClockifyManifest : V extends "1.3" ? generated.v1_3.ClockifyManifest : V extends "1.4" ? generated.v1_4.ClockifyManifest : V extends "1.5" ? generated.v1_5.ClockifyManifest : generated.v1_6.ClockifyManifest;
 export declare const ClockifyManifest: {
-    /** Canonical entry point: the current schema version's builder (currently 1.5). */
+    /**
+     * Canonical entry point: the current schema version's builder (currently
+     * 1.5). Schema 1.6 is also vendored and stable — it is additive over 1.5
+     * (see `addon-sdk/docs/manifest-builders.md`) — and available via
+     * {@link v1_6Builder} for a project that wants its newer fields.
+     */
     builder: typeof generated.v1_5.ClockifyManifest.builder;
     v1_2Builder: typeof generated.v1_2.ClockifyManifest.builder;
     v1_3Builder: typeof generated.v1_3.ClockifyManifest.builder;
@@ -338,6 +355,12 @@ export interface ClockifyRequestVerificationOptions {
     expectedEventType?: string;
     expectedWorkspaceId?: string;
     expectedAddonId?: string;
+    /**
+     * When `true`, a JWT without an `exp` claim fails with `missing-expiration`.
+     * Unset (the default) accepts a token with no `exp`, matching Clockify's
+     * lifecycle and webhook `authToken`s, which never expire.
+     */
+    requireExpiration?: boolean;
 }
 export interface ClockifyWebhookVerificationOptions {
     signatureHeader?: string;
@@ -346,13 +369,21 @@ export interface ClockifyWebhookVerificationOptions {
     expectedWorkspaceId?: string;
     expectedAddonId?: string;
     expectedWebhookAuthToken: string;
+    /**
+     * When `true`, a webhook JWT without an `exp` claim fails with
+     * `missing-expiration`. Unset (the default) accepts a webhook `authToken`
+     * with no `exp`, matching the documented Clockify contract that it never
+     * expires. Set this only if your signer adds `exp` and you want it
+     * enforced.
+     */
+    requireExpiration?: boolean;
 }
 export interface ClockifyTokenVerificationOptions {
     expectedWorkspaceId?: string;
     expectedAddonId?: string;
     requireExpiration?: boolean;
 }
-export type ClockifyRequestVerificationFailureReason = "missing-signature" | "ambiguous-signature" | "invalid-signature" | "missing-event-type" | "ambiguous-event-type" | "event-type-mismatch" | "workspace-id-mismatch" | "addon-id-mismatch";
+export type ClockifyRequestVerificationFailureReason = "missing-signature" | "ambiguous-signature" | "invalid-signature" | "missing-expiration" | "missing-event-type" | "ambiguous-event-type" | "event-type-mismatch" | "workspace-id-mismatch" | "addon-id-mismatch";
 export type ClockifyWebhookVerificationFailureReason = ClockifyRequestVerificationFailureReason | "missing-expected-event-type" | "missing-expected-webhook-auth-token" | "missing-installation-context" | "webhook-token-mismatch";
 export type ClockifyTokenVerificationFailureReason = "ambiguous-token" | "missing-token" | "invalid-token" | "missing-expiration" | "workspace-id-mismatch" | "addon-id-mismatch";
 export type ClockifyRequestVerificationResult = {
@@ -891,9 +922,13 @@ export declare function createRotatingClockifyTokenCodec(newCodec: ClockifyToken
  * Wraps a store so installation and nested webhook credentials are encrypted at rest.
  *
  * A `load()` whose stored row fails to decode (wrong key, tampering, corruption) returns `null`,
- * the same result as "no installation" — the caller must fail closed either way. Pass
- * `onDecodeError` to observe the difference for operational alerting; it does not change what
- * `load()` returns.
+ * the same result as "no installation" — the caller must fail closed either way.
+ *
+ * @param onDecodeError - Required in production. Called when a stored row fails to decrypt
+ *   (wrong key or corrupted data). It does not change what `load()` returns — decode failures
+ *   stay indistinguishable from "never installed" to the caller either way — but without it, a
+ *   decode failure is silent, with no signal that storage is misconfigured or corrupted rather
+ *   than simply unpopulated. Wire it to your logger or alerting.
  */
 export declare function wrapClockifyInstallationStoreWithEncryption(store: ClockifyInstallationStore, codec: ClockifyTokenCodec, onDecodeError?: (error: unknown, workspaceId: string, addonId: string) => void): ClockifyInstallationStore;
 ```
@@ -907,17 +942,39 @@ export interface ClockifyIdempotencyLeaseStore {
     complete(key: string, owner: string): Promise<boolean>;
     release(key: string, owner: string): Promise<boolean>;
 }
+/** Bounds for {@link InMemoryClockifyIdempotencyLeaseStore}'s completed-entry retention. */
+export interface ClockifyIdempotencyLeaseStoreOptions {
+    /**
+     * Caps how many completed entries are retained at once. Once exceeded, the
+     * oldest completed entry is evicted (FIFO). Unset keeps every completed
+     * entry (the default, unbounded).
+     */
+    readonly maxCompletedEntries?: number;
+    /**
+     * TTL, in milliseconds, for a completed entry. Once it elapses, the key is
+     * treated as never completed and becomes claimable again — a webhook
+     * redelivered after the TTL is no longer deduplicated. Unset retains
+     * completed entries forever (the default), matching the class's original
+     * behavior.
+     */
+    readonly completedTtlMs?: number;
+}
 /**
- * In-memory lease store for tests and single-process deployments. Completed
- * entries are retained forever (no TTL) so a replayed webhook is always
- * recognized as a duplicate; a long-lived process therefore grows this map
- * without bound. Use a durable store with a TTL on completed entries for
- * production.
+ * In-memory lease store for tests and single-process deployments. By
+ * default, completed entries are retained forever (no TTL) so a replayed
+ * webhook is always recognized as a duplicate; a long-lived process
+ * therefore grows this map without bound. Pass `maxCompletedEntries` and/or
+ * `completedTtlMs` to bound that growth, or use a durable store with a TTL
+ * on completed entries for production.
  */
 export declare class InMemoryClockifyIdempotencyLeaseStore implements ClockifyIdempotencyLeaseStore {
     private readonly leases;
+    private readonly completedOrder;
     private readonly now;
-    constructor(now?: () => number);
+    private readonly options;
+    constructor(now?: () => number, options?: ClockifyIdempotencyLeaseStoreOptions);
+    /** Number of keys currently tracked (active leases plus retained completed entries). */
+    size(): number;
     claim(key: string, owner: string, leaseMs: number): Promise<boolean>;
     complete(key: string, owner: string): Promise<boolean>;
     release(key: string, owner: string): Promise<boolean>;
@@ -3512,13 +3569,33 @@ export interface ClockifyAddonClientOptions {
     /** Observe retries for metrics/logging. Never affects retry behavior, even if it throws. */
     readonly onRetry?: (info: ClockifyAddonClientRetryInfo) => void;
 }
-/** HTTP failure returned by a Clockify add-on API call. */
+/**
+ * HTTP failure returned by a Clockify add-on API call.
+ *
+ * `responseBody` is read in full via `response.text()` with no size cap — the Clockify backend is
+ * trusted, but a misconfigured proxy or a network failure mid-response could still return a large
+ * body, which is buffered entirely before this error is thrown.
+ */
 export declare class ClockifyAddonHttpError extends Error {
     readonly status: number;
     readonly responseBody: string;
     constructor(status: number, responseBody: string);
 }
-/** Fetch-based client for Marketplace-specific add-on token, settings, and generic API calls. */
+/**
+ * Fetch-based client for Marketplace-specific add-on token, settings, and generic API calls.
+ *
+ * A request can reject with:
+ * - {@link ClockifyAddonHttpError} on a non-`ok` HTTP status.
+ * - `Error("Clockify add-on request timed out.")` — a generic `Error`, matched by `/timed out/i` —
+ *   when one attempt exceeds `timeoutMs`.
+ * - `signal.reason` (identity preserved, may be a `DOMException`) when the caller's `signal` aborts.
+ * - `Error` with `cause` set to the original parse error when `getSettings`/`updateSettings` receive
+ *   a `200` response whose body is not valid JSON.
+ *
+ * The `sleep` constructor option exists to let tests control backoff timing; a production override
+ * must not throw or reject — if it does, that rejection propagates as-is instead of one of the
+ * shapes above.
+ */
 export declare class ClockifyAddonClient {
     private readonly token;
     private readonly backendUrl;
@@ -3532,6 +3609,12 @@ export declare class ClockifyAddonClient {
     private notifyRetry;
     private send;
     private expectOk;
+    /**
+     * Parses an ok response as JSON, wrapping a malformed body (a `SyntaxError`
+     * from `response.json()`) with a clearer message and `cause` chain instead
+     * of letting the raw parse error surface unattributed.
+     */
+    private parseJson;
     /** Exchanges an installation token for a user-scoped add-on token. */
     exchangeUserToken(userId: string): Promise<string>;
     /** Retrieves structured settings for one installation workspace. */
@@ -3612,6 +3695,11 @@ import { ClockifyWebhook, ClockifyLifecycleEvent, ClockifyComponent } from "./cl
  * fixture) must still start. Use {@link createValidatedClockifyAddon} instead when the manifest's
  * shape is not statically known (built at runtime from configuration, deserialized JSON) and you
  * want a schema violation to fail fast at startup rather than surface later as a rejected install.
+ *
+ * The default `M` (when constructed without an explicit manifest, which the type inference above
+ * makes unnecessary in practice) is the 1.4 manifest shape, kept only for backward compatibility.
+ * New code should let `M` infer from a real manifest, or parameterize explicitly with
+ * `ClockifyManifest<"1.5">` / `ClockifyManifest<"1.6">`.
  */
 export declare class ClockifyAddon<M extends {
     readonly schemaVersion: ClockifySchemaVersion;
@@ -3635,7 +3723,12 @@ import * as generated from "./generated/index.js";
 export type ClockifySchemaVersion = "1.2" | "1.3" | "1.4" | "1.5" | "1.6";
 export type ClockifyManifest<V extends ClockifySchemaVersion = "1.4"> = V extends "1.2" ? generated.v1_2.ClockifyManifest : V extends "1.3" ? generated.v1_3.ClockifyManifest : V extends "1.4" ? generated.v1_4.ClockifyManifest : V extends "1.5" ? generated.v1_5.ClockifyManifest : generated.v1_6.ClockifyManifest;
 export declare const ClockifyManifest: {
-    /** Canonical entry point: the current schema version's builder (currently 1.5). */
+    /**
+     * Canonical entry point: the current schema version's builder (currently
+     * 1.5). Schema 1.6 is also vendored and stable — it is additive over 1.5
+     * (see `addon-sdk/docs/manifest-builders.md`) — and available via
+     * {@link v1_6Builder} for a project that wants its newer fields.
+     */
     builder: typeof generated.v1_5.ClockifyManifest.builder;
     v1_2Builder: typeof generated.v1_2.ClockifyManifest.builder;
     v1_3Builder: typeof generated.v1_3.ClockifyManifest.builder;
@@ -3794,6 +3887,12 @@ export interface ClockifyRequestVerificationOptions {
     expectedEventType?: string;
     expectedWorkspaceId?: string;
     expectedAddonId?: string;
+    /**
+     * When `true`, a JWT without an `exp` claim fails with `missing-expiration`.
+     * Unset (the default) accepts a token with no `exp`, matching Clockify's
+     * lifecycle and webhook `authToken`s, which never expire.
+     */
+    requireExpiration?: boolean;
 }
 export interface ClockifyWebhookVerificationOptions {
     signatureHeader?: string;
@@ -3802,13 +3901,21 @@ export interface ClockifyWebhookVerificationOptions {
     expectedWorkspaceId?: string;
     expectedAddonId?: string;
     expectedWebhookAuthToken: string;
+    /**
+     * When `true`, a webhook JWT without an `exp` claim fails with
+     * `missing-expiration`. Unset (the default) accepts a webhook `authToken`
+     * with no `exp`, matching the documented Clockify contract that it never
+     * expires. Set this only if your signer adds `exp` and you want it
+     * enforced.
+     */
+    requireExpiration?: boolean;
 }
 export interface ClockifyTokenVerificationOptions {
     expectedWorkspaceId?: string;
     expectedAddonId?: string;
     requireExpiration?: boolean;
 }
-export type ClockifyRequestVerificationFailureReason = "missing-signature" | "ambiguous-signature" | "invalid-signature" | "missing-event-type" | "ambiguous-event-type" | "event-type-mismatch" | "workspace-id-mismatch" | "addon-id-mismatch";
+export type ClockifyRequestVerificationFailureReason = "missing-signature" | "ambiguous-signature" | "invalid-signature" | "missing-expiration" | "missing-event-type" | "ambiguous-event-type" | "event-type-mismatch" | "workspace-id-mismatch" | "addon-id-mismatch";
 export type ClockifyWebhookVerificationFailureReason = ClockifyRequestVerificationFailureReason | "missing-expected-event-type" | "missing-expected-webhook-auth-token" | "missing-installation-context" | "webhook-token-mismatch";
 export type ClockifyTokenVerificationFailureReason = "ambiguous-token" | "missing-token" | "invalid-token" | "missing-expiration" | "workspace-id-mismatch" | "addon-id-mismatch";
 export type ClockifyRequestVerificationResult = {
@@ -4347,9 +4454,13 @@ export declare function createRotatingClockifyTokenCodec(newCodec: ClockifyToken
  * Wraps a store so installation and nested webhook credentials are encrypted at rest.
  *
  * A `load()` whose stored row fails to decode (wrong key, tampering, corruption) returns `null`,
- * the same result as "no installation" — the caller must fail closed either way. Pass
- * `onDecodeError` to observe the difference for operational alerting; it does not change what
- * `load()` returns.
+ * the same result as "no installation" — the caller must fail closed either way.
+ *
+ * @param onDecodeError - Required in production. Called when a stored row fails to decrypt
+ *   (wrong key or corrupted data). It does not change what `load()` returns — decode failures
+ *   stay indistinguishable from "never installed" to the caller either way — but without it, a
+ *   decode failure is silent, with no signal that storage is misconfigured or corrupted rather
+ *   than simply unpopulated. Wire it to your logger or alerting.
  */
 export declare function wrapClockifyInstallationStoreWithEncryption(store: ClockifyInstallationStore, codec: ClockifyTokenCodec, onDecodeError?: (error: unknown, workspaceId: string, addonId: string) => void): ClockifyInstallationStore;
 ```
@@ -4363,17 +4474,39 @@ export interface ClockifyIdempotencyLeaseStore {
     complete(key: string, owner: string): Promise<boolean>;
     release(key: string, owner: string): Promise<boolean>;
 }
+/** Bounds for {@link InMemoryClockifyIdempotencyLeaseStore}'s completed-entry retention. */
+export interface ClockifyIdempotencyLeaseStoreOptions {
+    /**
+     * Caps how many completed entries are retained at once. Once exceeded, the
+     * oldest completed entry is evicted (FIFO). Unset keeps every completed
+     * entry (the default, unbounded).
+     */
+    readonly maxCompletedEntries?: number;
+    /**
+     * TTL, in milliseconds, for a completed entry. Once it elapses, the key is
+     * treated as never completed and becomes claimable again — a webhook
+     * redelivered after the TTL is no longer deduplicated. Unset retains
+     * completed entries forever (the default), matching the class's original
+     * behavior.
+     */
+    readonly completedTtlMs?: number;
+}
 /**
- * In-memory lease store for tests and single-process deployments. Completed
- * entries are retained forever (no TTL) so a replayed webhook is always
- * recognized as a duplicate; a long-lived process therefore grows this map
- * without bound. Use a durable store with a TTL on completed entries for
- * production.
+ * In-memory lease store for tests and single-process deployments. By
+ * default, completed entries are retained forever (no TTL) so a replayed
+ * webhook is always recognized as a duplicate; a long-lived process
+ * therefore grows this map without bound. Pass `maxCompletedEntries` and/or
+ * `completedTtlMs` to bound that growth, or use a durable store with a TTL
+ * on completed entries for production.
  */
 export declare class InMemoryClockifyIdempotencyLeaseStore implements ClockifyIdempotencyLeaseStore {
     private readonly leases;
+    private readonly completedOrder;
     private readonly now;
-    constructor(now?: () => number);
+    private readonly options;
+    constructor(now?: () => number, options?: ClockifyIdempotencyLeaseStoreOptions);
+    /** Number of keys currently tracked (active leases plus retained completed entries). */
+    size(): number;
     claim(key: string, owner: string, leaseMs: number): Promise<boolean>;
     complete(key: string, owner: string): Promise<boolean>;
     release(key: string, owner: string): Promise<boolean>;
@@ -6944,7 +7077,7 @@ export declare const clockifyManifestSchemas: ClockifyEmbeddedManifestSchemas;
 ```ts
 /**
  * @deprecated Import a specific runtime subpath instead of this aggregate:
- * `@apet97/clockify-addon-sdk/adapters/node-http`,
+ * `@apet97/clockify-addon-sdk/adapters/node`,
  * `@apet97/clockify-addon-sdk/adapters/express`, or
  * `@apet97/clockify-addon-sdk/adapters/fetch`. A Worker or browser bundle
  * that imports this aggregate pulls in `node:http` transitively even when it
@@ -6994,6 +7127,12 @@ export interface ExpressLikeResponse {
     end(): unknown;
 }
 export type ExpressLikeNextFunction = (error?: unknown) => void;
+/**
+ * Unlike the Fetch and Node adapters, this handler enforces no body-size limit itself — it trusts
+ * `req.body`/`req.rawBody` exactly as Express (or an upstream middleware) already produced them.
+ * The host application must configure a limit before this handler runs, e.g.
+ * `app.use(express.json({ limit: "1mb" }))`. Without one, a request body is unbounded.
+ */
 export declare function createExpressAddonHandler(addon: Addon<unknown>, options?: {
     readonly onError?: AddonErrorReporter;
 }): (req: ExpressLikeRequest, res: ExpressLikeResponse, next?: ExpressLikeNextFunction) => Promise<void>;
@@ -7098,6 +7237,12 @@ export interface ExpressLikeResponse {
     end(): unknown;
 }
 export type ExpressLikeNextFunction = (error?: unknown) => void;
+/**
+ * Unlike the Fetch and Node adapters, this handler enforces no body-size limit itself — it trusts
+ * `req.body`/`req.rawBody` exactly as Express (or an upstream middleware) already produced them.
+ * The host application must configure a limit before this handler runs, e.g.
+ * `app.use(express.json({ limit: "1mb" }))`. Without one, a request body is unbounded.
+ */
 export declare function createExpressAddonHandler(addon: Addon<unknown>, options?: {
     readonly onError?: AddonErrorReporter;
 }): (req: ExpressLikeRequest, res: ExpressLikeResponse, next?: ExpressLikeNextFunction) => Promise<void>;
@@ -7136,13 +7281,33 @@ export interface ClockifyAddonClientOptions {
     /** Observe retries for metrics/logging. Never affects retry behavior, even if it throws. */
     readonly onRetry?: (info: ClockifyAddonClientRetryInfo) => void;
 }
-/** HTTP failure returned by a Clockify add-on API call. */
+/**
+ * HTTP failure returned by a Clockify add-on API call.
+ *
+ * `responseBody` is read in full via `response.text()` with no size cap — the Clockify backend is
+ * trusted, but a misconfigured proxy or a network failure mid-response could still return a large
+ * body, which is buffered entirely before this error is thrown.
+ */
 export declare class ClockifyAddonHttpError extends Error {
     readonly status: number;
     readonly responseBody: string;
     constructor(status: number, responseBody: string);
 }
-/** Fetch-based client for Marketplace-specific add-on token, settings, and generic API calls. */
+/**
+ * Fetch-based client for Marketplace-specific add-on token, settings, and generic API calls.
+ *
+ * A request can reject with:
+ * - {@link ClockifyAddonHttpError} on a non-`ok` HTTP status.
+ * - `Error("Clockify add-on request timed out.")` — a generic `Error`, matched by `/timed out/i` —
+ *   when one attempt exceeds `timeoutMs`.
+ * - `signal.reason` (identity preserved, may be a `DOMException`) when the caller's `signal` aborts.
+ * - `Error` with `cause` set to the original parse error when `getSettings`/`updateSettings` receive
+ *   a `200` response whose body is not valid JSON.
+ *
+ * The `sleep` constructor option exists to let tests control backoff timing; a production override
+ * must not throw or reject — if it does, that rejection propagates as-is instead of one of the
+ * shapes above.
+ */
 export declare class ClockifyAddonClient {
     private readonly token;
     private readonly backendUrl;
@@ -7156,6 +7321,12 @@ export declare class ClockifyAddonClient {
     private notifyRetry;
     private send;
     private expectOk;
+    /**
+     * Parses an ok response as JSON, wrapping a malformed body (a `SyntaxError`
+     * from `response.json()`) with a clearer message and `cause` chain instead
+     * of letting the raw parse error surface unattributed.
+     */
+    private parseJson;
     /** Exchanges an installation token for a user-scoped add-on token. */
     exchangeUserToken(userId: string): Promise<string>;
     /** Retrieves structured settings for one installation workspace. */
@@ -7197,6 +7368,13 @@ export interface ClockifyBrowserWindow {
 export interface CreateClockifyBridgeOptions {
     readonly window: ClockifyBrowserWindow;
     readonly parentOrigin: string;
+    /**
+     * Observes a same-origin message the bridge could not parse as a
+     * `ClockifyWindowMessage` — malformed JSON, or a missing/blank `title`.
+     * The bridge always drops the message either way; this hook exists only
+     * for debugging and never affects that drop behavior, even if it throws.
+     */
+    readonly onInvalidMessage?: (rawData: unknown, reason: "invalid-json" | "missing-title") => void;
 }
 /**
  * The add-on-dispatchable event names Clockify's window-messaging bridge documents. See
