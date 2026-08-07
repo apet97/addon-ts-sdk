@@ -117,7 +117,7 @@ describe("installation stores", () => {
     }
   });
 
-  it("fails open-null when encrypted storage is corrupt and rejects empty writes", async () => {
+  it("fails closed to null when encrypted storage is corrupt and rejects empty writes", async () => {
     const raw = new InMemoryClockifyInstallationStore();
     const key = await crypto.subtle.generateKey({ name: "AES-GCM", length: 256 }, false, [
       "encrypt",
