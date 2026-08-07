@@ -40,7 +40,7 @@ section above remains the accurate record of what the registry currently serves.
 `npm run release:verify` (`ci:verify && verify:schema-live && release:dry-run`) now **passes end to
 end**:
 
-- `ci:verify` passes with 477 tests, thresholded coverage, lint, format, build, the public API
+- `ci:verify` passes with 480 tests, thresholded coverage, lint, format, build, the public API
   snapshot, `verify:dist`, `pack:dry-run`, package-lint, package-consumer, all four packed
   Node/Worker scaffolds (including real `workerd` routes), and both `npm audit --omit=dev` and the
   full-tree `npm audit` (0 vulnerabilities each; the production dependency tree remains `jose`
