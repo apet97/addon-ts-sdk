@@ -10,12 +10,14 @@ verification, runtime adapters, storage contracts, browser-response helpers, and
 Marketplace-specific add-on transport. The application owns durable persistence, secret handling,
 business logic, public-origin configuration, deployment, and operational policy.
 
-For `INSTALLED`, verify the signed request and matched payload before storing its `authToken` and
-`apiUrl`; retain the verified signed `backendUrl` separately for `ClockifyAddonClient`. Treat the
-component `auth_token` as transient. Verify webhook event, signed installation context, and the
-stored expected webhook token before handling a delivery. Process `DELETED` cleanup with the
-documented unconditional lifecycle semantics. Entity-specific Clockify REST resources, CLI, and MCP
-behavior belong to the separate `clockify-ts-sdk`.
+- For `INSTALLED`, verify the signed request and matched payload before storing its `authToken` and
+  `apiUrl`. Retain the verified signed `backendUrl` separately for `ClockifyAddonClient`.
+- Treat the component `auth_token` as transient.
+- Verify the webhook event, the signed installation context, and the stored expected webhook token
+  before handling a delivery.
+- Process `DELETED` cleanup with the documented unconditional lifecycle semantics.
+- Entity-specific Clockify REST resources, CLI, and MCP behavior belong to the separate
+  `clockify-ts-sdk`.
 
 ## Commands
 
@@ -78,20 +80,20 @@ respecting the upstream, generated, historical, and ignored-local boundaries abo
 - Keep Node and Fetch body-limit semantics aligned for declared and streamed bodies. Express body
   limits remain the host application's responsibility. Reject malformed sizes before application
   error handling and oversized bodies before dispatch.
-- Safe reads may retry transient failures; mutations may replay only after a confirmed `429`.
-  Caller aborts are terminal, timeout bounds stay validated, and discarded retry bodies are
-  cancelled before backoff without replacing the intended result.
+- Safe reads may retry transient failures. Mutations may replay only after a confirmed `429`.
+  Caller aborts are terminal, and timeout bounds stay validated. Before backoff, cancel any
+  discarded retry body so it cannot replace the intended result.
 - Never hardcode Clockify service hosts. Build `/v1` entity bases from the documented verified
-  inputs, retain signed `backendUrl` for Marketplace `/addon/...` calls, encode every dynamic path
-  segment, and reject empty or dot-only segments before transport.
+  inputs. Retain the signed `backendUrl` for Marketplace `/addon/...` calls. Encode every dynamic
+  path segment, and reject empty or dot-only segments before transport.
 - Use `X-Addon-Token`, not `Authorization`, for Clockify add-on calls. Never log tokens, signatures,
   private keys, outbound query strings, or unsanitized credentials.
-- Runtime manifest validation uses generated static Draft-04 validators; do not add a runtime AJV
+- Runtime manifest validation uses generated static Draft-04 validators. Do not add a runtime AJV
   compiler or string code generation. Preserve `addon-sdk/THIRD_PARTY_NOTICES.md` and its packed
   consumer check when validator generation changes.
 - Never hand-edit generated models, validators, or the public API snapshot. Change the owning
-  schema, generator, or source; update schema provenance deliberately and include focused regression
-  coverage plus the generated diff.
+  schema, generator, or source instead. Update schema provenance deliberately, and include focused
+  regression coverage plus the generated diff.
 
 ## Layout
 
@@ -111,19 +113,26 @@ respecting the upstream, generated, historical, and ignored-local boundaries abo
 - Preserve unrelated working-tree changes and keep each commit limited to the requested task. Run
   focused tests while editing, then the applicable docs/generated/public-API checks and
   `npm run ci:verify` before handoff.
-- Update user-visible docs with behavior changes. A green local gate is not fresh npm registry,
-  authenticated Clockify, or Marketplace submission evidence; record those only in their canonical
-  maintainer documents after the corresponding live check.
+- Update user-visible docs with behavior changes. A green local gate is not evidence of a fresh npm
+  registry publish, an authenticated Clockify check, or a Marketplace submission. Record that
+  evidence only in the canonical maintainer documents, and only after the corresponding live check.
 - Do not change CI, authentication, security policy, package versions, or publication settings
-  without explicit authority. Do not run `release:verify` against unchanged published versions; its
+  without explicit authority. Do not run `release:verify` against unchanged published versions. Its
   publish dry-run must reject immutable versions.
 - Commit when requested. Push only when explicitly requested, and publish only with explicit
   npm-owner approval for the exact packages and versions. When both packages are authorized, publish
   the SDK first and the creator second, then run `npm run verify:registry`.
-- For an authorized two-package release, update both workspace versions and the lockfile together,
-  run `release:preflight` then `release:verify`, push the exact source and wait for green CI before
-  publishing, and record the post-registry receipt in `docs/maintainers/release-readiness.md`.
-- Before a direct `main` push, fetch `origin`, confirm `origin/main` is an ancestor of the commit,
-  push without force, and verify the remote and local tips match. Never force-push or amend a pushed
-  commit, and never redirect this repository's history to a similarly named project.
+- For an authorized two-package release:
+  1. Update both workspace versions and the lockfile together.
+  2. Run `release:preflight`, then `release:verify`.
+  3. Push the exact source, and wait for green CI before publishing.
+  4. Record the post-registry receipt in `docs/maintainers/release-readiness.md`.
+- Before a direct `main` push:
+  1. Fetch `origin`.
+  2. Confirm `origin/main` is an ancestor of the commit.
+  3. Push without force.
+  4. Verify the remote and local tips match.
+
+  Never force-push or amend a pushed commit. Never redirect this repository's history to a
+  similarly named project.
 - This is an independent, unofficial project and is not affiliated with Clockify or CAKE.com.
