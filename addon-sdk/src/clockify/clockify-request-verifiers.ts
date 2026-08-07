@@ -227,3 +227,20 @@ export async function verifyClockifyLifecycleRequest(
     requireExpiration: options.requireExpiration ?? false,
   });
 }
+
+// --- Naming aliases ---------------------------------------------------------
+//
+// The canonical names above verify a "request" (signature + claims), which
+// reads awkwardly for the component/lifecycle cases that are really "check
+// this bearer token". These aliases give that reading without renaming the
+// canonical export. Additive only: nothing above changes, and no call site in
+// this package switches to the alias.
+
+/** @deprecated Alias of {@link verifyClockifyComponentRequest}. */
+export const verifyComponentToken = verifyClockifyComponentRequest;
+
+/** @deprecated Alias of {@link verifyClockifyLifecycleRequest}. */
+export const verifyLifecycleToken = verifyClockifyLifecycleRequest;
+
+/** @deprecated Alias of {@link verifyClockifyWebhookRequest}. */
+export const verifyWebhookToken = verifyClockifyWebhookRequest;

@@ -29,6 +29,9 @@ import {
   withClockifyVerifiedRequest,
   withClockifyVerifiedWebhookRequest,
   withClockifyHandler,
+  verifyComponentToken,
+  verifyLifecycleToken,
+  verifyWebhookToken,
 } from "../src";
 import { generateTestKeys, signTestToken } from "../src/testing";
 
@@ -1263,5 +1266,19 @@ describe("withClockifyHandler (unified arity)", () => {
     const invalid = await handler(request({}));
     expect(invalid).toEqual({ status: 401, body: "Unauthorized" });
     expect(handled).toBe(false);
+  });
+});
+
+describe("verifier naming aliases (deprecated, additive)", () => {
+  it("verifyComponentToken is verifyClockifyComponentRequest", () => {
+    expect(verifyComponentToken).toBe(verifyClockifyComponentRequest);
+  });
+
+  it("verifyLifecycleToken is verifyClockifyLifecycleRequest", () => {
+    expect(verifyLifecycleToken).toBe(verifyClockifyLifecycleRequest);
+  });
+
+  it("verifyWebhookToken is verifyClockifyWebhookRequest", () => {
+    expect(verifyWebhookToken).toBe(verifyClockifyWebhookRequest);
   });
 });

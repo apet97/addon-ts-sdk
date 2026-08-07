@@ -178,6 +178,24 @@ persisting installation data or webhook `authToken` values. After
 `clockifyLifecyclePayloadMatchesClaims()` returns true, TypeScript treats the claims as carrying
 required `workspaceId` and `addonId` strings.
 
+## Wire → header → helper
+
+`verifyClockify*Request()` reads naturally as "verify this signed request", which fits the general
+and webhook cases but reads awkwardly for the component/lifecycle cases, which are really "check
+this bearer token". The SDK also exports `@deprecated` naming aliases with the "verify ... token"
+shape for those — purely additive, never a replacement for the canonical export, and no call site in
+this package switches to them:
+
+| Wire credential                     | Header/query                     | Canonical helper                   | `@deprecated` alias      |
+| ------------------------------------ | ---------------------------------- | ------------------------------------ | -------------------------- |
+| Component user token                 | `auth_token` query param           | `verifyClockifyComponentRequest()`   | `verifyComponentToken`     |
+| Lifecycle token (no `exp` by default) | `x-addon-lifecycle-token` header   | `verifyClockifyLifecycleRequest()`   | `verifyLifecycleToken`     |
+| Webhook signature + stored token     | `clockify-signature` header + stored token | `verifyClockifyWebhookRequest()` | `verifyWebhookToken`       |
+
+Each alias is a direct reference to its canonical function (`export const verifyComponentToken =
+verifyClockifyComponentRequest`), so both names share one implementation and one set of test
+coverage — calling the alias is identical to calling the canonical export.
+
 ## Environments and Regions
 
 Clockify can issue tokens for different environments and regions. Do not hardcode API, reports,
