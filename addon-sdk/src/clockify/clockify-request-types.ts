@@ -231,10 +231,7 @@ export type ClockifyHandlerOptions =
 type ClockifyHandlerKind = ClockifyHandlerOptions["kind"];
 
 type ClockifyLifecyclePayloadHandlerKind =
-  | "installed"
-  | "statusChanged"
-  | "settingsUpdated"
-  | "deleted";
+  "installed" | "statusChanged" | "settingsUpdated" | "deleted";
 
 // Maps a lifecycle-payload kind to its exact matched payload type — kept in sync with
 // withClockifyInstalledLifecycleRequest/withClockifyStatusChangedLifecycleRequest/
