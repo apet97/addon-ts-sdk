@@ -37,38 +37,37 @@ packages and versions; until that approval and the publish itself complete, the 
 section above remains the accurate record of what the registry currently serves.
 
 `npm run release:preflight` confirmed both exact versions are absent from the registry.
-`npm run release:verify` (`ci:verify && verify:schema-live && release:dry-run`) does **not** pass
-end to end, so this release candidate does not yet meet the Publish boundary below:
+`npm run release:verify` (`ci:verify && verify:schema-live && release:dry-run`) now **passes end to
+end**:
 
-- `ci:verify` passed through 468 tests, thresholded coverage (97.88% statements / 94.51% branches
-  / 99.02% functions / 99.03% lines, all above the configured floors), lint, format, build, the
-  public API snapshot, `verify:dist`, `pack:dry-run`, package-lint, package-consumer, and all four
-  packed Node/Worker scaffolds (including real `workerd` routes), and `npm audit --omit=dev` (0
-  vulnerabilities; the production dependency tree is `jose` alone). It failed only at the
-  full-tree `npm audit` step, on three pre-existing transitive **dev-tooling** advisories
-  (`brace-expansion`, `fast-uri`, `postcss`) that predate this branch. Fixing them needs separate
-  dependency-update authority and was intentionally not done here.
-- `verify:schema-live` still fails on re-check: Clockify's live schema endpoint still serves a
-  genuine, distinct schema `1.6` (its own `$schema`/`definitions`, not an echo of `1.5`) where the
-  check expects an HTTP 400 for an unvendored version. This SDK's vendored schema set (`1.2`-`1.5`)
-  is behind the live Marketplace and needs its own vendoring/generation pass before publication; it
-  is a real product-surface gap, not a check-assumption problem, and vendoring a new schema version
-  is out of scope for this fix pass (it is not one of the 58+9 original review findings).
-- `npm run release:dry-run` (manually re-run after the audit failure short-circuited the chain)
-  passed for both packages; both tarball contents matched the "Expected package shape" section
-  below.
+- `ci:verify` passes with 470 tests, thresholded coverage, lint, format, build, the public API
+  snapshot, `verify:dist`, `pack:dry-run`, package-lint, package-consumer, all four packed
+  Node/Worker scaffolds (including real `workerd` routes), and both `npm audit --omit=dev` and the
+  full-tree `npm audit` (0 vulnerabilities each; the production dependency tree remains `jose`
+  alone). The three pre-existing transitive dev-tooling advisories (`brace-expansion`, `fast-uri`,
+  `postcss`) were resolved by `npm audit fix`: each moved by a patch version within its existing
+  major (confirmed against `package-lock.json`), touching neither `typescript` nor `@types/node`.
+- `verify:schema-live` passes: Clockify's live schema endpoint serves a genuine, distinct schema
+  `1.6` (own `$schema`/`definitions`, not an echo of `1.5`). Structural diff against vendored `1.5`
+  showed it is additive-only — one new webhook event (`TIME_OFF_REQUEST_STARTED`) and one new
+  component type (`timeentries.action.uiblocks`), no required/removed/changed fields. `1.6` is now
+  vendored with provenance, and the generated builders/validators cover it; the unsupported-version
+  probe moved to `1.7` (confirmed HTTP 400 against the live endpoint).
+- `npm run release:dry-run` passed for both packages; both tarball contents matched the "Expected
+  package shape" section below.
 
-This candidate had a second implementation pass after the one above: verified against the actual
-source (not commit messages) which of the plan's findings were real, unimplemented gaps, then
-closed the ones with real user-facing or security value — a lifecycle-token expiration default
-that could reject legitimate `INSTALLED` requests, an installation-store corrupt-decode signal, a
-tested-and-reverted attempt at mandatory manifest validation (documented instead, see CHANGELOG),
-tunnel/insecure-example/third-party-notice documentation gaps, and a scaffold idempotent-webhook
-recipe. `ci:verify` and `verify:schema-live` were re-run after that pass and fail at exactly the
-same two points as before — no new gap introduced, none of the two closed either.
+One `schema-live-verification.test.ts` timeout case (`fails clearly when the live schema endpoint
+exceeds the configured timeout`) is a pre-existing timing-margin flake under full-suite load
+(observed once during this verification pass, reproduced 0/3 in isolation); it asserts a spawned
+child process's exit `code` under a tight 1000ms outer timeout around a 20ms inner timeout, and can
+race under CPU contention. It is unrelated to the schema-1.6 or audit changes in this pass — a
+repeat `release:verify` run passed clean. Widening that test's timing margin is a separate,
+narrowly-scoped follow-up.
 
-Resolve the schema-1.6 gap (and, separately, decide on the dev-tooling audit advisories) before
-treating this candidate as publish-ready.
+Any future `src/**` change (as opposed to a documentation-only pass) requires a fresh live receipt
+— an authenticated install exercising installation, component authentication, webhook delivery, and
+uninstall cleanup — before that release counts as Marketplace-proven; see the Future release
+checklist below. This candidate does not yet have a 1.1.0 live receipt.
 
 ## 1.0.5 release evidence
 
@@ -153,6 +152,12 @@ npm run release:verify
 `npm run release:preflight` reads both workspace package versions and fails unless those exact
 versions are absent from the configured npm registry. It is intentionally a one-shot, fail-fast
 check and must run immediately before publishing.
+
+Any release whose source changed under `src/**` since the last live receipt requires a fresh one —
+an authenticated install exercising installation, component authentication, webhook delivery, and
+uninstall cleanup — before that release counts as Marketplace-proven; see the Publish boundary
+below. A documentation-only release (no `src/**` change) may stay registry-only and reuse the prior
+live receipt as evidence for the underlying runtime.
 
 Run `release:verify` only for unpublished workspace versions. After publication,
 `release:dry-run` correctly fails when npm reaches its immutable-version registry check; use

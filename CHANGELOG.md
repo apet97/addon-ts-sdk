@@ -70,6 +70,14 @@ All notable changes to this SDK are recorded here.
 - Recorded the remaining Java-parity rows (lifecycle-token expiration, `scopes` and
   `component.label` requiredness drift across schema versions) and expanded the previously thin
   "TS Extensions" list.
+- Vendored Clockify manifest schema 1.6 (additive over 1.5: the `TIME_OFF_REQUEST_STARTED` webhook
+  event and the `timeentries.action.uiblocks` component type). Added `ClockifyManifest.v1_6Builder()`
+  and the matching per-model `v1_6Builder()` factories alongside the existing 1.2–1.5 versions; the
+  canonical `.builder()` alias stays on 1.5. `npm run verify:schema-live` now passes against the
+  live Clockify endpoint.
+- Applied `npm audit fix` for three pre-existing transitive dev-only advisories (`brace-expansion`,
+  `fast-uri`, `postcss`): all three moved by a patch version within their existing majors. The
+  packed production dependency tree (`jose` alone) already had 0 vulnerabilities.
 
 ## 1.0.5 - 2026-07-14
 
