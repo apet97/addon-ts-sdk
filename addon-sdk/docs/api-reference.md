@@ -118,7 +118,7 @@ highlights the stable boundaries and commonly used symbols; the generated
 ## Validation, Security, Storage, and Client
 
 - `validateClockifyManifest()` and `assertClockifyManifest()` use the embedded draft-04 schema named
-  by `schemaVersion`. Validation dispatches to generated static validators for 1.2-1.5; it does
+  by `schemaVersion`. Validation dispatches to generated static validators for 1.2-1.6; it does
   not compile AJV schemas or generate code at request time, so the same path runs under Workers.
 - `buildClockifySecurityHeaders()`, `createClockifyHtmlResponse()`, and
   `createClockifyJsonResponse()` supply no-store browser response defaults.

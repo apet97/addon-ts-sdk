@@ -2,7 +2,7 @@ const crypto = require("node:crypto");
 const fs = require("node:fs");
 const path = require("node:path");
 
-const SUPPORTED_SCHEMA_VERSIONS = ["1.2", "1.3", "1.4", "1.5"];
+const SUPPORTED_SCHEMA_VERSIONS = ["1.2", "1.3", "1.4", "1.5", "1.6"];
 
 function argValue(name) {
   const index = process.argv.indexOf(name);

@@ -134,7 +134,7 @@ development, expose your server with a tunnel (`npx ngrok http 8080` or
 
 ## Product surface
 
-- **Manifest builders** for schema versions 1.2–1.5. Required fields are enforced at the type
+- **Manifest builders** for schema versions 1.2–1.6. Required fields are enforced at the type
   level: the chain will not expose `.build()` until every required step is set.
 - **Router** that serves `/manifest`, trims one trailing slash before matching, returns 404 when no
   route owns a path, returns 405 with `Allow` when the path exists for another method, and contains
@@ -247,11 +247,12 @@ Clockify credentials.
 
 ## Schema versions
 
-1.2–1.4 are ported from the Clockify add-on Java SDK; 1.5 is taken from the live schema endpoint
-(`GET https://api.clockify.me/api/addons/manifest-schema?version=1.5`). The copies vendored under
-`schemas/clockify-manifests/` are structurally identical to those sources, and the generated builders
-are reproducible from them. Run `npm run verify:schema-live` manually when you want to compare the
-vendored schemas against Clockify's live endpoint.
+1.2–1.4 are ported from the Clockify add-on Java SDK; 1.5 and 1.6 are taken from the live schema
+endpoint (`GET https://api.clockify.me/api/addons/manifest-schema?version=1.6`). Schema 1.6 is
+additive over 1.5 — one new webhook event and one new component type, no changed or removed fields.
+The copies vendored under `schemas/clockify-manifests/` are structurally identical to those sources,
+and the generated builders are reproducible from them. Run `npm run verify:schema-live` manually
+when you want to compare the vendored schemas against Clockify's live endpoint.
 
 The packaged tarball intentionally exposes the vendored schema JSON files. ESM consumers can
 import a schema or the provenance file directly:

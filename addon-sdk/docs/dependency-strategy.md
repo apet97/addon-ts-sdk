@@ -12,7 +12,7 @@ dependencies even though their runtime roles differ:
 
 - Signing and verification paths dynamically import ESM-only `jose@6`.
 - Repository code generation uses AJV Draft-04 and AJV standalone output to create the committed
-  schema 1.2-1.5 validators.
+  schema 1.2-1.6 validators.
 - Runtime manifest validation imports those static generated validators. It does not import an AJV
   compiler, call `eval` or `Function`, or generate code at request time, which keeps the validation
   path compatible with Workers that prohibit string code generation.

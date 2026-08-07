@@ -8,7 +8,7 @@ import { validateClockifyManifest } from "../src/index";
 
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
-function minimalManifest(schemaVersion: "1.2" | "1.3" | "1.4" | "1.5") {
+function minimalManifest(schemaVersion: "1.2" | "1.3" | "1.4" | "1.5" | "1.6") {
   return {
     schemaVersion,
     key: "validator-test",
@@ -20,7 +20,7 @@ function minimalManifest(schemaVersion: "1.2" | "1.3" | "1.4" | "1.5") {
 }
 
 describe("Clockify manifest validation", () => {
-  it.each(["1.2", "1.3", "1.4", "1.5"] as const)(
+  it.each(["1.2", "1.3", "1.4", "1.5", "1.6"] as const)(
     "validates supported schema version %s",
     (schemaVersion) => {
       const manifest = minimalManifest(schemaVersion);

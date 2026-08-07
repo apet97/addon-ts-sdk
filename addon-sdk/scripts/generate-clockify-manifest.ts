@@ -589,7 +589,7 @@ function main() {
 
   fs.mkdirSync(outDir, { recursive: true });
 
-  const schemas = ["1.2.json", "1.3.json", "1.4.json", "1.5.json"];
+  const schemas = ["1.2.json", "1.3.json", "1.4.json", "1.5.json", "1.6.json"];
   for (const schemaName of schemas) {
     const schemaPath = path.join(schemasDir, schemaName);
     if (fs.existsSync(schemaPath)) {
@@ -606,7 +606,7 @@ function main() {
   });
   const schemaContent = [
     "/** Draft-04 Clockify manifest schemas embedded for runtime-neutral validation. */",
-    'export type ClockifyEmbeddedManifestSchemas = Readonly<Record<"1.2" | "1.3" | "1.4" | "1.5", object>>;',
+    'export type ClockifyEmbeddedManifestSchemas = Readonly<Record<"1.2" | "1.3" | "1.4" | "1.5" | "1.6", object>>;',
     "/** Supported schemas keyed by the manifest's declared schema version. */",
     "export const clockifyManifestSchemas: ClockifyEmbeddedManifestSchemas = {",
     ...schemaEntries,

@@ -58,18 +58,18 @@ describe("live schema verification script", () => {
     expect(workflow).toContain("npm run verify:schema-live");
   });
 
-  it("accepts structurally equal live schemas and rejects unsupported 1.6", async () => {
+  it("accepts structurally equal live schemas and rejects unsupported 1.7", async () => {
     const server = createServer((req, res) => {
       const url = new URL(req.url ?? "/", "http://127.0.0.1");
       const version = url.searchParams.get("version");
 
-      if (version === "1.6") {
+      if (version === "1.7") {
         res.writeHead(400, { "content-type": "application/json" });
         res.end(JSON.stringify({ message: "Unsupported manifest schema version" }));
         return;
       }
 
-      if (version && ["1.2", "1.3", "1.4", "1.5"].includes(version)) {
+      if (version && ["1.2", "1.3", "1.4", "1.5", "1.6"].includes(version)) {
         const schema = JSON.parse(readFileSync(resolve(schemasDir, `${version}.json`), "utf8"));
         res.writeHead(200, { "content-type": "application/json" });
         res.end(JSON.stringify(schema));
@@ -91,7 +91,7 @@ describe("live schema verification script", () => {
           "--base-url",
           `http://127.0.0.1:${port}/manifest-schema`,
           "--unsupported-version",
-          "1.6",
+          "1.7",
         ],
         { cwd: packageRoot, encoding: "utf8" },
       );
@@ -119,7 +119,7 @@ describe("live schema verification script", () => {
             "--base-url",
             `http://127.0.0.1:${port}/manifest-schema`,
             "--unsupported-version",
-            "1.6",
+            "1.7",
             "--timeout-ms",
             "20",
           ],
