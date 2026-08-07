@@ -257,7 +257,7 @@ function getTSType(node: SchemaNode, definitions: Record<string, SchemaNode>): s
       .map((t) => {
         if (t === "integer") return "number";
         if (t === "array") return "any[]";
-        if (t === "object") return "Record<string, any>";
+        if (t === "object") return "Record<string, unknown>";
         return t;
       })
       .join(" | ");
@@ -282,7 +282,7 @@ function getTSType(node: SchemaNode, definitions: Record<string, SchemaNode>): s
     return "string[]";
   }
   if (type === "object") {
-    return "Record<string, any>";
+    return "Record<string, unknown>";
   }
   return "any";
 }

@@ -65,7 +65,7 @@ export interface ClockifyComponent extends ClockifyResource {
   /** Specifies which kind of component will be rendered. If component is 'tab', it also comes with the name of Clockify page where 'tab' component will be rendered. */
   readonly type: "sidebar" | "widget" | "timeoff.tab" | "schedule.tab" | "approvals.tab" | "reports.tab" | "activity.tab" | "team.tab" | "projects.tab" | "invoices.action" | "timeentries.action.uiblocks";
   /** If you want to define some component-specific options for component that holds your addon app, this is the place to define them. */
-  readonly options?: Record<string, any>;
+  readonly options?: Record<string, unknown>;
   /** Label of the component e.g. if component is 'tab', value of 'label' property will be shown in UI. Label is not required for WIDGET component type. */
   readonly label: string;
   /** Specifies who can access addon component. You can either choose to give access only to Clockify workspace admins, or everyone. */
@@ -660,7 +660,7 @@ export interface ClockifyComponentBuilder_label {
 
 export interface ClockifyComponentBuilder_Optional {
   /** If you want to define some component-specific options for component that holds your addon app, this is the place to define them. */
-  options(value: Record<string, any>): ClockifyComponentBuilder_Optional;
+  options(value: Record<string, unknown>): ClockifyComponentBuilder_Optional;
   /** Path to addon hosted image which will serve as an icon for Clockify component. Path is part of the url from which the image will be served. Full url is constructed by concatenating addon 'baseUrl' and path. */
   iconPath(value: string): ClockifyComponentBuilder_Optional;
   /** Defines rendered component width expressed in 'vw'. Applicable only to WIDGET components. */
@@ -732,7 +732,7 @@ class ClockifyComponentBuilderImpl implements ClockifyComponentBuilder_type, Clo
     return this.type("timeentries.action.uiblocks");
   }
 
-  options(value: Record<string, any>): any {
+  options(value: Record<string, unknown>): any {
     this._options = value;
     return this;
   }
