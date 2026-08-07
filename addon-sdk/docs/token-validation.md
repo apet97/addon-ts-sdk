@@ -42,11 +42,14 @@ The signature parser checks that:
 5. An `exp` claim, when present, has not expired.
 
 `ClockifySignatureParser.parseClaims()` does not require an `exp` claim by itself.
-`verifyClockifyComponentRequest()` and `verifyClockifyLifecycleRequest()` default
-`requireExpiration` to `true`, so their normal request paths reject a missing expiration as well as
-an expired token. The webhook verifier requires nonblank signed installation context but does not
-add a missing-expiration requirement; an expired `exp`, if supplied, still fails signature parsing.
-Low-level callers can set `requireExpiration` on `verifyClockifyToken()`.
+`verifyClockifyComponentRequest()` defaults `requireExpiration` to `true`, so its normal request
+path rejects a missing expiration as well as an expired token — component tokens are interactive
+and short-lived. `verifyClockifyLifecycleRequest()` defaults `requireExpiration` to `false` because
+the lifecycle `authToken` (read from the `INSTALLED` payload) does not expire; pass
+`{ requireExpiration: true }` if a custom signer adds `exp` to lifecycle tokens. The webhook
+verifier requires nonblank signed installation context but does not add a missing-expiration
+requirement; an expired `exp`, if supplied, still fails signature parsing. Low-level callers can set
+`requireExpiration` on `verifyClockifyToken()`.
 
 The parser verifies tokens only; it does not store secrets or perform transport. The separate
 `ClockifyAddonClient` uses a server-held installation token for Marketplace-specific token

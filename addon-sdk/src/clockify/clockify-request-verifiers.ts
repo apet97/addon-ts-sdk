@@ -220,6 +220,10 @@ export async function verifyClockifyLifecycleRequest(
 
   return verifyClockifyToken(parser, token.value, {
     ...options,
-    requireExpiration: options.requireExpiration ?? true,
+    // The lifecycle authToken (read from the INSTALLED payload) does not expire per
+    // MARKETPLACE_DOCS/08-authentication-and-authorization.md. Requiring `exp` here by
+    // default would reject legitimate lifecycle requests. Callers with a custom signer
+    // that does add `exp` can still opt in with `{ requireExpiration: true }`.
+    requireExpiration: options.requireExpiration ?? false,
   });
 }
