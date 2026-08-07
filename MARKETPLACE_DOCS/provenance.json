@@ -1,18 +1,19 @@
 {
-  "capturedAt": "2026-07-11",
+  "capturedAt": "2026-08-07",
   "documents": {
-    "01-introduction.md": "943eb38240bbc898fc928348ca39c936344dc7909f1547c3b115f7ae4d182c4f",
-    "02-quick-start.md": "0293131aff4a9790b3aa5b071033649e6f0824f0aa7a5f781d61bb35428ce232",
-    "03-lifecycle.md": "61990cd188de3a4d2816667766e635a6d9329035e46673ade69a23499f58fc4a",
-    "04-ui-components.md": "96a74d53c82d9b3bbb6814b5ea9cf87a938ba52cce8e39923e13ac30e31466e4",
-    "05-webhooks.md": "5cd4dc02cd75cef6781306df0048a8c23072ce59e84d1ab91d12283960c31abe",
-    "06-structured-settings.md": "2b294430334cd7f71f51a363a6fe99b5eefb6c702db951c36e57ba4bf1eaf0f6",
-    "07-developer-account.md": "b15a5541863fe9a09dc3712e7274d72b88cbc33a28d3fd6f418d430425365366",
-    "08-authentication-and-authorization.md": "a2e6f71026c75d3305ff1f2dffbf548713a3573dba69c4ef5d2cb0ee977f680f",
-    "09-environments-and-regions.md": "d0ba75b3e8e76b4907ff7507de50aacac754ca87fa04ea43147211a2e110dd6c",
-    "10-window-events.md": "b9ae6d53e940fb18c7080876068964b5cbea404d6c14c5679bcd043dc111fc29",
-    "11-development-checklist.md": "a0f7a6c2ad19f33c1e3dbe103a11715aa0aa014cc21ba034c184fe1450d3313e",
-    "12-publishing-and-guidelines.md": "5e1bf8b9bd5eed146bbc983a472415c914861f14d56eb05e3806150ad853e7c0",
-    "13-private-addon-deployment.md": "8823b2442f904b23e44540e263ae71ecdbd1cd13c21c572f1c9f45148ed9d1c1"
+    "01-introduction.md": "57a42eff7f3682945cc30105d36d8b86f822f374f593ed775c5166b50d366914",
+    "02-quick-start.md": "fba4ee76a75f3240e2b277df4299cfdc2f0cc7f8747728b5c07819ff29477f05",
+    "03-lifecycle.md": "3dfff09b36ddb13696337c3818d63d88a55335dbae88eb0a9bd644a9cce4246e",
+    "04-ui-components.md": "e9a3a3ef25f8666dd151d2fcaf0bd54ea7c44b4b850f9978af434b5768d3b3cb",
+    "05-webhooks.md": "b98fbf66e940fa2b7edee5b332ad4f0fc6aa03af982c95609f59088596653107",
+    "06-structured-settings.md": "dea57baf069c0707a0a887ac857bea4ca3934571191f2b3c9b39127fd957dbd1",
+    "07-developer-account.md": "13bbb5fea45a5ca513d91584d1f09101c02dfa72221c388fee040ae0ad0d862d",
+    "08-authentication-and-authorization.md": "933c16e94d8e475057830a9f8346592c20f39472e2415bbf3343bb83f12ba0e4",
+    "09-environments-and-regions.md": "9f361d166eb22bde881e047d3f15121ebe7e09d4165b763cfcf572ea3d715d28",
+    "10-window-events.md": "59ada96dc4d540c0681438b4a847608149491f9017f6cf847139e9c48e57d0ad",
+    "11-development-checklist.md": "c28ed4c6bb201c3b9125af3cff416c49d268f0d7fd5d1ee5eb9e5ca27a82495e",
+    "12-publishing-and-guidelines.md": "ea17d685c5f62cd801ce2f76b24e7e69c21049e32d64f049b259eeb1dbc31d05",
+    "13-private-addon-deployment.md": "ea8c80555670fccda56dca5cf19f18d93cc9591ddd64b5f43dc6c5feca7a8c93",
+    "14-manifest.md": "a584e8b054ad7464e07c52755b20116f6fed354e930b80134543d55de5456591"
   }
 }

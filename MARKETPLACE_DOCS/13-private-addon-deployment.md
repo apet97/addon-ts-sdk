@@ -12,11 +12,11 @@ Private add-ons allow developers to create solutions accessible only to specific
 
 ### Steps to Create:
 
-1. **Set Visibility**: During creation, select "Private" visibility.
-2. **Whitelist Workspaces**: Define up to three workspaces by their IDs for access.
+1. **Set Visibility**: Set Visibility: During creation, select "Private" visibility.
+2. **Whitelist Workspaces**:  Define up to three workspaces by their IDs for access.
 3. **Manifest key**: If you already have the add-on in production, the manifest key needs to be different since the private add-on is technically a new add-on.
 
-**Note**: You can find your workspace ID by going to the workspace settings.
+> **Note**: You can find your workspace ID by going to the workspace settings.
 
 ## Managing a Private Add-on
 
@@ -33,11 +33,11 @@ Private add-ons allow developers to create solutions accessible only to specific
 - **No Payment Setup**: Skip payment configuration.
 - **No Vendor Profile**: Not required for private distribution.
 - **No Review Process**: Immediate publication post-submission.
-- Can delete a Private Add-on without waiting.
+- **Can delete a Private Add-on without waiting.**
 
-## Deleting a Private Add-on
+### Deleting a Private Add-on:
 
-Deletion is immediate. All installations are removed upon deletion.
+- Deletion is immediate. All installations are removed upon deletion.
 
 ## Installing a Private Add-on
 
