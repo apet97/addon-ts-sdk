@@ -1181,6 +1181,99 @@ describe("Marketplace request verification helpers", () => {
 });
 
 describe("withClockifyHandler (unified arity)", () => {
+  it("normalizes the verified kind to (request, context)", async () => {
+    const token = await validToken();
+    let handled = false;
+    const handler = withClockifyHandler(
+      parser(),
+      { kind: "verified", expectedEventType: "EXPENSE_CREATED" },
+      async (_request, context) => {
+        handled = true;
+        expect(context.eventType).toBe("EXPENSE_CREATED");
+        return { status: 200, body: { workspaceId: context.claims.workspaceId } };
+      },
+    );
+
+    const valid = await handler(
+      request({
+        [ClockifyHeaders.SIGNATURE]: token,
+        [ClockifyHeaders.WEBHOOK_EVENT_TYPE]: "EXPENSE_CREATED",
+      }),
+    );
+    expect(valid).toEqual({ status: 200, body: { workspaceId: WORKSPACE_ID } });
+    expect(handled).toBe(true);
+  });
+
+  it("normalizes the lifecycle kind to (request, context)", async () => {
+    const token = await validToken();
+    let handled = false;
+    const handler = withClockifyHandler(parser(), { kind: "lifecycle" }, async (_request, context) => {
+      handled = true;
+      expect(context.payload).toBeUndefined();
+      return { status: 200, body: { addonId: context.claims.addonId } };
+    });
+
+    const valid = await handler(request({ [ClockifyHeaders.LIFECYCLE_TOKEN]: token }));
+    expect(valid).toEqual({ status: 200, body: { addonId: ADDON_ID } });
+    expect(handled).toBe(true);
+  });
+
+  it("normalizes the statusChanged, settingsUpdated, and deleted kinds, exposing payload on context", async () => {
+    const token = await validToken();
+    const headers = { [ClockifyHeaders.LIFECYCLE_TOKEN]: token };
+
+    const statusPayload: ClockifyStatusChangedLifecyclePayload = {
+      addonId: ADDON_ID,
+      workspaceId: WORKSPACE_ID,
+      status: "ACTIVE",
+    };
+    const statusHandler = withClockifyHandler(
+      parser(),
+      { kind: "statusChanged" },
+      async (_request, context) => {
+        expect(context.payload).toBe(statusPayload);
+        return { status: 200 };
+      },
+    );
+    await expect(
+      statusHandler({ ...request(headers), body: statusPayload }),
+    ).resolves.toEqual({ status: 200 });
+
+    const settingsPayload: ClockifySettingsUpdatedLifecyclePayload = {
+      addonId: ADDON_ID,
+      workspaceId: WORKSPACE_ID,
+      settings: [{ id: "setting-1", name: "Setting", value: true }],
+    };
+    const settingsHandler = withClockifyHandler(
+      parser(),
+      { kind: "settingsUpdated" },
+      async (_request, context) => {
+        expect(context.payload).toBe(settingsPayload);
+        return { status: 200 };
+      },
+    );
+    await expect(
+      settingsHandler({ ...request(headers), body: settingsPayload }),
+    ).resolves.toEqual({ status: 200 });
+
+    const deletedPayload: ClockifyDeletedLifecyclePayload = {
+      addonId: ADDON_ID,
+      workspaceId: WORKSPACE_ID,
+      asUser: "admin-user",
+    };
+    const deletedHandler = withClockifyHandler(
+      parser(),
+      { kind: "deleted" },
+      async (_request, context) => {
+        expect(context.payload).toBe(deletedPayload);
+        return { status: 200 };
+      },
+    );
+    await expect(
+      deletedHandler({ ...request(headers), body: deletedPayload }),
+    ).resolves.toEqual({ status: 200 });
+  });
+
   it("normalizes the component kind to (request, context)", async () => {
     const token = await validToken({ user: "component-user", workspaceRole: "ADMIN" });
     let handled = false;
