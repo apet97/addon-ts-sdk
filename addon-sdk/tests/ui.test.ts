@@ -51,6 +51,57 @@ describe("Clockify UI bridge", () => {
     expect(handler).toHaveBeenLastCalledWith(4);
   });
 
+  it("reports invalid messages via onInvalidMessage without changing the drop behavior", () => {
+    const parent = { postMessage: vi.fn() };
+    let listener: ((event: { origin: string; source: unknown; data: unknown }) => void) | undefined;
+    const windowLike = {
+      parent,
+      addEventListener: (_name: "message", next: typeof listener) => {
+        listener = next;
+      },
+      removeEventListener: vi.fn(),
+    };
+    const onInvalidMessage = vi.fn();
+    const bridge = createClockifyBridge({
+      window: windowLike,
+      parentOrigin: "https://app.clockify.me",
+      onInvalidMessage,
+    });
+    const handler = vi.fn();
+    bridge.subscribe("TIME_ENTRY_UPDATED", handler);
+
+    listener?.({ origin: "https://app.clockify.me", source: parent, data: "not-json{" });
+    expect(onInvalidMessage).toHaveBeenCalledExactlyOnceWith("not-json{", "invalid-json");
+
+    listener?.({ origin: "https://app.clockify.me", source: parent, data: { body: 1 } });
+    expect(onInvalidMessage).toHaveBeenLastCalledWith({ body: 1 }, "missing-title");
+
+    expect(handler).not.toHaveBeenCalled();
+  });
+
+  it("keeps dropping an invalid message even when onInvalidMessage itself throws", () => {
+    const parent = { postMessage: vi.fn() };
+    let listener: ((event: { origin: string; source: unknown; data: unknown }) => void) | undefined;
+    const windowLike = {
+      parent,
+      addEventListener: (_name: "message", next: typeof listener) => {
+        listener = next;
+      },
+      removeEventListener: vi.fn(),
+    };
+    createClockifyBridge({
+      window: windowLike,
+      parentOrigin: "https://app.clockify.me",
+      onInvalidMessage: () => {
+        throw new Error("observer boom");
+      },
+    });
+
+    expect(() =>
+      listener?.({ origin: "https://app.clockify.me", source: parent, data: "not-json{" }),
+    ).not.toThrow();
+  });
+
   it("dispatches typed actions without wildcard postMessage targets", () => {
     const parent = { postMessage: vi.fn() };
     const windowLike = { parent, addEventListener: vi.fn(), removeEventListener: vi.fn() };

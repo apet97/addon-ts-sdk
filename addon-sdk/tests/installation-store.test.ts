@@ -24,6 +24,21 @@ function context(
 }
 
 describe("installation stores", () => {
+  it("rejects a save() whose apiUrl, asUser, or addonUserId fails validation", async () => {
+    const store = new InMemoryClockifyInstallationStore();
+    await expect(store.save({ ...context(100), apiUrl: "" })).rejects.toThrow(/apiUrl/);
+    await expect(store.save({ ...context(100), apiUrl: "not-a-url" })).rejects.toThrow(/apiUrl/);
+    await expect(
+      store.save({ ...context(100), apiUrl: "http://nonloopback.example/api" }),
+    ).rejects.toThrow(/apiUrl/);
+    await expect(store.save({ ...context(100), asUser: " " })).rejects.toThrow(/asUser/);
+    await expect(store.save({ ...context(100), addonUserId: "" })).rejects.toThrow(/addonUserId/);
+    // A loopback HTTP apiUrl is still accepted (local development).
+    await expect(
+      store.save({ ...context(100), apiUrl: "http://localhost:3000/api" }),
+    ).resolves.toBeUndefined();
+  });
+
   it("does not let a stale uninstall delete a newer installation generation", async () => {
     const store = new InMemoryClockifyInstallationStore();
     await store.save(context(100));
@@ -188,6 +203,31 @@ describe("installation stores", () => {
     await expect(store.load("workspace-1", "addon-1")).resolves.toMatchObject({
       authToken: "pre-rotation-secret",
       webhooks: [{ authToken: "webhook-secret" }],
+    });
+  });
+
+  it("chains both codec errors when a rotating codec's decode fails under both keys", async () => {
+    const oldKey = await crypto.subtle.generateKey({ name: "AES-GCM", length: 256 }, false, [
+      "encrypt",
+      "decrypt",
+    ]);
+    const newKey = await crypto.subtle.generateKey({ name: "AES-GCM", length: 256 }, false, [
+      "encrypt",
+      "decrypt",
+    ]);
+    const rotating = createRotatingClockifyTokenCodec(
+      createClockifyAesGcmTokenCodec(newKey),
+      createClockifyAesGcmTokenCodec(oldKey),
+    );
+
+    // The thrown error's cause is the codec actually caught last (oldCodec's
+    // failure); newCodec's failure is chained one level deeper via
+    // cause.cause, so both are reachable without inventing a wrapper shape.
+    await expect(rotating.decode("enc:v1:not-valid-at-all")).rejects.toMatchObject({
+      message: expect.stringContaining("Both Clockify token codecs failed"),
+      cause: expect.objectContaining({
+        cause: expect.anything(),
+      }),
     });
   });
 });

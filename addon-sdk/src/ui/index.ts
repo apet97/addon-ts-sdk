@@ -31,6 +31,13 @@ export interface ClockifyBrowserWindow {
 export interface CreateClockifyBridgeOptions {
   readonly window: ClockifyBrowserWindow;
   readonly parentOrigin: string;
+  /**
+   * Observes a same-origin message the bridge could not parse as a
+   * `ClockifyWindowMessage` — malformed JSON, or a missing/blank `title`.
+   * The bridge always drops the message either way; this hook exists only
+   * for debugging and never affects that drop behavior, even if it throws.
+   */
+  readonly onInvalidMessage?: (rawData: unknown, reason: "invalid-json" | "missing-title") => void;
 }
 
 /**
@@ -61,18 +68,40 @@ function assertParentOrigin(value: string): string {
   return url.origin;
 }
 
-function parseMessage(data: unknown): ClockifyWindowMessage | null {
+function notifyInvalidMessage(
+  onInvalidMessage: CreateClockifyBridgeOptions["onInvalidMessage"],
+  rawData: unknown,
+  reason: "invalid-json" | "missing-title",
+): void {
+  try {
+    onInvalidMessage?.(rawData, reason);
+  } catch {
+    // An observer must never affect the bridge's drop behavior.
+  }
+}
+
+function parseMessage(
+  data: unknown,
+  onInvalidMessage?: CreateClockifyBridgeOptions["onInvalidMessage"],
+): ClockifyWindowMessage | null {
   let candidate = data;
   if (typeof candidate === "string") {
     try {
       candidate = JSON.parse(candidate);
     } catch {
+      notifyInvalidMessage(onInvalidMessage, data, "invalid-json");
       return null;
     }
   }
-  if (typeof candidate !== "object" || candidate === null || !("title" in candidate)) return null;
+  if (typeof candidate !== "object" || candidate === null || !("title" in candidate)) {
+    notifyInvalidMessage(onInvalidMessage, data, "missing-title");
+    return null;
+  }
   const title = (candidate as { readonly title?: unknown }).title;
-  if (typeof title !== "string" || title.trim() === "") return null;
+  if (typeof title !== "string" || title.trim() === "") {
+    notifyInvalidMessage(onInvalidMessage, data, "missing-title");
+    return null;
+  }
   return candidate as ClockifyWindowMessage;
 }
 
@@ -86,7 +115,7 @@ export function createClockifyBridge(options: CreateClockifyBridgeOptions): Cloc
     readonly data: unknown;
   }) => {
     if (event.origin !== origin || event.source !== options.window.parent) return;
-    const message = parseMessage(event.data);
+    const message = parseMessage(event.data, options.onInvalidMessage);
     if (!message) return;
     for (const handler of handlers.get(message.title) ?? []) handler(message.body);
   };

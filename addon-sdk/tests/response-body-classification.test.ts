@@ -21,12 +21,17 @@ describe("isJsonBody", () => {
     // silently dropping every entry — these must never be classified as a JSON body.
     expect(isJsonBody(new Map([["a", 1]]))).toBe(false);
     expect(isJsonBody(new Set([1, 2]))).toBe(false);
-    expect(isJsonBody(new Date())).toBe(false);
     expect(isJsonBody(/re/)).toBe(false);
 
     class Custom {
       value = 1;
     }
     expect(isJsonBody(new Custom())).toBe(false);
+  });
+
+  it("treats Date as JSON, since JSON.stringify serializes it meaningfully (an ISO string) rather than discarding its data", () => {
+    const date = new Date("2026-08-07T10:00:00.000Z");
+    expect(isJsonBody(date)).toBe(true);
+    expect(JSON.stringify(date)).toBe('"2026-08-07T10:00:00.000Z"');
   });
 });

@@ -1,3 +1,4 @@
+import { isHttpsOrLoopbackHttp } from "../shared/loopback";
 import type { ClockifyLifecycleWebhookToken } from "./clockify-lifecycle";
 import type { ClockifyCryptoKey } from "./clockify-crypto-key";
 
@@ -156,8 +157,20 @@ export function createRotatingClockifyTokenCodec(
     async decode(encoded) {
       try {
         return await newCodec.decode(encoded);
-      } catch {
-        return oldCodec.decode(encoded);
+      } catch (newError) {
+        try {
+          return await oldCodec.decode(encoded);
+        } catch (oldError) {
+          // Corrupted data (not a wrong-key rotation case) fails both codecs;
+          // surfacing only oldError would hide newError's more likely cause.
+          // Chain newError onto oldError.cause first so the thrown error's
+          // own cause is still the codec actually caught here, and a reader
+          // can walk error.cause.cause to see both failures.
+          if (oldError instanceof Error) oldError.cause = newError;
+          throw new Error("Both Clockify token codecs failed to decode the stored value.", {
+            cause: oldError,
+          });
+        }
       }
     },
   };
@@ -171,8 +184,19 @@ function assertInstallationContext(context: ClockifyInstallationContext): void {
   assertNonEmpty(context.workspaceId, "workspace id");
   assertNonEmpty(context.addonId, "add-on id");
   assertNonEmpty(context.authToken, "auth token");
+  assertNonEmpty(context.asUser, "asUser");
+  assertNonEmpty(context.addonUserId, "addonUserId");
   if (!Number.isFinite(context.installedAt))
     throw new Error("Clockify installedAt must be finite.");
+  let apiUrl: URL;
+  try {
+    apiUrl = new URL(context.apiUrl);
+  } catch {
+    throw new Error("Clockify apiUrl must be a valid URL.");
+  }
+  if (!isHttpsOrLoopbackHttp(apiUrl)) {
+    throw new Error("Clockify apiUrl must use HTTPS outside canonical loopback hosts.");
+  }
   for (const webhook of context.webhooks ?? [])
     assertNonEmpty(webhook.authToken, "webhook auth token");
 }
@@ -181,9 +205,13 @@ function assertInstallationContext(context: ClockifyInstallationContext): void {
  * Wraps a store so installation and nested webhook credentials are encrypted at rest.
  *
  * A `load()` whose stored row fails to decode (wrong key, tampering, corruption) returns `null`,
- * the same result as "no installation" — the caller must fail closed either way. Pass
- * `onDecodeError` to observe the difference for operational alerting; it does not change what
- * `load()` returns.
+ * the same result as "no installation" — the caller must fail closed either way.
+ *
+ * @param onDecodeError - Required in production. Called when a stored row fails to decrypt
+ *   (wrong key or corrupted data). It does not change what `load()` returns — decode failures
+ *   stay indistinguishable from "never installed" to the caller either way — but without it, a
+ *   decode failure is silent, with no signal that storage is misconfigured or corrupted rather
+ *   than simply unpopulated. Wire it to your logger or alerting.
  */
 export function wrapClockifyInstallationStoreWithEncryption(
   store: ClockifyInstallationStore,

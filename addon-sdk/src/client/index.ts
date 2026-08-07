@@ -45,13 +45,19 @@ export class ClockifyAddonHttpError extends Error {
 }
 
 function normalizeBackendUrl(value: string): URL {
-  const url = new URL(value);
+  // Trim once and parse the trimmed value everywhere below. `new URL()`
+  // already tolerates leading/trailing ASCII whitespace on its own, so
+  // parsing the untrimmed value while extracting rawHostname from the
+  // trimmed value (the previous shape) worked today only because both
+  // happened to agree — trimming once removes that implicit assumption.
+  const trimmed = value.trim();
+  const url = new URL(trimmed);
   if (url.username !== "" || url.password !== "") {
     throw new Error("Clockify backendUrl must not include credentials.");
   }
   const rawHostname =
     /^[a-z][a-z\d+.-]*:\/\/(\[[^?/#\\]+\]|[^:/?#\\]+)(?::[^/?#\\]*)?(?:[/?#\\]|$)/i.exec(
-      value.trim(),
+      trimmed,
     )?.[1];
   // Not using the shared isHttpsOrLoopbackHttp predicate here: this call site
   // additionally requires the raw input string's hostname to match the
@@ -87,6 +93,9 @@ function isBadClockifyPathSegment(segment: string): boolean {
 }
 
 function requestUrl(base: URL, segments: readonly string[]): URL {
+  if (segments.length === 0) {
+    throw new Error("Clockify API path segments must contain at least one segment.");
+  }
   if (segments.some(isBadClockifyPathSegment)) {
     throw new Error("Clockify API path segments must be non-empty and must not be '.' or '..'.");
   }
@@ -96,11 +105,55 @@ function requestUrl(base: URL, segments: readonly string[]): URL {
   return url;
 }
 
+/** RFC 7231's Retry-After: either delay-seconds or an HTTP-date, capped at 30s either way. */
 function retryDelay(response: Response, attempt: number): number {
   const header = response.headers.get("retry-after");
-  const seconds = header === null || header.trim() === "" ? Number.NaN : Number(header);
-  if (Number.isFinite(seconds) && seconds >= 0) return Math.min(seconds * 1000, 30_000);
+  if (header !== null && header.trim() !== "") {
+    const seconds = Number(header);
+    if (Number.isFinite(seconds) && seconds >= 0) return Math.min(seconds * 1000, 30_000);
+    const dateMs = Date.parse(header);
+    if (Number.isFinite(dateMs)) {
+      const diffMs = dateMs - Date.now();
+      if (diffMs > 0) return Math.min(diffMs, 30_000);
+    }
+  }
   return Math.min(100 * 2 ** (attempt - 1), 2_000);
+}
+
+/** True for a body shape `send()` can safely re-issue on a 429 retry without it having been consumed. */
+function isReplayableRequestBody(body: BodyInit | null | undefined): boolean {
+  return (
+    body === null ||
+    body === undefined ||
+    typeof body === "string" ||
+    body instanceof Uint8Array ||
+    body instanceof ArrayBuffer ||
+    body instanceof URLSearchParams
+  );
+}
+
+/** Races `sleep(ms)` against `signal` aborting, so an abort during backoff does not wait out the delay. */
+function sleepOrAbort(
+  ms: number,
+  signal: AbortSignal | undefined,
+  sleep: (milliseconds: number) => Promise<void>,
+): Promise<void> {
+  if (!signal) return sleep(ms);
+  if (signal.aborted) return Promise.reject(signal.reason);
+  return new Promise((resolve, reject) => {
+    const onAbort = () => reject(signal.reason);
+    signal.addEventListener("abort", onAbort, { once: true });
+    sleep(ms).then(
+      () => {
+        signal.removeEventListener("abort", onAbort);
+        resolve();
+      },
+      (error) => {
+        signal.removeEventListener("abort", onAbort);
+        reject(error);
+      },
+    );
+  });
 }
 
 /** Fetch-based client for Marketplace-specific add-on token, settings, and generic API calls. */
@@ -146,6 +199,7 @@ export class ClockifyAddonClient {
     const url = requestUrl(this.backendUrl, segments);
     const method = (init.method ?? "GET").toUpperCase();
     const safeRead = method === "GET" || method === "HEAD";
+    const replayableBody = isReplayableRequestBody(init.body);
     for (let attempt = 1; attempt <= this.maxAttempts; attempt += 1) {
       if (this.signal?.aborted) throw this.signal.reason;
       const controller = new AbortController();
@@ -155,15 +209,24 @@ export class ClockifyAddonClient {
       );
       const abort = () => controller.abort(this.signal?.reason);
       this.signal?.addEventListener("abort", abort, { once: true });
+      // The abort listener above closes most of the race, but signal could
+      // still have become aborted between the pre-check at the top of this
+      // iteration and the addEventListener call just above (both synchronous,
+      // but not atomic) — in that gap the "abort" event already fired and
+      // this listener, registered after, never runs. Re-check and abort the
+      // controller directly instead of waiting out the full request timeout.
+      if (this.signal?.aborted) controller.abort(this.signal.reason);
       try {
         const headers = new Headers(init.headers);
+        headers.delete("authorization");
         headers.set("x-addon-token", this.token);
         const response = await this.fetch(url, {
           ...init,
           headers,
           signal: controller.signal,
         });
-        const retryable = response.status === 429 || (safeRead && response.status >= 500);
+        const retryable =
+          replayableBody && (response.status === 429 || (safeRead && response.status >= 500));
         if (retryable && attempt < this.maxAttempts) {
           try {
             // cancel() releases the connection back to the pool on Node 22's
@@ -177,7 +240,7 @@ export class ClockifyAddonClient {
           }
           const delayMs = retryDelay(response, attempt);
           this.notifyRetry({ attempt, status: response.status, delayMs });
-          await this.sleep(delayMs);
+          await sleepOrAbort(delayMs, this.signal, this.sleep);
           continue;
         }
         return response;
@@ -185,7 +248,7 @@ export class ClockifyAddonClient {
         if (!safeRead || attempt >= this.maxAttempts || this.signal?.aborted) throw error;
         const delayMs = Math.min(100 * 2 ** (attempt - 1), 2_000);
         this.notifyRetry({ attempt, error, delayMs });
-        await this.sleep(delayMs);
+        await sleepOrAbort(delayMs, this.signal, this.sleep);
       } finally {
         clearTimeout(timeout);
         this.signal?.removeEventListener("abort", abort);
@@ -200,6 +263,19 @@ export class ClockifyAddonClient {
     return response;
   }
 
+  /**
+   * Parses an ok response as JSON, wrapping a malformed body (a `SyntaxError`
+   * from `response.json()`) with a clearer message and `cause` chain instead
+   * of letting the raw parse error surface unattributed.
+   */
+  private async parseJson<T>(response: Response): Promise<T> {
+    try {
+      return (await response.json()) as T;
+    } catch (cause) {
+      throw new Error("Clockify add-on response is not valid JSON.", { cause });
+    }
+  }
+
   /** Exchanges an installation token for a user-scoped add-on token. */
   async exchangeUserToken(userId: string): Promise<string> {
     const response = await this.expectOk(["addon", "user", userId, "token"], { method: "POST" });
@@ -211,7 +287,7 @@ export class ClockifyAddonClient {
     const response = await this.expectOk(["addon", "workspaces", workspaceId, "settings"], {
       method: "GET",
     });
-    return (await response.json()) as T;
+    return this.parseJson<T>(response);
   }
 
   /** Updates structured settings for one installation workspace. */
@@ -224,7 +300,7 @@ export class ClockifyAddonClient {
       headers: { "content-type": "application/json" },
       body: JSON.stringify(updates),
     });
-    return (await response.json()) as T;
+    return this.parseJson<T>(response);
   }
 
   /** Performs an authenticated request using encoded, caller-supplied path segments. */

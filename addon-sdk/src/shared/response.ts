@@ -15,6 +15,12 @@ export interface AddonResponse {
 export function isJsonBody(body: unknown): boolean {
   if (typeof body !== "object" || body === null || body instanceof Uint8Array) return false;
   if (Array.isArray(body)) return true;
+  // Date is the one class instance JSON.stringify serializes meaningfully
+  // (via its toJSON, to an ISO string) rather than silently dropping data
+  // the way Map/Set/RegExp do above — treat it as JSON so a handler that
+  // returns `new Date()` ships an ISO string instead of a res.end(date)
+  // engine-specific toString().
+  if (body instanceof Date) return true;
   const proto = Object.getPrototypeOf(body);
   return proto === Object.prototype || proto === null;
 }

@@ -11,8 +11,10 @@ import {
   ClockifyStatusChangedLifecyclePayload,
   getClockifyEnvironmentContext,
   getClockifyHeader,
+  getClockifyHeaderValues,
   getClockifyQueryParam,
   isClockifyAdminRole,
+  isClockifyInstalledLifecyclePayload,
   resolveClockifyApiBaseUrl,
   resolveClockifyReportsBaseUrl,
   verifyClockifyComponentRequest,
@@ -137,6 +139,24 @@ describe("Marketplace request verification helpers", () => {
     ]);
     expect(getClockifyQueryParam(query, ClockifyQueryParams.AUTH_TOKEN)).toBe("token-1");
     expect(getClockifyQueryParam(undefined, ClockifyQueryParams.AUTH_TOKEN)).toBeUndefined();
+  });
+
+  it("trims and drops empty entries from a folded comma-joined header value", () => {
+    expect(
+      getClockifyHeaderValues(
+        { [ClockifyHeaders.SIGNATURE]: "  BearerToken , " },
+        ClockifyHeaders.SIGNATURE,
+      ),
+    ).toEqual(["BearerToken"]);
+    // A trailing comma no longer manufactures a spurious empty second value —
+    // this is a single real value, not an ambiguous header.
+    expect(
+      getClockifyHeaderValues({ [ClockifyHeaders.SIGNATURE]: "a," }, ClockifyHeaders.SIGNATURE),
+    ).toEqual(["a"]);
+    // Two genuinely distinct values (with incidental whitespace) still surface as two.
+    expect(
+      getClockifyHeaderValues({ [ClockifyHeaders.SIGNATURE]: "a, , b" }, ClockifyHeaders.SIGNATURE),
+    ).toEqual(["a", "b"]);
   });
 
   it("verifies a webhook signature, event header, workspace, and add-on id", async () => {
@@ -685,6 +705,40 @@ describe("Marketplace request verification helpers", () => {
     });
   });
 
+  it("accepts an INSTALLED payload's webhook token path as the full absolute URL Clockify documents", () => {
+    // MARKETPLACE_DOCS/03-lifecycle.md's own INSTALLED example shows
+    // webhooks[].path as a full URL ("https://example.com/webhook"), not a
+    // manifest-relative path — the guard must not assume the latter shape.
+    const basePayload = {
+      addonId: ADDON_ID,
+      authToken: "installation-token",
+      workspaceId: WORKSPACE_ID,
+      asUser: "admin-user",
+      apiUrl: "https://developer.clockify.me/api",
+      addonUserId: "addon-user",
+    };
+
+    expect(
+      isClockifyInstalledLifecyclePayload({
+        ...basePayload,
+        webhooks: [
+          {
+            path: "https://example.com/addon/webhooks/expense-created",
+            webhookType: "ADDON",
+            authToken: "webhook-token",
+          },
+        ],
+      }),
+    ).toBe(true);
+
+    expect(
+      isClockifyInstalledLifecyclePayload({
+        ...basePayload,
+        webhooks: [{ path: 42, webhookType: "ADDON", authToken: "webhook-token" }],
+      }),
+    ).toBe(false);
+  });
+
   it("identifies Clockify admin roles case-insensitively", () => {
     expect(isClockifyAdminRole("OWNER")).toBe(true);
     expect(isClockifyAdminRole(" admin ")).toBe(true);
@@ -717,7 +771,7 @@ describe("Marketplace request verification helpers", () => {
     );
   });
 
-  it("prefers a nonblank apiUrl without falling back when it is invalid", () => {
+  it("prefers a nonblank, normalizable apiUrl and falls back to backendUrl when it is not", () => {
     expect(
       resolveClockifyApiBaseUrl({
         apiUrl: "https://developer.clockify.me/api",
@@ -730,18 +784,28 @@ describe("Marketplace request verification helpers", () => {
         backendUrl: "https://api.clockify.me/api",
       }),
     ).toBe("https://api.clockify.me/api/v1");
+    // A present-but-unparseable-or-policy-rejected apiUrl no longer shadows a
+    // valid backendUrl — it falls through instead of returning undefined.
     expect(
       resolveClockifyApiBaseUrl({
         apiUrl: "http://nonloopback.example/api",
         backendUrl: "https://api.clockify.me/api",
       }),
-    ).toBeUndefined();
+    ).toBe("https://api.clockify.me/api/v1");
+    expect(
+      resolveClockifyApiBaseUrl({
+        apiUrl: "not-a-url",
+        backendUrl: "https://api.clockify.me/api",
+      }),
+    ).toBe("https://api.clockify.me/api/v1");
     expect(
       resolveClockifyApiBaseUrl({
         apiUrl: 42 as unknown as string,
         backendUrl: "https://api.clockify.me/api",
       }),
-    ).toBeUndefined();
+    ).toBe("https://api.clockify.me/api/v1");
+    // With no usable backendUrl either, the result is still undefined.
+    expect(resolveClockifyApiBaseUrl({ apiUrl: "http://nonloopback.example/api" })).toBeUndefined();
   });
 
   it.each([

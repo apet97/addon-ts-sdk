@@ -47,8 +47,15 @@ export function getClockifyHeaderValues(headers: AddonRequest["headers"], name: 
       // one comma-joined string instead of an array. None of Clockify's signature,
       // event-type, or lifecycle-token values ever legitimately contain a comma, so
       // splitting here surfaces every value the client actually sent for the
-      // ambiguity checks below.
-      values.push(...value.split(","));
+      // ambiguity checks below. Trim each split entry (a folded header commonly
+      // carries "value1, value2" with a space after the comma) and drop empty
+      // entries so a trailing/duplicate comma does not fabricate an extra value.
+      values.push(
+        ...value
+          .split(",")
+          .map((entry) => entry.trim())
+          .filter((entry) => entry !== ""),
+      );
     }
   }
 
@@ -97,11 +104,16 @@ export function resolveClockifyApiBaseUrl(input: {
   apiUrl?: string;
   backendUrl?: string;
 }): string | undefined {
-  if (input.apiUrl !== undefined) {
-    if (typeof input.apiUrl !== "string") return undefined;
-    if (input.apiUrl.trim() !== "") return normalizeClockifyVersionedBaseUrl(input.apiUrl);
-  }
-  return normalizeClockifyVersionedBaseUrl(input.backendUrl);
+  // apiUrl is preferred, but only once it actually normalizes.
+  // normalizeClockifyVersionedBaseUrl already treats a non-string, blank, or
+  // malformed/policy-rejected value as "not usable" (returns undefined), so
+  // any such apiUrl falls through to backendUrl here instead of this
+  // function returning undefined outright — a valid backendUrl is a better
+  // answer than none, and a stale-but-present apiUrl should not shadow it.
+  return (
+    normalizeClockifyVersionedBaseUrl(input.apiUrl) ??
+    normalizeClockifyVersionedBaseUrl(input.backendUrl)
+  );
 }
 
 export function resolveClockifyReportsBaseUrl(input: { reportsUrl?: string }): string | undefined {
