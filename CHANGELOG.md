@@ -81,8 +81,11 @@ All notable changes to this SDK are recorded here.
 - Added `withClockifyHandler()` as an additive unified alternative to the `withClockify*` wrappers:
   it normalizes every verification kind (`verified`, `component`, `lifecycle`, `installed`,
   `statusChanged`, `settingsUpdated`, `deleted`, `webhook`) to one `(request, context)` handler
-  signature. No existing wrapper's signature changed. Documented the wire → header → wrapper →
-  handler mapping in `addon-sdk/docs/api-reference.md`.
+  signature. No existing wrapper's signature changed. `ClockifyHandlerContext<Kind>` is
+  parameterized on the discriminant, so the four lifecycle-payload kinds keep required
+  `claims.workspaceId`/`claims.addonId` and their exact matched `payload` type instead of widening
+  to the union a naive unification would produce. Documented the wire → header → wrapper → handler
+  mapping in `addon-sdk/docs/api-reference.md`.
 - Narrowed generated `Record<string, any>` component `options` fields to `Record<string, unknown>`
   across schema versions 1.2–1.6 by fixing the emitter in `generate-clockify-manifest.ts`. Added a
   runtime `typeof` guard to `createClockifyTextSetting` so a JavaScript (non-TS-checked) caller
