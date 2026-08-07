@@ -100,6 +100,16 @@ All notable changes to this SDK are recorded here.
   reference code rather than standalone runnable projects — each file imports `../../src` directly
   and has no `package.json` of its own. The packed tarball's `files` array never listed this
   directory, so publication is unaffected.
+- Refreshed all 13 captured `MARKETPLACE_DOCS/` snapshots from a 2026-08-07 re-scrape of Clockify's
+  developer docs and added `MARKETPLACE_DOCS/14-manifest.md` for a previously-uncaptured upstream
+  page. Documented that Clockify's live schema endpoint now also serves an intermediate `1.5.1`
+  schema this SDK does not vendor a dedicated builder for.
+- Fixed `addon-sdk/docs/api-reference.md`'s wire → header → wrapper → handler table, which named
+  headers that do not exist on the wire (`X-Clockify-Signature`, `X-Clockify-Lifecycle-Token`,
+  `X-Clockify-Webhook-Event-Token`); the real names are `clockify-signature`,
+  `clockify-webhook-event-type`, and `x-addon-lifecycle-token`.
+- Removed `docs/superpowers/**` (past-session planning records, not customer-facing) and the
+  orphaned, stale `docs/product-surface.json`.
 
 ## 1.0.5 - 2026-07-14
 
