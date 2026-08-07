@@ -136,6 +136,25 @@ describe("installation stores", () => {
     await expect(encrypted.load("workspace-1", "addon-1")).resolves.toBeNull();
   });
 
+  it("reports corrupt-decode events via onDecodeError without changing the null result", async () => {
+    const raw = new InMemoryClockifyInstallationStore();
+    const key = await crypto.subtle.generateKey({ name: "AES-GCM", length: 256 }, false, [
+      "encrypt",
+      "decrypt",
+    ]);
+    const onDecodeError = vi.fn();
+    const encrypted = wrapClockifyInstallationStoreWithEncryption(
+      raw,
+      createClockifyAesGcmTokenCodec(key),
+      onDecodeError,
+    );
+
+    await raw.save(context(100, "enc:v1:not-valid"));
+    await expect(encrypted.load("workspace-1", "addon-1")).resolves.toBeNull();
+    expect(onDecodeError).toHaveBeenCalledTimes(1);
+    expect(onDecodeError).toHaveBeenCalledWith(expect.anything(), "workspace-1", "addon-1");
+  });
+
   it("rotates encryption keys by decoding old-key rows and encoding new ones with the new key", async () => {
     const oldKey = await crypto.subtle.generateKey({ name: "AES-GCM", length: 256 }, false, [
       "encrypt",

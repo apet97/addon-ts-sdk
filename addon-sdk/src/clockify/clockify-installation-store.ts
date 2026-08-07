@@ -177,10 +177,18 @@ function assertInstallationContext(context: ClockifyInstallationContext): void {
     assertNonEmpty(webhook.authToken, "webhook auth token");
 }
 
-/** Wraps a store so installation and nested webhook credentials are encrypted at rest. */
+/**
+ * Wraps a store so installation and nested webhook credentials are encrypted at rest.
+ *
+ * A `load()` whose stored row fails to decode (wrong key, tampering, corruption) returns `null`,
+ * the same result as "no installation" — the caller must fail closed either way. Pass
+ * `onDecodeError` to observe the difference for operational alerting; it does not change what
+ * `load()` returns.
+ */
 export function wrapClockifyInstallationStoreWithEncryption(
   store: ClockifyInstallationStore,
   codec: ClockifyTokenCodec,
+  onDecodeError?: (error: unknown, workspaceId: string, addonId: string) => void,
 ): ClockifyInstallationStore {
   return {
     async load(workspaceId, addonId) {
@@ -201,7 +209,8 @@ export function wrapClockifyInstallationStoreWithEncryption(
               }
             : {}),
         };
-      } catch {
+      } catch (error) {
+        onDecodeError?.(error, workspaceId, addonId);
         return null;
       }
     },
