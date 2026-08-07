@@ -128,6 +128,10 @@ server.listen(8080, () => {
 });
 ```
 
+Clockify fetches `${baseUrl}/manifest` over public HTTPS — it cannot reach `localhost`. During
+development, expose your server with a tunnel (`npx ngrok http 8080` or
+`npx cloudflared tunnel --url http://localhost:8080`) and use the printed tunnel URL as `baseUrl`.
+
 ## Product surface
 
 - **Manifest builders** for schema versions 1.2–1.5. Required fields are enforced at the type

@@ -5,6 +5,11 @@
 You need Node 22.13.0 or newer, npm, a Clockify developer workspace, and a public HTTPS URL before
 installing the add-on in Clockify.
 
+> Clockify fetches your manifest over public HTTPS — it cannot reach `localhost`. During
+> development, expose your local server with a tunnel: `npx ngrok http 8080` or
+> `npx cloudflared tunnel --url http://localhost:8080`. Set `PUBLIC_BASE_URL` to the printed tunnel
+> URL before you install the add-on.
+
 ## Create a project
 
 Create the default Node project with component, lifecycle, and webhook routes:
@@ -82,10 +87,18 @@ option details.
 
 ## Install it in Clockify
 
-Expose the running application through HTTPS, set `PUBLIC_BASE_URL` to that public origin, and add
-`${PUBLIC_BASE_URL}/manifest` in the Clockify developer workspace. Clockify reads the manifest and,
-for the default all-features project, sends the declared `INSTALLED` lifecycle callback. Verify that
-request and persist its installation and webhook credentials server-side before returning success.
+Expose the running application through HTTPS — in development, start a tunnel
+(`npx ngrok http 8080` or `npx cloudflared tunnel --url http://localhost:8080`) — set
+`PUBLIC_BASE_URL` to that public origin, and confirm the manifest is reachable before you install:
+
+```bash
+curl $PUBLIC_BASE_URL/manifest
+```
+
+That call must return `200` with the generated manifest body. Then add `${PUBLIC_BASE_URL}/manifest`
+in the Clockify developer workspace. Clockify reads the manifest and, for the default all-features
+project, sends the declared `INSTALLED` lifecycle callback. Verify that request and persist its
+installation and webhook credentials server-side before returning success.
 
 ## Verify the first component
 
