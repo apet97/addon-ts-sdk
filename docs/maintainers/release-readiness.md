@@ -56,14 +56,6 @@ end**:
 - `npm run release:dry-run` passed for both packages; both tarball contents matched the "Expected
   package shape" section below.
 
-One `schema-live-verification.test.ts` timeout case (`fails clearly when the live schema endpoint
-exceeds the configured timeout`) is a pre-existing timing-margin flake under full-suite load
-(observed once during this verification pass, reproduced 0/3 in isolation); it asserts a spawned
-child process's exit `code` under a tight 1000ms outer timeout around a 20ms inner timeout, and can
-race under CPU contention. It is unrelated to the schema-1.6 or audit changes in this pass — a
-repeat `release:verify` run passed clean. Widening that test's timing margin is a separate,
-narrowly-scoped follow-up.
-
 Any future `src/**` change (as opposed to a documentation-only pass) requires a fresh live receipt
 — an authenticated install exercising installation, component authentication, webhook delivery, and
 uninstall cleanup — before that release counts as Marketplace-proven; see the Future release

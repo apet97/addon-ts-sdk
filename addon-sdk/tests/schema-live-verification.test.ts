@@ -45,7 +45,7 @@ describe("live schema verification script", () => {
     expect(rootPackageJson.scripts["ci:verify"]).not.toContain("verify:schema-live");
   });
 
-  it("has a scheduled/manual GitHub workflow outside deterministic CI", () => {
+  it("has a scheduled/manual GitHub workflow outside deterministic CI, plus a non-blocking PR check", () => {
     const workflow = readFileSync(
       resolve(repoRoot, ".github", "workflows", "schema-live.yml"),
       "utf8",
@@ -56,6 +56,10 @@ describe("live schema verification script", () => {
     expect(workflow).toContain("schedule:");
     expect(workflow).toContain("node-version: 24.x");
     expect(workflow).toContain("npm run verify:schema-live");
+    expect(workflow).toContain("pull_request:");
+    expect(workflow).toContain("addon-sdk/schemas/**");
+    expect(workflow).toContain("addon-sdk/src/clockify/generated/**");
+    expect(workflow).toContain("continue-on-error: ${{ github.event_name == 'pull_request' }}");
   });
 
   it("accepts structurally equal live schemas and rejects unsupported 1.7", async () => {
@@ -123,7 +127,11 @@ describe("live schema verification script", () => {
             "--timeout-ms",
             "20",
           ],
-          { cwd: packageRoot, encoding: "utf8", timeout: 1_000 },
+          // The outer timeout is a safety net, not the assertion: the script's own --timeout-ms
+          // bounds each version's fetch to 20ms, so it always exits well before this fires. Kept
+          // generous so CPU contention across a full test run can't race the outer net closed
+          // before the script's first per-version timeout even lands.
+          { cwd: packageRoot, encoding: "utf8", timeout: 15_000 },
         ),
       ).rejects.toMatchObject({
         code: 1,
@@ -132,5 +140,5 @@ describe("live schema verification script", () => {
     } finally {
       await close(server);
     }
-  }, 5_000);
+  }, 20_000);
 });
