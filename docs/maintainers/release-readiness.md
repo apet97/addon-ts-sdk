@@ -40,21 +40,32 @@ section above remains the accurate record of what the registry currently serves.
 `npm run release:verify` (`ci:verify && verify:schema-live && release:dry-run`) does **not** pass
 end to end, so this release candidate does not yet meet the Publish boundary below:
 
-- `ci:verify` passed through 466 tests, thresholded coverage, lint, format, build, the public API
-  snapshot, `verify:dist`, `pack:dry-run`, package-lint, package-consumer, and all four packed
-  Node/Worker scaffolds (including real `workerd` routes), and `npm audit --omit=dev` (0
+- `ci:verify` passed through 468 tests, thresholded coverage (97.88% statements / 94.51% branches
+  / 99.02% functions / 99.03% lines, all above the configured floors), lint, format, build, the
+  public API snapshot, `verify:dist`, `pack:dry-run`, package-lint, package-consumer, and all four
+  packed Node/Worker scaffolds (including real `workerd` routes), and `npm audit --omit=dev` (0
   vulnerabilities; the production dependency tree is `jose` alone). It failed only at the
   full-tree `npm audit` step, on three pre-existing transitive **dev-tooling** advisories
   (`brace-expansion`, `fast-uri`, `postcss`) that predate this branch. Fixing them needs separate
   dependency-update authority and was intentionally not done here.
-- `verify:schema-live` failed: Clockify's live schema endpoint now serves a genuine, distinct
-  schema `1.6` (its own `$schema`/`definitions`, not an echo of `1.5`) where the check expects an
-  HTTP 400 for an unvendored version. This SDK's vendored schema set (`1.2`-`1.5`) is behind the
-  live Marketplace and needs its own vendoring/generation pass before publication; it is a real
-  product-surface gap, not a check-assumption problem.
+- `verify:schema-live` still fails on re-check: Clockify's live schema endpoint still serves a
+  genuine, distinct schema `1.6` (its own `$schema`/`definitions`, not an echo of `1.5`) where the
+  check expects an HTTP 400 for an unvendored version. This SDK's vendored schema set (`1.2`-`1.5`)
+  is behind the live Marketplace and needs its own vendoring/generation pass before publication; it
+  is a real product-surface gap, not a check-assumption problem, and vendoring a new schema version
+  is out of scope for this fix pass (it is not one of the 58+9 original review findings).
 - `npm run release:dry-run` (manually re-run after the audit failure short-circuited the chain)
   passed for both packages; both tarball contents matched the "Expected package shape" section
   below.
+
+This candidate had a second implementation pass after the one above: verified against the actual
+source (not commit messages) which of the plan's findings were real, unimplemented gaps, then
+closed the ones with real user-facing or security value — a lifecycle-token expiration default
+that could reject legitimate `INSTALLED` requests, an installation-store corrupt-decode signal, a
+tested-and-reverted attempt at mandatory manifest validation (documented instead, see CHANGELOG),
+tunnel/insecure-example/third-party-notice documentation gaps, and a scaffold idempotent-webhook
+recipe. `ci:verify` and `verify:schema-live` were re-run after that pass and fail at exactly the
+same two points as before — no new gap introduced, none of the two closed either.
 
 Resolve the schema-1.6 gap (and, separately, decide on the dev-tooling audit advisories) before
 treating this candidate as publish-ready.

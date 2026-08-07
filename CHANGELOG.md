@@ -48,6 +48,28 @@ All notable changes to this SDK are recorded here.
 - Recorded documented Java/TypeScript SDK behavioral divergences in the parity checklist.
 - `verify:dist` now walks the portable ESM entry's relative-import closure to catch a `node:*`
   leak into the runtime-neutral graph.
+- Made `verifyClockifyLifecycleRequest` default `requireExpiration` to `false`: the `INSTALLED`
+  payload's `authToken` does not expire per the Marketplace auth docs, and requiring `exp` by
+  default rejected legitimate lifecycle requests. `verifyClockifyComponentRequest` keeps the
+  strict default for interactive, short-lived tokens.
+- Added an optional `onDecodeError` callback to `wrapClockifyInstallationStoreWithEncryption` so a
+  corrupt-decode event (wrong key, tampering) is observable instead of looking identical to "no
+  installation" — `load()` still fails closed to `null` either way.
+- Documented why manifest validation stays opt-in via `createValidatedClockifyAddon` rather than
+  running inside the `ClockifyAddon` constructor: forcing it broke two official Clockify example
+  manifests that fail this SDK's own schema validator for reasons unrelated to routing.
+- Added tunnel guidance (`ngrok`/`cloudflared`) to the getting-started guide and SDK README
+  quick-start — Clockify cannot reach `localhost`, and neither doc previously said so.
+- Warned on the three insecure examples (`express-basic`, `fetch-basic`, `custom-settings`) that
+  skip verifying Clockify's signed `auth_token`, and switched `expense-webhook` from the internal
+  `generated.v1_5.*` accessors to the canonical `ClockifyWebhook.v1_5Builder()` export.
+- Added `jose`'s MIT notice to `THIRD_PARTY_NOTICES.md` — the SDK's one runtime dependency was
+  undocumented there — and extended the packed-consumer check to assert it ships.
+- Added a commented `runClockifyIdempotentWebhook` recipe to the generated all-features webhook
+  handler, and a liveness/readiness/`SIGTERM`-drain recipe to the deployment guide.
+- Recorded the remaining Java-parity rows (lifecycle-token expiration, `scopes` and
+  `component.label` requiredness drift across schema versions) and expanded the previously thin
+  "TS Extensions" list.
 
 ## 1.0.5 - 2026-07-14
 
