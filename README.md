@@ -47,7 +47,7 @@ Clockify request
 
 | Capability             | SDK support                                                                                    |
 | ---------------------- | ---------------------------------------------------------------------------------------------- |
-| Typed manifests        | Schema 1.5 builders and runtime validation                                                     |
+| Typed manifests        | Schema 1.2–1.6 builders and runtime validation                                                 |
 | Verified requests      | RS256 component, lifecycle, and stored-token webhook verification with context checks          |
 | Runtime adapters       | Node.js `http`, optional Express integration, and the standard Fetch API                       |
 | Add-on services        | Claim-driven token exchange, structured settings transport, and generic authenticated requests |
@@ -92,11 +92,11 @@ npm install @apet97/clockify-addon-sdk
 
 The repository verifies what users install, not only workspace source:
 
-- package linting checks both packed artifacts with publint and Are The Types Wrong;
-- installed ESM, CommonJS, and TypeScript consumers import the packed SDK;
-- all four Node/Worker and minimal/all-feature projects are generated and executed from tarballs;
-- generated manifests are validated and failure paths are exercised;
-- vendored schemas and public API declarations are checked for drift.
+- Package linting checks both packed artifacts with publint and Are The Types Wrong.
+- Installed ESM, CommonJS, and TypeScript consumers import the packed SDK.
+- All four Node/Worker and minimal/all-feature projects are generated and executed from tarballs.
+- Generated manifests are validated, and failure paths are exercised.
+- Vendored schemas and public API declarations are checked for drift.
 
 The canonical gate is:
 
