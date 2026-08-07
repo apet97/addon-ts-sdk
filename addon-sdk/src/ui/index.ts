@@ -33,10 +33,17 @@ export interface CreateClockifyBridgeOptions {
   readonly parentOrigin: string;
 }
 
+/**
+ * The add-on-dispatchable event names Clockify's window-messaging bridge documents. See
+ * `MARKETPLACE_DOCS/10-window-events.md`'s "Event dispatch" section — Clockify states this list is
+ * not final and is subject to change.
+ */
+export type ClockifyBridgeAction = "refreshAddonToken" | "preview" | "navigate" | "toastrPop";
+
 /** Typed Clockify iframe messaging surface. */
 export interface ClockifyBridge {
   subscribe(title: string, handler: (body: unknown) => void): () => void;
-  dispatch(action: string, payload?: unknown): void;
+  dispatch(action: ClockifyBridgeAction, payload?: unknown): void;
   refreshAddonToken(): void;
   preview(): void;
   navigate(type: "tracker"): void;
@@ -85,7 +92,7 @@ export function createClockifyBridge(options: CreateClockifyBridgeOptions): Cloc
   };
   options.window.addEventListener("message", listener);
 
-  const dispatch = (action: string, payload?: unknown): void => {
+  const dispatch = (action: ClockifyBridgeAction, payload?: unknown): void => {
     const envelope = payload === undefined ? { action } : { action, payload };
     options.window.parent.postMessage(JSON.stringify(envelope), origin);
   };
