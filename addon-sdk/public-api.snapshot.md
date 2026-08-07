@@ -149,6 +149,13 @@ import { ClockifyWebhook, ClockifyLifecycleEvent, ClockifyComponent } from "./cl
  *   new ClockifyAddon(ClockifyManifest.v1_5Builder()....build())  // M inferred as the v1.5 manifest
  *
  * The `register*` methods are then typed against that same version.
+ *
+ * This constructor does NOT validate the manifest against the Clockify schema — the manifest
+ * builders already enforce required fields at the type level, and a router built from a manifest
+ * that a downstream tool intentionally serves unvalidated (a captured example, a hand-authored
+ * fixture) must still start. Use {@link createValidatedClockifyAddon} instead when the manifest's
+ * shape is not statically known (built at runtime from configuration, deserialized JSON) and you
+ * want a schema violation to fail fast at startup rather than surface later as a rejected install.
  */
 export declare class ClockifyAddon<M extends {
     readonly schemaVersion: ClockifySchemaVersion;
@@ -803,8 +810,15 @@ export declare function createClockifyAesGcmTokenCodec(key: ClockifyAesGcmKey): 
  * deployment guide for the equivalent recipe applied to signature keys.
  */
 export declare function createRotatingClockifyTokenCodec(newCodec: ClockifyTokenCodec, oldCodec: ClockifyTokenCodec): ClockifyTokenCodec;
-/** Wraps a store so installation and nested webhook credentials are encrypted at rest. */
-export declare function wrapClockifyInstallationStoreWithEncryption(store: ClockifyInstallationStore, codec: ClockifyTokenCodec): ClockifyInstallationStore;
+/**
+ * Wraps a store so installation and nested webhook credentials are encrypted at rest.
+ *
+ * A `load()` whose stored row fails to decode (wrong key, tampering, corruption) returns `null`,
+ * the same result as "no installation" — the caller must fail closed either way. Pass
+ * `onDecodeError` to observe the difference for operational alerting; it does not change what
+ * `load()` returns.
+ */
+export declare function wrapClockifyInstallationStoreWithEncryption(store: ClockifyInstallationStore, codec: ClockifyTokenCodec, onDecodeError?: (error: unknown, workspaceId: string, addonId: string) => void): ClockifyInstallationStore;
 ```
 
 ### clockify/clockify-webhook-idempotency.d.ts
@@ -2979,6 +2993,13 @@ import { ClockifyWebhook, ClockifyLifecycleEvent, ClockifyComponent } from "./cl
  *   new ClockifyAddon(ClockifyManifest.v1_5Builder()....build())  // M inferred as the v1.5 manifest
  *
  * The `register*` methods are then typed against that same version.
+ *
+ * This constructor does NOT validate the manifest against the Clockify schema — the manifest
+ * builders already enforce required fields at the type level, and a router built from a manifest
+ * that a downstream tool intentionally serves unvalidated (a captured example, a hand-authored
+ * fixture) must still start. Use {@link createValidatedClockifyAddon} instead when the manifest's
+ * shape is not statically known (built at runtime from configuration, deserialized JSON) and you
+ * want a schema violation to fail fast at startup rather than surface later as a rejected install.
  */
 export declare class ClockifyAddon<M extends {
     readonly schemaVersion: ClockifySchemaVersion;
@@ -3633,8 +3654,15 @@ export declare function createClockifyAesGcmTokenCodec(key: ClockifyAesGcmKey): 
  * deployment guide for the equivalent recipe applied to signature keys.
  */
 export declare function createRotatingClockifyTokenCodec(newCodec: ClockifyTokenCodec, oldCodec: ClockifyTokenCodec): ClockifyTokenCodec;
-/** Wraps a store so installation and nested webhook credentials are encrypted at rest. */
-export declare function wrapClockifyInstallationStoreWithEncryption(store: ClockifyInstallationStore, codec: ClockifyTokenCodec): ClockifyInstallationStore;
+/**
+ * Wraps a store so installation and nested webhook credentials are encrypted at rest.
+ *
+ * A `load()` whose stored row fails to decode (wrong key, tampering, corruption) returns `null`,
+ * the same result as "no installation" — the caller must fail closed either way. Pass
+ * `onDecodeError` to observe the difference for operational alerting; it does not change what
+ * `load()` returns.
+ */
+export declare function wrapClockifyInstallationStoreWithEncryption(store: ClockifyInstallationStore, codec: ClockifyTokenCodec, onDecodeError?: (error: unknown, workspaceId: string, addonId: string) => void): ClockifyInstallationStore;
 ```
 
 ### clockify/clockify-webhook-idempotency.d.ts
