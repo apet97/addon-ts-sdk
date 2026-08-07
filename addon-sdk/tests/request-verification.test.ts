@@ -28,6 +28,7 @@ import {
   withClockifyVerifiedLifecycleRequest,
   withClockifyVerifiedRequest,
   withClockifyVerifiedWebhookRequest,
+  withClockifyHandler,
 } from "../src";
 import { generateTestKeys, signTestToken } from "../src/testing";
 
@@ -1173,5 +1174,94 @@ describe("Marketplace request verification helpers", () => {
         sub: ADDON_KEY,
       }).backendUrl,
     ).toBeUndefined();
+  });
+});
+
+describe("withClockifyHandler (unified arity)", () => {
+  it("normalizes the component kind to (request, context)", async () => {
+    const token = await validToken({ user: "component-user", workspaceRole: "ADMIN" });
+    let handled = false;
+    const handler = withClockifyHandler(
+      parser(),
+      { kind: "component", expectedWorkspaceId: WORKSPACE_ID, expectedAddonId: ADDON_ID },
+      async (_request, context) => {
+        handled = true;
+        expect(context.payload).toBeUndefined();
+        expect(context.eventType).toBeUndefined();
+        return { status: 200, body: { user: context.claims.user } };
+      },
+    );
+
+    const valid = await handler(
+      componentRequest(new URLSearchParams({ [ClockifyQueryParams.AUTH_TOKEN]: token })),
+    );
+    expect(valid).toEqual({ status: 200, body: { user: "component-user" } });
+    expect(handled).toBe(true);
+
+    handled = false;
+    const invalid = await handler(componentRequest(new URLSearchParams()));
+    expect(invalid).toEqual({ status: 401, body: "Unauthorized" });
+    expect(handled).toBe(false);
+  });
+
+  it("normalizes the installed lifecycle kind, exposing payload on context", async () => {
+    const token = await validToken();
+    const payload: ClockifyInstalledLifecyclePayload = {
+      addonId: ADDON_ID,
+      authToken: "installation-token",
+      workspaceId: WORKSPACE_ID,
+      asUser: "admin-user",
+      apiUrl: "https://developer.clockify.me/api",
+      addonUserId: "addon-user",
+      webhooks: [],
+    };
+    let handled = false;
+    const handler = withClockifyHandler(
+      parser(),
+      { kind: "installed", expectedWorkspaceId: WORKSPACE_ID, expectedAddonId: ADDON_ID },
+      async (_request, context) => {
+        handled = true;
+        expect(context.payload).toBe(payload);
+        return { status: 201, body: { workspaceId: context.claims.workspaceId } };
+      },
+    );
+
+    const valid = await handler({
+      ...request({ [ClockifyHeaders.LIFECYCLE_TOKEN]: token }),
+      body: payload,
+    });
+    expect(valid).toEqual({ status: 201, body: { workspaceId: WORKSPACE_ID } });
+    expect(handled).toBe(true);
+  });
+
+  it("normalizes the webhook kind, exposing eventType on context", async () => {
+    const token = await signTestToken(keys.privateKey, ADDON_KEY, {
+      workspaceId: WORKSPACE_ID,
+      addonId: ADDON_ID,
+    });
+    let handled = false;
+    const handler = withClockifyHandler(
+      parser(),
+      { kind: "webhook", expectedEventType: "EXPENSE_CREATED", expectedWebhookAuthToken: token },
+      async (_request, context) => {
+        handled = true;
+        expect(context.eventType).toBe("EXPENSE_CREATED");
+        return { status: 204 };
+      },
+    );
+
+    const valid = await handler(
+      request({
+        [ClockifyHeaders.SIGNATURE]: token,
+        [ClockifyHeaders.WEBHOOK_EVENT_TYPE]: "EXPENSE_CREATED",
+      }),
+    );
+    expect(valid).toEqual({ status: 204 });
+    expect(handled).toBe(true);
+
+    handled = false;
+    const invalid = await handler(request({}));
+    expect(invalid).toEqual({ status: 401, body: "Unauthorized" });
+    expect(handled).toBe(false);
   });
 });

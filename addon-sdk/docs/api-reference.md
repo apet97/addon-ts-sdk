@@ -64,10 +64,45 @@ highlights the stable boundaries and commonly used symbols; the generated
   handlers and return `401 Unauthorized` before application code runs when verification fails. The
   webhook wrapper requires exactly one token source: fixed `expectedWebhookAuthToken` or
   `getExpectedWebhookAuthToken`, never neither or both.
+- `withClockifyHandler()` is an additive unified wrapper that normalizes every `withClockify*` kind
+  above to one `(request, context)` handler signature — see the mapping table below.
 - `ClockifyHeaders`, `ClockifyQueryParams`, `getClockifyHeader()`, and `getClockifyQueryParam()`
   centralize Marketplace wire names.
 - `getClockifyEnvironmentContext()`, `resolveClockifyApiBaseUrl()`, and
   `resolveClockifyReportsBaseUrl()` keep region/environment URL handling claim-driven.
+
+### Wire → header → wrapper → handler
+
+Each `withClockify*` wrapper reads a different Marketplace credential and calls its handler with a
+different arity. The table below is the exact mapping; `withClockifyHandler()` is an additive
+alternative that normalizes every one of these to `(request, context)` via its `kind` option (see
+row-per-kind below) without changing or removing any wrapper.
+
+| Wire credential                                        | Header/query                                  | Wrapper                                     | `withClockifyHandler` `kind` | Handler signature                                                    |
+| -------------------------------------------------------- | ---------------------------------------------- | -------------------------------------------- | ----------------------------- | --------------------------------------------------------------------- |
+| Signed request (any event)                              | `X-Clockify-Signature` + event header          | `withClockifyVerifiedRequest`               | `"verified"`                  | `(request, claims, { claims, eventType })`                            |
+| Component auth token                                     | `auth_token` query param                       | `withClockifyVerifiedComponentRequest`      | `"component"`                 | `(request, claims, { claims })`                                       |
+| Lifecycle token (no `exp` required by default)            | `X-Clockify-Lifecycle-Token`                   | `withClockifyVerifiedLifecycleRequest`      | `"lifecycle"`                 | `(request, claims, { claims })`                                       |
+| Lifecycle token + matched `INSTALLED` payload             | `X-Clockify-Lifecycle-Token` + JSON body        | `withClockifyInstalledLifecycleRequest`     | `"installed"`                 | `(request, payload, claims, { claims, payload })`                     |
+| Lifecycle token + matched `STATUS_CHANGED` payload         | `X-Clockify-Lifecycle-Token` + JSON body        | `withClockifyStatusChangedLifecycleRequest` | `"statusChanged"`             | `(request, payload, claims, { claims, payload })`                     |
+| Lifecycle token + matched `SETTINGS_UPDATED` payload       | `X-Clockify-Lifecycle-Token` + JSON body        | `withClockifySettingsUpdatedLifecycleRequest` | `"settingsUpdated"`         | `(request, payload, claims, { claims, payload })`                     |
+| Lifecycle token + matched `DELETED` payload                | `X-Clockify-Lifecycle-Token` + JSON body        | `withClockifyDeletedLifecycleRequest`       | `"deleted"`                   | `(request, payload, claims, { claims, payload })`                     |
+| Signed request + stored webhook auth token                | `X-Clockify-Signature` + event header + `X-Clockify-Webhook-Event-Token` | `withClockifyVerifiedWebhookRequest`        | `"webhook"`                   | `(request, claims, { claims, eventType })`                            |
+
+`withClockifyHandler(parser, { kind, ...options }, handler)` always calls
+`handler(request, context)`, where `context: ClockifyHandlerContext` carries `claims` (and
+`payload`/`eventType` when the underlying wrapper supplies them). Reach for it when a single
+normalized handler shape is more convenient than matching each wrapper's own arity; reach for the
+specific `withClockify*` wrapper when its extra positional arguments (payload, claims) read more
+naturally at the call site.
+
+```ts
+const handleComponent = withClockifyHandler(
+  parser,
+  { kind: "component" },
+  (request, { claims }) => ({ status: 200, body: { user: claims.user } }),
+);
+```
 
 ## Lifecycle Helpers
 

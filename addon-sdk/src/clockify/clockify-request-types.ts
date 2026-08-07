@@ -208,3 +208,40 @@ export type ClockifyVerifiedWebhookRequestHandler = (
   claims: ClockifyAddonClaims,
   context: ClockifyVerifiedWebhookRequestContext,
 ) => AddonResponse | Promise<AddonResponse>;
+
+// --- Unified handler shape -------------------------------------------------
+//
+// Every `withClockify*` wrapper above calls its handler with a different arity
+// (2, 3, or 4 positional arguments) because each grew independently from its
+// own verification result. `withClockifyHandler` is an additive alternative
+// that normalizes all of them to one `(request, context)` shape, at the cost
+// of a discriminated `kind` option selecting which underlying verification to
+// run. It does not replace or change any `withClockify*` export above.
+
+/** Normalized handler context shared by every `withClockifyHandler` kind. */
+export interface ClockifyHandlerContext {
+  claims: ClockifyAddonClaims | ClockifyLifecycleMatchedClaims;
+  /** Present only for the four lifecycle-payload kinds (`installed`, `statusChanged`, `settingsUpdated`, `deleted`). */
+  payload?:
+    | ClockifyInstalledLifecyclePayload
+    | ClockifyStatusChangedLifecyclePayload
+    | ClockifySettingsUpdatedLifecyclePayload
+    | ClockifyDeletedLifecyclePayload;
+  /** Present for `verified` and `webhook` kinds. */
+  eventType?: string;
+}
+
+export type ClockifyHandler = (
+  request: AddonRequest,
+  context: ClockifyHandlerContext,
+) => AddonResponse | Promise<AddonResponse>;
+
+export type ClockifyHandlerOptions =
+  | ({ kind: "verified" } & ClockifyRequestVerificationOptions)
+  | ({ kind: "component" } & ClockifyTokenVerificationOptions)
+  | ({ kind: "lifecycle" } & ClockifyTokenVerificationOptions)
+  | ({ kind: "installed" } & ClockifyTokenVerificationOptions)
+  | ({ kind: "statusChanged" } & ClockifyTokenVerificationOptions)
+  | ({ kind: "settingsUpdated" } & ClockifyTokenVerificationOptions)
+  | ({ kind: "deleted" } & ClockifyTokenVerificationOptions)
+  | ({ kind: "webhook" } & ClockifyVerifiedWebhookRequestOptions);

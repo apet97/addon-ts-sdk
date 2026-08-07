@@ -12,6 +12,8 @@ import {
 } from "./clockify-lifecycle";
 import {
   ClockifyDeletedLifecycleRequestHandler,
+  ClockifyHandler,
+  ClockifyHandlerOptions,
   ClockifyInstalledLifecycleRequestHandler,
   ClockifyRequestVerificationOptions,
   ClockifySettingsUpdatedLifecycleRequestHandler,
@@ -259,4 +261,89 @@ export function withClockifyVerifiedWebhookRequest(
       eventType,
     });
   };
+}
+
+/**
+ * Unified alternative to the `withClockify*` wrappers above: always calls
+ * `handler(request, context)`, regardless of which verification `kind` ran.
+ * Additive only — every existing `withClockify*` export keeps its own arity
+ * and signature; use this when a single normalized shape is more convenient
+ * than matching each wrapper's specific handler arity.
+ *
+ * @example
+ * ```ts
+ * const handleComponent = withClockifyHandler(
+ *   parser,
+ *   { kind: "component" },
+ *   (request, { claims }) => ({ status: 200, body: `hello ${claims.addonId}` }),
+ * );
+ * ```
+ */
+export function withClockifyHandler(
+  parser: ClockifySignatureParser,
+  options: ClockifyHandlerOptions,
+  handler: ClockifyHandler,
+): RequestHandler {
+  switch (options.kind) {
+    case "verified": {
+      const { kind: _kind, ...rest } = options;
+      return withClockifyVerifiedRequest(parser, rest, (request, _claims, context) =>
+        handler(request, context),
+      );
+    }
+    case "component": {
+      const { kind: _kind, ...rest } = options;
+      return withClockifyVerifiedComponentRequest(
+        parser,
+        (request, _claims, context) => handler(request, context),
+        rest,
+      );
+    }
+    case "lifecycle": {
+      const { kind: _kind, ...rest } = options;
+      return withClockifyVerifiedLifecycleRequest(
+        parser,
+        (request, _claims, context) => handler(request, context),
+        rest,
+      );
+    }
+    case "installed": {
+      const { kind: _kind, ...rest } = options;
+      return withClockifyInstalledLifecycleRequest(
+        parser,
+        (request, _payload, _claims, context) => handler(request, context),
+        rest,
+      );
+    }
+    case "statusChanged": {
+      const { kind: _kind, ...rest } = options;
+      return withClockifyStatusChangedLifecycleRequest(
+        parser,
+        (request, _payload, _claims, context) => handler(request, context),
+        rest,
+      );
+    }
+    case "settingsUpdated": {
+      const { kind: _kind, ...rest } = options;
+      return withClockifySettingsUpdatedLifecycleRequest(
+        parser,
+        (request, _payload, _claims, context) => handler(request, context),
+        rest,
+      );
+    }
+    case "deleted": {
+      const { kind: _kind, ...rest } = options;
+      return withClockifyDeletedLifecycleRequest(
+        parser,
+        (request, _payload, _claims, context) => handler(request, context),
+        rest,
+      );
+    }
+    case "webhook": {
+      const { kind: _kind, ...rest } = options;
+      return withClockifyVerifiedWebhookRequest(parser, rest, (request, _claims, context) =>
+        handler(request, context),
+      );
+    }
+  }
 }
