@@ -256,11 +256,12 @@ Clockify credentials.
 ## Schema versions
 
 1.2–1.4 are ported from the Clockify add-on Java SDK; 1.5 and 1.6 are taken from the live schema
-endpoint (`GET https://api.clockify.me/api/addons/manifest-schema?version=1.6`). Schema 1.6 is
-additive over 1.5 — one new webhook event and one new component type, no changed or removed fields.
-The copies vendored under `schemas/clockify-manifests/` are structurally identical to those sources,
-and the generated builders are reproducible from them. Run `npm run verify:schema-live` manually
-when you want to compare the vendored schemas against Clockify's live endpoint.
+endpoint (`GET https://developer.clockify.me/api/addons/manifest-schema?version=1.6`, also served
+identically from `api.clockify.me`). Schema 1.6 is additive over 1.5 — one new webhook event and one
+new component type, no changed or removed fields. The copies vendored under
+`schemas/clockify-manifests/` are structurally identical to those sources, and the generated
+builders are reproducible from them. Run `npm run verify:schema-live` manually when you want to
+compare the vendored schemas against Clockify's live endpoint.
 
 The packaged tarball intentionally exposes the vendored schema JSON files. ESM consumers can
 import a schema or the provenance file directly:

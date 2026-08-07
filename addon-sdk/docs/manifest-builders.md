@@ -81,6 +81,14 @@ Schema 1.6 is additive over 1.5: one new webhook event (`TIME_OFF_REQUEST_STARTE
 so the v1.6 builders otherwise mirror v1.5. Use `ClockifyManifest.v1_6Builder()` and
 `generated.v1_6.*` when a manifest needs either new surface.
 
+Clockify's live schema endpoint also serves an intermediate `1.5.1` schema — the webhook event
+listed above alone, without the 1.6 component type — that this SDK does not vendor a dedicated
+builder or validator for. A manifest built with `v1_6Builder()` satisfies every field `1.5.1`
+requires, so `1.6` is a safe drop-in replacement for `1.5.1` manifests; only a manifest whose
+`schemaVersion` literally must read `"1.5.1"` is unsupported. `validateClockifyManifest()` fails
+closed with an unsupported-version issue for that exact string rather than validating it against
+the wrong schema.
+
 `validateClockifyManifest()`, `assertClockifyManifest()`, and
 `createValidatedClockifyAddon()` dispatch by `schemaVersion` to generated static Draft-04
 validators. AJV runs during repository code generation, not during request handling; the committed

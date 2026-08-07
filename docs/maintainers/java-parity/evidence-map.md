@@ -40,7 +40,7 @@ independently importable.
 ## Schema Provenance
 
 - `schemas/clockify-manifests/1.2.json`, `1.3.json`, and `1.4.json` are byte-identical to the Java SDK resources under `annotation-processor/src/main/resources/clockify-manifests/`.
-- `schemas/clockify-manifests/1.5.json` is byte-identical to `GET https://api.clockify.me/api/addons/manifest-schema?version=1.5` after trimming trailing whitespace.
+- `schemas/clockify-manifests/1.5.json` is byte-identical to `GET https://api.clockify.me/api/addons/manifest-schema?version=1.5` after trimming trailing whitespace. Clockify's documented endpoint host is `developer.clockify.me`; `api.clockify.me` serves identical content and is what `verify-live-schemas.mjs` uses.
 - Generated files under `src/clockify/generated/**` are reproducible with `npm run generate` and
   guarded by the check-only `npm run verify:generated` drift gate. The generated manifest
   validators are internal implementation, not public generated-model exports.
