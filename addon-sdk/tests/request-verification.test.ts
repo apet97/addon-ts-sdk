@@ -164,6 +164,37 @@ describe("Marketplace request verification helpers", () => {
     });
   });
 
+  it("does not require expiration on webhook tokens by default, but honors an explicit requireExpiration", async () => {
+    const token = await new SignJWT({
+      type: "addon",
+      workspaceId: WORKSPACE_ID,
+      addonId: ADDON_ID,
+    })
+      .setProtectedHeader({ alg: "RS256" })
+      .setIssuer("clockify")
+      .setSubject(ADDON_KEY)
+      .sign(keys.privateKey);
+    const webhookRequest = request({
+      [ClockifyHeaders.SIGNATURE]: token,
+      [ClockifyHeaders.WEBHOOK_EVENT_TYPE]: "EXPENSE_CREATED",
+    });
+
+    await expect(
+      verifyClockifyWebhookRequest(parser(), webhookRequest, {
+        expectedEventType: "EXPENSE_CREATED",
+        expectedWebhookAuthToken: token,
+      }),
+    ).resolves.toMatchObject({ ok: true });
+
+    await expect(
+      verifyClockifyWebhookRequest(parser(), webhookRequest, {
+        expectedEventType: "EXPENSE_CREATED",
+        expectedWebhookAuthToken: token,
+        requireExpiration: true,
+      }),
+    ).resolves.toEqual({ ok: false, reason: "missing-expiration" });
+  });
+
   it("reports missing and invalid signatures without calling the parser successfully", async () => {
     await expect(verifyClockifyRequest(parser(), request({}))).resolves.toEqual({
       ok: false,
@@ -362,6 +393,65 @@ describe("Marketplace request verification helpers", () => {
       eventType: "EXPENSE_CREATED",
       claims: { workspaceId: WORKSPACE_ID, addonId: ADDON_ID },
     });
+  });
+
+  it("rejects webhook token mismatches of equal and different length via constant-time compare", async () => {
+    const token = await validToken();
+    const webhookRequest = request({
+      [ClockifyHeaders.SIGNATURE]: token,
+      [ClockifyHeaders.WEBHOOK_EVENT_TYPE]: "EXPENSE_CREATED",
+    });
+
+    // Equal-length mismatch: differs only in the last character.
+    await expect(
+      verifyClockifyWebhookRequest(parser(), webhookRequest, {
+        expectedEventType: "EXPENSE_CREATED",
+        expectedWebhookAuthToken: `${token.slice(0, -1)}${token[token.length - 1] === "a" ? "b" : "a"}`,
+      }),
+    ).resolves.toEqual({ ok: false, reason: "webhook-token-mismatch" });
+
+    // Different-length mismatch: an unrelated, shorter stored token.
+    await expect(
+      verifyClockifyWebhookRequest(parser(), webhookRequest, {
+        expectedEventType: "EXPENSE_CREATED",
+        expectedWebhookAuthToken: "short",
+      }),
+    ).resolves.toEqual({ ok: false, reason: "webhook-token-mismatch" });
+  });
+
+  it("does not re-read the signature header after JWT verification for the token compare", async () => {
+    // request.headers is a plain object; middleware could hand the verifier
+    // one that mutates what it returns over time. verifyClockifyRequest reads
+    // the header once synchronously to capture it (T07's fix) and once more
+    // internally to verify the JWT — both happen before the JWT check's
+    // `await`, so both must see the real token. Any read beyond that would
+    // mean the token comparison re-read the header *after* the async JWT
+    // check, which is exactly the gap this fix closes — fail loudly if it
+    // regresses by returning a value that can never legitimately match.
+    const token = await validToken();
+    let reads = 0;
+    const headers = new Proxy(
+      {
+        [ClockifyHeaders.SIGNATURE]: token,
+        [ClockifyHeaders.WEBHOOK_EVENT_TYPE]: "EXPENSE_CREATED",
+      },
+      {
+        get(target, property, receiver) {
+          if (property === ClockifyHeaders.SIGNATURE) {
+            reads += 1;
+            return reads <= 2 ? token : "should-never-be-read-again";
+          }
+          return Reflect.get(target, property, receiver);
+        },
+      },
+    );
+
+    await expect(
+      verifyClockifyWebhookRequest(parser(), request(headers), {
+        expectedEventType: "EXPENSE_CREATED",
+        expectedWebhookAuthToken: token,
+      }),
+    ).resolves.toMatchObject({ ok: true });
   });
 
   it("rejects missing or blank expected webhook tokens from runtime-unsafe callers", async () => {

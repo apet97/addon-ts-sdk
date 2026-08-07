@@ -65,7 +65,11 @@ describe("Node HTTP server boot (integration)", () => {
     expect(res.status).toBe(404);
   });
 
-  it("does not reinterpret a double-slash request target as a different authority", async () => {
+  it("rejects a double-slash request target with 400 instead of treating it as a literal path", async () => {
+    // A "//host/path" target is authority-form grammar, not origin-form. A
+    // downstream proxy that forwards the raw target could interpret it as
+    // absolute with host "host", so the server rejects it outright rather
+    // than silently treating it as a literal, harmless path.
     const addon = new ClockifyAddon(base());
     const handler = vi.fn(() => ({ status: 204 }));
     addon.registerHandler("/component", "GET", handler);
@@ -82,7 +86,7 @@ describe("Node HTTP server boot (integration)", () => {
       ].join("\r\n"),
     );
 
-    expect(response).toMatch(/^HTTP\/1\.1 404 /);
+    expect(response).toMatch(/^HTTP\/1\.1 400 /);
     expect(handler).not.toHaveBeenCalled();
   });
 

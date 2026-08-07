@@ -250,6 +250,55 @@ describe("Clockify Addon Hooks", () => {
     expect(requests).toContainEqual({ method: "GET", path: "/settings/custom" });
   });
 
+  it("should treat an identical registerCustomSettings redeclaration as a no-op", () => {
+    const manifest = getCleanManifest();
+    const addon = new ClockifyAddon(manifest);
+    const firstHandler = () => ({ status: 200 });
+
+    addon.registerCustomSettings("/settings/custom", firstHandler);
+    expect(() =>
+      addon.registerCustomSettings("/settings/custom", () => ({ status: 200 })),
+    ).not.toThrow();
+
+    expect(addon.getManifest().settings).toBe("/settings/custom");
+    expect(addon.getRegisteredRequests()).toEqual(
+      expect.arrayContaining([{ method: "GET", path: "/settings/custom" }]),
+    );
+  });
+
+  it("should throw and leave the router and manifest unchanged when registerCustomSettings conflicts with a prior structured settings object", () => {
+    const manifest = getCleanManifest();
+    const addon = new ClockifyAddon(manifest);
+    const structuredSettings = { tabs: [] } as unknown as string;
+    (addon.getManifest() as { settings?: unknown }).settings = structuredSettings;
+
+    expect(() => addon.registerCustomSettings("/settings/custom", () => ({ status: 200 }))).toThrow(
+      IllegalArgumentException,
+    );
+
+    expect(addon.getManifest().settings).toBe(structuredSettings);
+    expect(addon.getRegisteredRequests()).not.toContainEqual({
+      method: "GET",
+      path: "/settings/custom",
+    });
+  });
+
+  it("should throw and leave the router and manifest unchanged when registerCustomSettings conflicts with a different path", () => {
+    const manifest = getCleanManifest();
+    const addon = new ClockifyAddon(manifest);
+
+    addon.registerCustomSettings("/settings/custom", () => ({ status: 200 }));
+    expect(() => addon.registerCustomSettings("/settings/other", () => ({ status: 200 }))).toThrow(
+      IllegalArgumentException,
+    );
+
+    expect(addon.getManifest().settings).toBe("/settings/custom");
+    expect(addon.getRegisteredRequests()).not.toContainEqual({
+      method: "GET",
+      path: "/settings/other",
+    });
+  });
+
   it("should not mutate manifest if hook registration fails due to duplicate path", () => {
     const manifest = getCleanManifest();
     const addon = new ClockifyAddon(manifest);

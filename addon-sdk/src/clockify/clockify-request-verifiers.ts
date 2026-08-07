@@ -1,4 +1,5 @@
 import type { AddonRequest } from "../shared/request";
+import { constantTimeEqual } from "../shared/constant-time";
 import { ClockifyAddonClaims, ClockifySignatureParser } from "./clockify-signature-parser";
 import {
   ClockifyRequestVerificationOptions,
@@ -84,6 +85,9 @@ export async function verifyClockifyRequest(
     return { ok: false, reason: "invalid-signature" };
   }
 
+  if (options.requireExpiration && !Number.isFinite(claims.exp)) {
+    return { ok: false, reason: "missing-expiration" };
+  }
   const contextMismatch = checkClockifyClaimContext(claims, options);
   if (contextMismatch) {
     return { ok: false, reason: contextMismatch };
@@ -130,6 +134,22 @@ export async function verifyClockifyWebhookRequest(
 
   const signatureHeader = options.signatureHeader ?? ClockifyHeaders.SIGNATURE;
 
+  // Read the signature header once, before verification, and reuse this same
+  // captured value for the token comparison below. verifyClockifyRequest also
+  // reads this header internally to verify the JWT, but that second read
+  // happens synchronously right after this one (no await in between), so it
+  // cannot observe a different value. Reusing `token` instead of reading the
+  // header again after the `await` below closes a gap where middleware could
+  // otherwise mutate `request.headers` between the JWT check and the token
+  // compare.
+  const signature = getSingleClockifyHeader(
+    request.headers,
+    signatureHeader,
+    "ambiguous-signature",
+  );
+  if (!signature.ok) return signature;
+  const token = signature.value;
+
   // Verify the signed JWT before comparing the stored webhook token. Comparing
   // first would let an attacker probe for the correct token with an arbitrary
   // unsigned string, never needing a request Clockify actually signed.
@@ -137,6 +157,7 @@ export async function verifyClockifyWebhookRequest(
     signatureHeader,
     eventHeader: options.eventHeader,
     expectedEventType: options.expectedEventType,
+    requireExpiration: options.requireExpiration,
   });
 
   if (!result.ok) return result;
@@ -153,8 +174,7 @@ export async function verifyClockifyWebhookRequest(
     return { ok: false, reason: contextMismatch };
   }
 
-  const token = getClockifyHeaderValues(request.headers, signatureHeader)[0];
-  if (token !== options.expectedWebhookAuthToken) {
+  if (!token || !constantTimeEqual(token, options.expectedWebhookAuthToken)) {
     return { ok: false, reason: "webhook-token-mismatch" };
   }
 

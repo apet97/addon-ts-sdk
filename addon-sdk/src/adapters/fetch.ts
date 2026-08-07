@@ -57,6 +57,15 @@ export async function handleFetchRequest(
 
     try {
       const contentLength = request.headers.get("content-length");
+      // The Fetch Headers object folds a client-repeated header into one
+      // comma-joined string (e.g. two "Content-Length: 10" lines become
+      // "10, 10") instead of exposing the duplicate as a list. Node's raw
+      // headers preserve duplicates and are rejected explicitly in
+      // node-http.ts; reject the folded form here too instead of relying on
+      // parseContentLength's regex to reject it implicitly.
+      if (contentLength !== null && contentLength.includes(",")) {
+        return new Response("Bad Request", { status: 400 });
+      }
       if ((parseContentLength(contentLength) ?? 0) > maxBodyBytes) {
         throw new PayloadTooLargeError(maxBodyBytes);
       }

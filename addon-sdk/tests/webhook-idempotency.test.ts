@@ -55,4 +55,41 @@ describe("webhook idempotency leases", () => {
     );
     expect(result).toEqual({ status: "duplicate" });
   });
+
+  it("evicts the oldest completed entry once maxCompletedEntries is exceeded", async () => {
+    const store = new InMemoryClockifyIdempotencyLeaseStore(Date.now, { maxCompletedEntries: 2 });
+    for (const key of ["a", "b", "c"]) {
+      await store.claim(key, "owner", 1000);
+      await store.complete(key, "owner");
+    }
+
+    expect(store.size()).toBe(2);
+    // "a" was evicted (oldest completed entry), so it is claimable again.
+    await expect(store.claim("a", "owner", 1000)).resolves.toBe(true);
+    // "b" and "c" are still retained as completed duplicates.
+    await expect(store.claim("b", "owner", 1000)).resolves.toBe(false);
+    await expect(store.claim("c", "owner", 1000)).resolves.toBe(false);
+  });
+
+  it("lets a completed entry expire and become claimable again once completedTtlMs elapses", async () => {
+    let now = 0;
+    const store = new InMemoryClockifyIdempotencyLeaseStore(() => now, { completedTtlMs: 10 });
+    await store.claim("key", "owner", 1000);
+    await store.complete("key", "owner");
+
+    now = 5;
+    await expect(store.claim("key", "other-owner", 1000)).resolves.toBe(false);
+
+    now = 11;
+    await expect(store.claim("key", "other-owner", 1000)).resolves.toBe(true);
+  });
+
+  it("reports the tracked key count via size()", async () => {
+    const store = new InMemoryClockifyIdempotencyLeaseStore();
+    expect(store.size()).toBe(0);
+    await store.claim("key", "owner", 1000);
+    expect(store.size()).toBe(1);
+    await store.complete("key", "owner");
+    expect(store.size()).toBe(1);
+  });
 });

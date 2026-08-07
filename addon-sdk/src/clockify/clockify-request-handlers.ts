@@ -1,6 +1,7 @@
 import type { AddonResponse } from "../shared/response";
 import type { RequestHandler } from "../shared/handler";
 import { reportAddonError } from "../shared/addon";
+import { constantTimeEqual } from "../shared/constant-time";
 import type { ClockifySignatureParser } from "./clockify-signature-parser";
 import type { ClockifyLifecycleMatchedClaims } from "./clockify-lifecycle";
 import {
@@ -216,6 +217,12 @@ export function withClockifyVerifiedWebhookRequest(
       expectedWebhookAuthToken: _expectedWebhookAuthToken,
       ...firstPassOptions
     } = options;
+    const signatureHeader = firstPassOptions.signatureHeader ?? ClockifyHeaders.SIGNATURE;
+    // Capture the signature header once, before the JWT verify and before the
+    // async token lookup below, and reuse this same value for the token
+    // comparison. Reading the header again after those awaits would risk
+    // observing a different value if request.headers were mutated in between.
+    const token = getClockifyHeaderValues(request.headers, signatureHeader)[0];
     const firstPass = await verifyClockifyRequest(parser, request, firstPassOptions);
     if (!firstPass.ok) {
       return unauthorizedResponse();
@@ -248,11 +255,10 @@ export function withClockifyVerifiedWebhookRequest(
     }
 
     // firstPass already verified the JWT and confirmed the signature header is
-    // unambiguous, so the raw token can be read directly instead of paying for
-    // a second full verifyClockifyWebhookRequest (and its second JWT verify).
-    const signatureHeader = firstPassOptions.signatureHeader ?? ClockifyHeaders.SIGNATURE;
-    const token = getClockifyHeaderValues(request.headers, signatureHeader)[0];
-    if (token !== expectedWebhookAuthToken) {
+    // unambiguous, so the captured `token` above can be compared directly
+    // instead of paying for a second full verifyClockifyWebhookRequest (and
+    // its second JWT verify).
+    if (!token || !constantTimeEqual(token, expectedWebhookAuthToken)) {
       return unauthorizedResponse();
     }
 

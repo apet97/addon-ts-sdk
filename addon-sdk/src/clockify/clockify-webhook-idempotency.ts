@@ -11,19 +11,46 @@ interface Lease {
   readonly completed: boolean;
 }
 
+/** Bounds for {@link InMemoryClockifyIdempotencyLeaseStore}'s completed-entry retention. */
+export interface ClockifyIdempotencyLeaseStoreOptions {
+  /**
+   * Caps how many completed entries are retained at once. Once exceeded, the
+   * oldest completed entry is evicted (FIFO). Unset keeps every completed
+   * entry (the default, unbounded).
+   */
+  readonly maxCompletedEntries?: number;
+  /**
+   * TTL, in milliseconds, for a completed entry. Once it elapses, the key is
+   * treated as never completed and becomes claimable again — a webhook
+   * redelivered after the TTL is no longer deduplicated. Unset retains
+   * completed entries forever (the default), matching the class's original
+   * behavior.
+   */
+  readonly completedTtlMs?: number;
+}
+
 /**
- * In-memory lease store for tests and single-process deployments. Completed
- * entries are retained forever (no TTL) so a replayed webhook is always
- * recognized as a duplicate; a long-lived process therefore grows this map
- * without bound. Use a durable store with a TTL on completed entries for
- * production.
+ * In-memory lease store for tests and single-process deployments. By
+ * default, completed entries are retained forever (no TTL) so a replayed
+ * webhook is always recognized as a duplicate; a long-lived process
+ * therefore grows this map without bound. Pass `maxCompletedEntries` and/or
+ * `completedTtlMs` to bound that growth, or use a durable store with a TTL
+ * on completed entries for production.
  */
 export class InMemoryClockifyIdempotencyLeaseStore implements ClockifyIdempotencyLeaseStore {
   private readonly leases = new Map<string, Lease>();
+  private readonly completedOrder: string[] = [];
   private readonly now: () => number;
+  private readonly options: ClockifyIdempotencyLeaseStoreOptions;
 
-  constructor(now: () => number = Date.now) {
+  constructor(now: () => number = Date.now, options: ClockifyIdempotencyLeaseStoreOptions = {}) {
     this.now = now;
+    this.options = options;
+  }
+
+  /** Number of keys currently tracked (active leases plus retained completed entries). */
+  size(): number {
+    return this.leases.size;
   }
 
   async claim(key: string, owner: string, leaseMs: number): Promise<boolean> {
@@ -31,7 +58,10 @@ export class InMemoryClockifyIdempotencyLeaseStore implements ClockifyIdempotenc
       throw new Error("Lease key and owner must not be empty.");
     if (!Number.isFinite(leaseMs) || leaseMs <= 0) throw new Error("leaseMs must be positive.");
     const current = this.leases.get(key);
-    if (current?.completed || (current && current.expiresAt > this.now())) return false;
+    // A completed entry with no TTL has expiresAt = Infinity, so it always
+    // fails this check (stays a permanent duplicate). A completed entry with
+    // a TTL becomes claimable again once its expiresAt has passed.
+    if (current && current.expiresAt > this.now()) return false;
     this.leases.set(key, { owner, expiresAt: this.now() + leaseMs, completed: false });
     return true;
   }
@@ -40,7 +70,19 @@ export class InMemoryClockifyIdempotencyLeaseStore implements ClockifyIdempotenc
     const current = this.leases.get(key);
     if (!current || current.completed || current.owner !== owner || current.expiresAt <= this.now())
       return false;
-    this.leases.set(key, { ...current, completed: true, expiresAt: Number.POSITIVE_INFINITY });
+    const { completedTtlMs, maxCompletedEntries } = this.options;
+    const expiresAt =
+      completedTtlMs === undefined ? Number.POSITIVE_INFINITY : this.now() + completedTtlMs;
+    this.leases.set(key, { ...current, completed: true, expiresAt });
+    if (maxCompletedEntries !== undefined) {
+      this.completedOrder.push(key);
+      while (this.completedOrder.length > maxCompletedEntries) {
+        const oldest = this.completedOrder.shift();
+        if (oldest !== undefined && this.leases.get(oldest)?.completed) {
+          this.leases.delete(oldest);
+        }
+      }
+    }
     return true;
   }
 

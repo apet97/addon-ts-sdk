@@ -131,8 +131,29 @@ export class ClockifyAddon<
   }
 
   registerCustomSettings(path: string, handler: RequestHandler): void {
+    const m = this.manifest as { settings?: string | Record<string, unknown> };
+    const existing = m.settings;
+
+    // Mirror registerManifestRoute's atomicity contract: check the existing
+    // manifest state before mutating the router, so a conflict leaves both
+    // unchanged, and an identical redeclaration (hot reload) is a no-op
+    // instead of throwing from the router's duplicate-bind guard.
+    if (existing !== undefined) {
+      if (existing !== path) {
+        throw new IllegalArgumentException(
+          `Clockify settings already registered as ${
+            typeof existing === "string" ? existing : "structured settings"
+          }.`,
+        );
+      }
+      const methodUpper = Addon.HTTP_GET.toUpperCase();
+      const alreadyRouted = this.getRegisteredRequests().some(
+        (entry) => entry.path === path && entry.method === methodUpper,
+      );
+      if (alreadyRouted) return;
+    }
+
     this.registerHandler(path, Addon.HTTP_GET, handler);
-    const m = this.manifest as { settings?: string };
     m.settings = path;
   }
 }

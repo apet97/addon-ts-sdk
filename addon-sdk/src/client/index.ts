@@ -166,6 +166,11 @@ export class ClockifyAddonClient {
         const retryable = response.status === 429 || (safeRead && response.status >= 500);
         if (retryable && attempt < this.maxAttempts) {
           try {
+            // cancel() releases the connection back to the pool on Node 22's
+            // fetch and on workerd. The Fetch spec defines cancel() as
+            // best-effort, so a runtime that needs a full drain instead of a
+            // cancel is a known gap; whatever happens here must never block
+            // or replace the intended retry below.
             await response.body?.cancel();
           } catch {
             // Discarded-response cleanup must not replace the intended retry.

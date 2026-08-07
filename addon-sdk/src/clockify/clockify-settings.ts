@@ -78,6 +78,16 @@ function dropdownSetting<Type extends ClockifySetting["type"], Value>(
   type: Type,
   input: ClockifyDropdownSettingOptions<Value>,
 ): ClockifyDropdownSetting<Type, Value> {
+  // Types already enforce `allowedValues: string[]`; this guard exists for
+  // JavaScript (non-TS-checked) callers who can pass anything at runtime.
+  if (
+    !Array.isArray(input.allowedValues) ||
+    !input.allowedValues.every((v) => typeof v === "string")
+  ) {
+    throw new ValidationException(
+      `Clockify ${type} setting requires allowedValues to be an array of strings.`,
+    );
+  }
   return {
     ...valueSetting(type, input),
     allowedValues: input.allowedValues,
@@ -100,41 +110,76 @@ export function createClockifyTextSetting(
 export function createClockifyNumberSetting(
   input: ClockifyNumberSettingOptions,
 ): ClockifyTypedSetting<"NUMBER", number> {
+  if (typeof input.value !== "number" || !Number.isFinite(input.value)) {
+    throw new ValidationException(
+      `createClockifyNumberSetting requires a finite number value — got ${typeof input.value}.`,
+    );
+  }
   return valueSetting("NUMBER", input);
 }
 
 export function createClockifyCheckboxSetting(
   input: ClockifyCheckboxSettingOptions,
 ): ClockifyTypedSetting<"CHECKBOX", boolean> {
+  if (typeof input.value !== "boolean") {
+    throw new ValidationException(
+      `createClockifyCheckboxSetting requires a boolean value — got ${typeof input.value}.`,
+    );
+  }
   return valueSetting("CHECKBOX", input);
 }
 
 export function createClockifyLinkSetting(
   input: ClockifyLinkSettingOptions,
 ): ClockifyTypedSetting<"LINK", string> {
+  if (typeof input.value !== "string") {
+    throw new ValidationException(
+      `createClockifyLinkSetting requires a string value — got ${typeof input.value}.`,
+    );
+  }
   return valueSetting("LINK", input);
 }
 
 export function createClockifyDropdownSingleSetting(
   input: ClockifyDropdownSingleSettingOptions,
 ): ClockifyDropdownSetting<"DROPDOWN_SINGLE", string> {
+  if (typeof input.value !== "string") {
+    throw new ValidationException(
+      `createClockifyDropdownSingleSetting requires a string value — got ${typeof input.value}.`,
+    );
+  }
   return dropdownSetting("DROPDOWN_SINGLE", input);
 }
 
 export function createClockifyDropdownMultipleSetting(
   input: ClockifyDropdownMultipleSettingOptions,
 ): ClockifyDropdownSetting<"DROPDOWN_MULTIPLE", string[]> {
+  if (!Array.isArray(input.value) || !input.value.every((v) => typeof v === "string")) {
+    throw new ValidationException(
+      `createClockifyDropdownMultipleSetting requires value to be an array of strings.`,
+    );
+  }
   return dropdownSetting("DROPDOWN_MULTIPLE", input);
 }
 
 export function createClockifyUserDropdownSingleSetting(
   input: ClockifyUserDropdownSingleSettingOptions,
 ): ClockifyTypedSetting<"USER_DROPDOWN_SINGLE", string> {
+  if (typeof input.value !== "string") {
+    throw new ValidationException(
+      `createClockifyUserDropdownSingleSetting requires a string value — got ${typeof input.value}.`,
+    );
+  }
   return valueSetting("USER_DROPDOWN_SINGLE", input);
 }
 
 export function createClockifyUserDropdownMultipleSetting(
   input: ClockifyUserDropdownMultipleSettingOptions,
 ): ClockifyTypedSetting<"USER_DROPDOWN_MULTIPLE", string[]> {
+  if (!Array.isArray(input.value) || !input.value.every((v) => typeof v === "string")) {
+    throw new ValidationException(
+      `createClockifyUserDropdownMultipleSetting requires value to be an array of strings.`,
+    );
+  }
   return valueSetting("USER_DROPDOWN_MULTIPLE", input);
 }

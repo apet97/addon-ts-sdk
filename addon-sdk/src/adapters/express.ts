@@ -1,7 +1,7 @@
 import { Addon, AddonErrorReporter, reportAddonError } from "../shared/addon";
 import { AddonRequest } from "../shared/request";
 import { AddonResponse, isJsonBody } from "../shared/response";
-import { parseHttpRequestTarget } from "./request-target";
+import { InvalidRequestTargetError, parseHttpRequestTarget } from "./request-target";
 
 export interface ExpressLikeRequest {
   method?: string;
@@ -81,10 +81,17 @@ export function createExpressAddonHandler(
         res.end();
       }
     } catch (e) {
+      // A malformed request target is a client error, not a server fault —
+      // matches the Node adapter's 400 for the same InvalidRequestTargetError,
+      // and is not reported through onError (same as the Node adapter).
+      if (e instanceof InvalidRequestTargetError) {
+        res.status(400).send("Bad Request");
+        return;
+      }
       // addon.handle() already reports errors from inside the handler/middleware
       // chain through its own onError (set on the ClockifyAddon/Addon instance).
       // This covers what that path can't see: an error thrown before dispatch
-      // (e.g. a malformed request target) or while writing the response.
+      // or while writing the response.
       reportAddonError(options.onError, e, { source: "router", nativeRequest: req });
       if (next) {
         next(e);

@@ -16,6 +16,12 @@ export interface ClockifyRequestVerificationOptions {
   expectedEventType?: string;
   expectedWorkspaceId?: string;
   expectedAddonId?: string;
+  /**
+   * When `true`, a JWT without an `exp` claim fails with `missing-expiration`.
+   * Unset (the default) accepts a token with no `exp`, matching Clockify's
+   * lifecycle and webhook `authToken`s, which never expire.
+   */
+  requireExpiration?: boolean;
 }
 
 export interface ClockifyWebhookVerificationOptions {
@@ -25,6 +31,14 @@ export interface ClockifyWebhookVerificationOptions {
   expectedWorkspaceId?: string;
   expectedAddonId?: string;
   expectedWebhookAuthToken: string;
+  /**
+   * When `true`, a webhook JWT without an `exp` claim fails with
+   * `missing-expiration`. Unset (the default) accepts a webhook `authToken`
+   * with no `exp`, matching the documented Clockify contract that it never
+   * expires. Set this only if your signer adds `exp` and you want it
+   * enforced.
+   */
+  requireExpiration?: boolean;
 }
 
 export interface ClockifyTokenVerificationOptions {
@@ -37,6 +51,7 @@ export type ClockifyRequestVerificationFailureReason =
   | "missing-signature"
   | "ambiguous-signature"
   | "invalid-signature"
+  | "missing-expiration"
   | "missing-event-type"
   | "ambiguous-event-type"
   | "event-type-mismatch"

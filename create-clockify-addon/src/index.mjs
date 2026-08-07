@@ -87,7 +87,13 @@ function commonSource(features) {
       async () => {
         // TODO(prod): make webhook processing idempotent — Clockify can redeliver an
         // event. Claim a lease keyed by a stable identifier from the payload (not the
-        // request) before doing work, with a durable ClockifyIdempotencyLeaseStore:
+        // request) before doing work, with a durable ClockifyIdempotencyLeaseStore.
+        // InMemoryClockifyIdempotencyLeaseStore retains completed keys forever by
+        // default — replace it with a durable store, or bound it explicitly:
+        //   new InMemoryClockifyIdempotencyLeaseStore(Date.now, {
+        //     completedTtlMs: 7 * 24 * 60 * 60 * 1000,
+        //     maxCompletedEntries: 10_000,
+        //   })
         //
         //   const result = await runClockifyIdempotentWebhook(
         //     leaseStore,

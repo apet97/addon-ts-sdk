@@ -57,15 +57,26 @@ describe("Adapters", () => {
   });
 
   it("rejects an absolute-form Node request-target before it can pick its own host", async () => {
-    // A "/..." or "//..." target is always prefixed with http://localhost, so
-    // it can never resolve to a foreign host. Only a full "scheme://host/..."
-    // target bypasses that prefix entirely.
+    // A single-"/" target is always prefixed with http://localhost, so it can
+    // never resolve to a foreign host. Only a full "scheme://host/..." target
+    // bypasses that prefix entirely and lets the target pick its own host.
     const mockReq = new IncomingMessage(new Socket());
     mockReq.headers = { host: "localhost" };
     mockReq.url = "http://evil.example/manifest";
     mockReq.method = "GET";
 
     await expect(fromNodeRequest(mockReq)).rejects.toBeInstanceOf(InvalidRequestTargetError);
+  });
+
+  it("rejects a //-prefixed Node request-target (authority-form, not origin-form)", async () => {
+    for (const url of ["//evil.example/manifest", "///", "//"]) {
+      const mockReq = new IncomingMessage(new Socket());
+      mockReq.headers = { host: "localhost" };
+      mockReq.url = url;
+      mockReq.method = "GET";
+
+      await expect(fromNodeRequest(mockReq)).rejects.toBeInstanceOf(InvalidRequestTargetError);
+    }
   });
 
   it("rejects Node HTTP requests with oversized content-length before body parsing", async () => {
@@ -330,6 +341,29 @@ describe("Adapters", () => {
     expect(handler).not.toHaveBeenCalled();
   });
 
+  it.each(["10, 10", "5,5", " 10, 10"])(
+    "explicitly rejects a folded duplicate Fetch content-length %j",
+    async (contentLength) => {
+      // The Fetch Headers object folds a client-repeated content-length
+      // header into one comma-joined string instead of exposing it as a
+      // list, matching how node-http.ts rejects a duplicate observed via
+      // rawHeaders — reject it explicitly here too.
+      const addon = new ClockifyAddon(mockManifest);
+      const handler = vi.fn(() => ({ status: 204 }));
+      addon.registerHandler("/webhook", "POST", handler);
+      const response = await handleFetchRequest(
+        addon,
+        new Request("https://example.com/webhook", {
+          method: "POST",
+          headers: { "content-length": contentLength },
+          body: "{}",
+        }),
+      );
+      expect(response.status).toBe(400);
+      expect(handler).not.toHaveBeenCalled();
+    },
+  );
+
   it("should handle Express handler flow", async () => {
     const addon = new ClockifyAddon(mockManifest);
     const handler = createExpressAddonHandler(addon);
@@ -405,9 +439,29 @@ describe("Adapters", () => {
       end: vi.fn().mockReturnThis(),
     };
 
-    await handler({ method: "GET", url: "//other.example/component", headers: {} }, mockRes);
+    await handler({ method: "GET", url: "/other-path", headers: {} }, mockRes);
 
     expect(mockRes.status).toHaveBeenCalledWith(404);
+    expect(route).not.toHaveBeenCalled();
+  });
+
+  it("rejects a //-prefixed request target with 400 instead of routing it as a literal path", async () => {
+    const addon = new ClockifyAddon(mockManifest);
+    const route = vi.fn(() => ({ status: 204 }));
+    addon.registerHandler("/component", "GET", route);
+    const handler = createExpressAddonHandler(addon);
+    const mockRes = {
+      status: vi.fn().mockReturnThis(),
+      set: vi.fn().mockReturnThis(),
+      json: vi.fn().mockReturnThis(),
+      send: vi.fn().mockReturnThis(),
+      end: vi.fn().mockReturnThis(),
+    };
+
+    await handler({ method: "GET", url: "//evil.example/component", headers: {} }, mockRes);
+
+    expect(mockRes.status).toHaveBeenCalledWith(400);
+    expect(mockRes.send).toHaveBeenCalledWith("Bad Request");
     expect(route).not.toHaveBeenCalled();
   });
 
@@ -621,11 +675,11 @@ describe("Adapters", () => {
     expect(response.headers.get("x-clockify-trace")).toBe("first, second");
   });
 
-  it("reports an Express adapter error via onError before falling through to next()", async () => {
-    // addon.handle() reports errors from inside the handler chain via the
-    // ClockifyAddon-level onError; this covers what happens before dispatch —
-    // here, a malformed absolute-form request target rejected by
-    // parseHttpRequestTarget.
+  it("rejects a malformed absolute-form Express request-target with 400, without reporting or calling next()", async () => {
+    // A malformed request target is a client error, not a server fault: it
+    // returns 400 directly without dispatch, matching the Node adapter's
+    // InvalidRequestTargetError handling and the Fetch adapter's un-reported
+    // 400/413 for malformed/oversized content-length above.
     const addon = new ClockifyAddon(mockManifest);
     const onError = vi.fn();
     const handler = createExpressAddonHandler(addon, { onError });
@@ -647,12 +701,49 @@ describe("Adapters", () => {
 
     await handler(mockReq as any, mockRes as any, next);
 
+    expect(mockRes.status).toHaveBeenCalledWith(400);
+    expect(mockRes.send).toHaveBeenCalledWith("Bad Request");
+    expect(onError).not.toHaveBeenCalled();
+    expect(next).not.toHaveBeenCalled();
+  });
+
+  it("reports an Express adapter error via onError before falling through to next()", async () => {
+    // addon.handle() reports errors from inside the handler chain via its own
+    // onError; this covers what happens for an error the router itself
+    // surfaces after successful dispatch, while writing the response.
+    const addon = new ClockifyAddon(mockManifest);
+    addon.registerHandler("/component", "GET", () => ({
+      status: 204,
+      headers: { "x-test": "1" },
+    }));
+    const onError = vi.fn();
+    const handler = createExpressAddonHandler(addon, { onError });
+
+    const mockReq = {
+      method: "GET",
+      url: "/component",
+      headers: {},
+      query: {},
+    };
+    const next = vi.fn();
+    const failingError = new Error("res.set exploded");
+    const mockRes = {
+      status: vi.fn().mockReturnThis(),
+      set: vi.fn(() => {
+        throw failingError;
+      }),
+      json: vi.fn().mockReturnThis(),
+      send: vi.fn().mockReturnThis(),
+      end: vi.fn().mockReturnThis(),
+    };
+
+    await handler(mockReq as any, mockRes as any, next);
+
     expect(onError).toHaveBeenCalledExactlyOnceWith(
-      expect.any(Error),
+      failingError,
       expect.objectContaining({ source: "router", nativeRequest: mockReq }),
     );
-    expect(next).toHaveBeenCalledExactlyOnceWith(expect.any(Error));
-    expect(mockRes.status).not.toHaveBeenCalled();
+    expect(next).toHaveBeenCalledExactlyOnceWith(failingError);
   });
 
   it("sends Uint8Array response bodies as raw bytes via the Express adapter", async () => {

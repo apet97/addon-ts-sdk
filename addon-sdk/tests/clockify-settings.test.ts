@@ -163,4 +163,76 @@ describe("Clockify settings helpers", () => {
       }),
     ).toThrow(ValidationException);
   });
+
+  // Every setting factory validates its runtime value/allowedValues shape,
+  // not just createClockifyTextSetting — a JS (non-TS-checked) caller can
+  // pass anything, and TypeScript's compile-time check does not help there.
+  const base = { id: "s", name: "Setting", accessLevel: "ADMINS" as const };
+
+  it("createClockifyNumberSetting rejects a non-finite-number value at runtime", () => {
+    expect(() =>
+      createClockifyNumberSetting({ ...base, value: "123" as unknown as number }),
+    ).toThrow(ValidationException);
+    expect(() => createClockifyNumberSetting({ ...base, value: Number.POSITIVE_INFINITY })).toThrow(
+      ValidationException,
+    );
+  });
+
+  it("createClockifyCheckboxSetting rejects a non-boolean value at runtime", () => {
+    expect(() =>
+      createClockifyCheckboxSetting({ ...base, value: "true" as unknown as boolean }),
+    ).toThrow(ValidationException);
+  });
+
+  it("createClockifyLinkSetting rejects a non-string value at runtime", () => {
+    expect(() => createClockifyLinkSetting({ ...base, value: 42 as unknown as string })).toThrow(
+      ValidationException,
+    );
+  });
+
+  it("createClockifyDropdownSingleSetting rejects a non-string value or non-string allowedValues", () => {
+    expect(() =>
+      createClockifyDropdownSingleSetting({
+        ...base,
+        value: 1 as unknown as string,
+        allowedValues: ["a"],
+      }),
+    ).toThrow(ValidationException);
+    expect(() =>
+      createClockifyDropdownSingleSetting({
+        ...base,
+        value: "a",
+        allowedValues: "a" as unknown as string[],
+      }),
+    ).toThrow(ValidationException);
+  });
+
+  it("createClockifyDropdownMultipleSetting rejects a non-array value or non-string allowedValues entries", () => {
+    expect(() =>
+      createClockifyDropdownMultipleSetting({
+        ...base,
+        value: "a" as unknown as string[],
+        allowedValues: ["a"],
+      }),
+    ).toThrow(ValidationException);
+    expect(() =>
+      createClockifyDropdownMultipleSetting({
+        ...base,
+        value: ["a"],
+        allowedValues: [1 as unknown as string],
+      }),
+    ).toThrow(ValidationException);
+  });
+
+  it("createClockifyUserDropdownSingleSetting rejects a non-string value at runtime", () => {
+    expect(() =>
+      createClockifyUserDropdownSingleSetting({ ...base, value: 1 as unknown as string }),
+    ).toThrow(ValidationException);
+  });
+
+  it("createClockifyUserDropdownMultipleSetting rejects a non-array value at runtime", () => {
+    expect(() =>
+      createClockifyUserDropdownMultipleSetting({ ...base, value: "a" as unknown as string[] }),
+    ).toThrow(ValidationException);
+  });
 });
