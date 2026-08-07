@@ -29,6 +29,54 @@ check must reject immutable versions that are already published. Documentation v
 not create a new release candidate, registry receipt, authenticated Clockify receipt, or Marketplace
 submission evidence.
 
+## 1.2.0 release evidence
+
+Branch `fix/audit-2026-08-07` merged into `main` at commit `85bffc9790afd1eb19b56feeb0536fec6cee4f5f`
+(fast-forward, no conflicts). SDK CI run
+[`31214619268`](https://github.com/apet97/addon-ts-sdk/actions/runs/31214619268) passed on Node
+22.13.0 and Node 24.x against that commit. The pass hardened webhook/lookup-token comparison to
+constant-time, rejected `//`-prefixed and duplicate-`Content-Length` requests, made
+`registerCustomSettings` idempotent, added runtime type guards to the setting factories, tightened
+`assertInstallationContext` validation, bounded the in-memory idempotency lease store, and hardened
+`ClockifyAddonClient` retry/abort/JSON-parse handling — see `CHANGELOG.md`'s 1.2.0 entry for the
+full list, including behavior changes for existing consumers.
+
+The version bump (`f067e5b73be0c903abcf516e1da91e95d395def9`) then updated both workspace versions,
+the lockfile, the creator's default `sdkSpec` literal, and this document's "Published versions"
+section together. SDK CI run
+[`31215466365`](https://github.com/apet97/addon-ts-sdk/actions/runs/31215466365) passed on Node
+22.13.0 and Node 24.x against that exact commit.
+
+`npm run release:preflight` confirmed both exact versions were absent from the registry.
+`npm run release:verify` (`ci:verify && verify:schema-live && release:dry-run`) passed end to end:
+
+- `ci:verify` passed with 528 tests, thresholded coverage, lint, format, build, the public API
+  snapshot, `verify:dist`, `pack:dry-run`, package-lint, package-consumer, all four packed
+  Node/Worker scaffolds (including real `workerd` routes), and both `npm audit --omit=dev` and the
+  full-tree `npm audit` (0 vulnerabilities each; the production dependency tree remains `jose`
+  alone).
+- `verify:schema-live` passed: Clockify's live schema endpoint still serves schema `1.6` structurally
+  matching the vendored copy (versions 1.2–1.6 all matched; 1.7 remains unsupported).
+- `npm run release:dry-run` passed for both packages; both tarball contents matched the "Expected
+  package shape" section below.
+
+The exact artifacts were published from `main` commit `f067e5b73be0c903abcf516e1da91e95d395def9` in
+SDK-first order with these immutable registry digests:
+
+- `@apet97/clockify-addon-sdk@1.2.0`: SHA-1
+  `244e416522ec7501092633f96696012e6b785061`; SHA-512
+  `sha512-V2OXR6dzKdTfBwOWaHV77gxh8rcKczQf4cyz/1oQQeuPG/8R0LcT8/pIKiMs+/avMsfY5aJptEF5fqHU6afuZg==`
+- `create-clockify-addon@1.2.0`: SHA-1
+  `8967649c7f4c626e14a838bcd8e1681f81a2ecc6`; SHA-512
+  `sha512-IklYGgmeMJlq698lwBdsSBpCmu/Zsw7jBhUQNmBhmrQzYUzfWdaL1mlDXerg9u3Xl9SK0rrpycUnw7rWTDXLyg==`
+
+Post-publication `npm run verify:registry` passed from an isolated empty npm cache and executed both
+exact public versions, including a real `npm create` scaffold that type-checked and served a
+schema-valid manifest. Both `latest` tags resolve to 1.2.0. `src/**` changed in this release; no
+fresh authenticated developer-workspace pass was run against it, so this release makes no new
+Marketplace-lifecycle claim. The 1.1.0 developer-workspace receipt below remains historical evidence
+for that exact prior release source. No Git tag or Marketplace submission was created.
+
 ## 1.1.0 release evidence
 
 Branch `perfect-state-2026-08-06` merged into `main` at commit `919639e1c0b7f4bcb4d85a0b32fb37ba4c4b81d7`
