@@ -72,10 +72,22 @@ SDK-first order with these immutable registry digests:
 
 Post-publication `npm run verify:registry` passed from an isolated empty npm cache and executed both
 exact public versions, including a real `npm create` scaffold that type-checked and served a
-schema-valid manifest. Both `latest` tags resolve to 1.2.0. `src/**` changed in this release; no
-fresh authenticated developer-workspace pass was run against it, so this release makes no new
-Marketplace-lifecycle claim. The 1.1.0 developer-workspace receipt below remains historical evidence
-for that exact prior release source. No Git tag or Marketplace submission was created.
+schema-valid manifest. Both `latest` tags resolve to 1.2.0.
+
+A follow-up authenticated developer-workspace pass then covered this release. A temporary add-on,
+scaffolded from the published `create-clockify-addon@1.2.0`, was exposed through a `cloudflared`
+tunnel and installed on `https://developer.clockify.me`, registering all seven time-entry-related
+webhook events schema 1.6 exposes (Clockify has no separate read/list webhook event; only mutations
+push). Real API-driven time-entry CRUD then exercised the running instance: `INSTALLED`, `DELETED`,
+the signed component request, and five of the seven webhooks (`NEW_TIME_ENTRY`, `TIME_ENTRY_UPDATED`,
+`TIME_ENTRY_DELETED`, `NEW_TIMER_STARTED`, `TIMER_STOPPED`) were each verified end to end (signature
+check, constant-time stored-token comparison, `204` response). `TIME_ENTRY_SPLIT` and
+`TIME_ENTRY_RESTORED` were not exercised — neither has a discoverable public REST endpoint, so
+triggering them needs a direct UI action rather than an API call. This satisfies the Publish
+boundary's live-receipt requirement for this candidate; the two unexercised webhook registrations
+are a known, documented gap rather than an unproven claim. The 1.1.0 developer-workspace receipt
+below remains separate historical evidence for that exact prior release source. No Git tag or
+Marketplace submission was created.
 
 ## 1.1.0 release evidence
 

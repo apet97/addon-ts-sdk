@@ -126,7 +126,9 @@ respecting the upstream, generated, historical, and ignored-local boundaries abo
   npm-owner approval for the exact packages and versions. When both packages are authorized, publish
   the SDK first and the creator second, then run `npm run verify:registry`.
 - For an authorized two-package release:
-  1. Update both workspace versions and the lockfile together.
+  1. Update both workspace versions and the lockfile together, and keep the creator's default
+     `sdkSpec` literal (`create-clockify-addon/src/index.mjs`) and its README mention in sync with
+     the new SDK version — `tests/creator.test.ts` fails otherwise.
   2. Run `release:preflight`, then `release:verify`.
   3. Push the exact source, and wait for green CI before publishing.
   4. Record the post-registry receipt in `docs/maintainers/release-readiness.md`.
