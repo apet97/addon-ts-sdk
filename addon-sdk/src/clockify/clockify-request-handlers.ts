@@ -279,6 +279,15 @@ export function withClockifyVerifiedWebhookRequest(
  * );
  * ```
  */
+export function withClockifyHandler<Kind extends ClockifyHandlerOptions["kind"]>(
+  parser: ClockifySignatureParser,
+  options: Extract<ClockifyHandlerOptions, { kind: Kind }>,
+  handler: ClockifyHandler<Kind>,
+): RequestHandler;
+// Runtime implementation signature: intentionally non-generic. A generic function body cannot
+// narrow its own type parameter from a `switch` on a sibling value, so the implementation below
+// is checked against the widest (default `Kind`) overload instead; each case's context literal
+// still matches its exact narrowed member of that union structurally, so no cast is needed.
 export function withClockifyHandler(
   parser: ClockifySignatureParser,
   options: ClockifyHandlerOptions,

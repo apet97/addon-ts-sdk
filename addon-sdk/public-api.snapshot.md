@@ -319,7 +319,9 @@ export declare function withClockifyVerifiedWebhookRequest(parser: ClockifySigna
  * );
  * ```
  */
-export declare function withClockifyHandler(parser: ClockifySignatureParser, options: ClockifyHandlerOptions, handler: ClockifyHandler): RequestHandler;
+export declare function withClockifyHandler<Kind extends ClockifyHandlerOptions["kind"]>(parser: ClockifySignatureParser, options: Extract<ClockifyHandlerOptions, {
+    kind: Kind;
+}>, handler: ClockifyHandler<Kind>): RequestHandler;
 ```
 
 ### clockify/clockify-request-types.d.ts
@@ -430,15 +432,6 @@ export interface ClockifyVerifiedWebhookRequestContext {
     eventType: string;
 }
 export type ClockifyVerifiedWebhookRequestHandler = (request: AddonRequest, claims: ClockifyAddonClaims, context: ClockifyVerifiedWebhookRequestContext) => AddonResponse | Promise<AddonResponse>;
-/** Normalized handler context shared by every `withClockifyHandler` kind. */
-export interface ClockifyHandlerContext {
-    claims: ClockifyAddonClaims | ClockifyLifecycleMatchedClaims;
-    /** Present only for the four lifecycle-payload kinds (`installed`, `statusChanged`, `settingsUpdated`, `deleted`). */
-    payload?: ClockifyInstalledLifecyclePayload | ClockifyStatusChangedLifecyclePayload | ClockifySettingsUpdatedLifecyclePayload | ClockifyDeletedLifecyclePayload;
-    /** Present for `verified` and `webhook` kinds. */
-    eventType?: string;
-}
-export type ClockifyHandler = (request: AddonRequest, context: ClockifyHandlerContext) => AddonResponse | Promise<AddonResponse>;
 export type ClockifyHandlerOptions = ({
     kind: "verified";
 } & ClockifyRequestVerificationOptions) | ({
@@ -456,6 +449,32 @@ export type ClockifyHandlerOptions = ({
 } & ClockifyTokenVerificationOptions) | ({
     kind: "webhook";
 } & ClockifyVerifiedWebhookRequestOptions);
+type ClockifyHandlerKind = ClockifyHandlerOptions["kind"];
+type ClockifyLifecyclePayloadHandlerKind = "installed" | "statusChanged" | "settingsUpdated" | "deleted";
+type ClockifyHandlerPayloadFor<Kind extends ClockifyLifecyclePayloadHandlerKind> = Kind extends "installed" ? ClockifyInstalledLifecyclePayload : Kind extends "statusChanged" ? ClockifyStatusChangedLifecyclePayload : Kind extends "settingsUpdated" ? ClockifySettingsUpdatedLifecyclePayload : ClockifyDeletedLifecyclePayload;
+/**
+ * Normalized handler context for `withClockifyHandler`, parameterized on `Kind` so `claims` keeps
+ * the same narrowing each underlying `withClockify*` wrapper already provides: a lifecycle-payload
+ * kind gets required `workspaceId`/`addonId` via `ClockifyLifecycleMatchedClaims` and its exact
+ * matched `payload` type; every other kind gets plain `ClockifyAddonClaims` and no `payload`.
+ * `eventType` is required only for `"webhook"` (matching `ClockifyVerifiedWebhookRequestContext`);
+ * `"verified"` carries it optionally, matching `ClockifyVerifiedRequestContext`.
+ */
+export type ClockifyHandlerContext<Kind extends ClockifyHandlerKind = ClockifyHandlerKind> = Kind extends ClockifyLifecyclePayloadHandlerKind ? {
+    claims: ClockifyLifecycleMatchedClaims;
+    payload: ClockifyHandlerPayloadFor<Kind>;
+    eventType?: undefined;
+} : Kind extends "webhook" ? {
+    claims: ClockifyAddonClaims;
+    payload?: undefined;
+    eventType: string;
+} : {
+    claims: ClockifyAddonClaims;
+    payload?: undefined;
+    eventType?: string;
+};
+export type ClockifyHandler<Kind extends ClockifyHandlerKind = ClockifyHandlerKind> = (request: AddonRequest, context: ClockifyHandlerContext<Kind>) => AddonResponse | Promise<AddonResponse>;
+export {};
 ```
 
 ### clockify/clockify-request-verifiers.d.ts
@@ -3756,7 +3775,9 @@ export declare function withClockifyVerifiedWebhookRequest(parser: ClockifySigna
  * );
  * ```
  */
-export declare function withClockifyHandler(parser: ClockifySignatureParser, options: ClockifyHandlerOptions, handler: ClockifyHandler): RequestHandler;
+export declare function withClockifyHandler<Kind extends ClockifyHandlerOptions["kind"]>(parser: ClockifySignatureParser, options: Extract<ClockifyHandlerOptions, {
+    kind: Kind;
+}>, handler: ClockifyHandler<Kind>): RequestHandler;
 ```
 
 ### clockify/clockify-request-types.d.ts
@@ -3867,15 +3888,6 @@ export interface ClockifyVerifiedWebhookRequestContext {
     eventType: string;
 }
 export type ClockifyVerifiedWebhookRequestHandler = (request: AddonRequest, claims: ClockifyAddonClaims, context: ClockifyVerifiedWebhookRequestContext) => AddonResponse | Promise<AddonResponse>;
-/** Normalized handler context shared by every `withClockifyHandler` kind. */
-export interface ClockifyHandlerContext {
-    claims: ClockifyAddonClaims | ClockifyLifecycleMatchedClaims;
-    /** Present only for the four lifecycle-payload kinds (`installed`, `statusChanged`, `settingsUpdated`, `deleted`). */
-    payload?: ClockifyInstalledLifecyclePayload | ClockifyStatusChangedLifecyclePayload | ClockifySettingsUpdatedLifecyclePayload | ClockifyDeletedLifecyclePayload;
-    /** Present for `verified` and `webhook` kinds. */
-    eventType?: string;
-}
-export type ClockifyHandler = (request: AddonRequest, context: ClockifyHandlerContext) => AddonResponse | Promise<AddonResponse>;
 export type ClockifyHandlerOptions = ({
     kind: "verified";
 } & ClockifyRequestVerificationOptions) | ({
@@ -3893,6 +3905,32 @@ export type ClockifyHandlerOptions = ({
 } & ClockifyTokenVerificationOptions) | ({
     kind: "webhook";
 } & ClockifyVerifiedWebhookRequestOptions);
+type ClockifyHandlerKind = ClockifyHandlerOptions["kind"];
+type ClockifyLifecyclePayloadHandlerKind = "installed" | "statusChanged" | "settingsUpdated" | "deleted";
+type ClockifyHandlerPayloadFor<Kind extends ClockifyLifecyclePayloadHandlerKind> = Kind extends "installed" ? ClockifyInstalledLifecyclePayload : Kind extends "statusChanged" ? ClockifyStatusChangedLifecyclePayload : Kind extends "settingsUpdated" ? ClockifySettingsUpdatedLifecyclePayload : ClockifyDeletedLifecyclePayload;
+/**
+ * Normalized handler context for `withClockifyHandler`, parameterized on `Kind` so `claims` keeps
+ * the same narrowing each underlying `withClockify*` wrapper already provides: a lifecycle-payload
+ * kind gets required `workspaceId`/`addonId` via `ClockifyLifecycleMatchedClaims` and its exact
+ * matched `payload` type; every other kind gets plain `ClockifyAddonClaims` and no `payload`.
+ * `eventType` is required only for `"webhook"` (matching `ClockifyVerifiedWebhookRequestContext`);
+ * `"verified"` carries it optionally, matching `ClockifyVerifiedRequestContext`.
+ */
+export type ClockifyHandlerContext<Kind extends ClockifyHandlerKind = ClockifyHandlerKind> = Kind extends ClockifyLifecyclePayloadHandlerKind ? {
+    claims: ClockifyLifecycleMatchedClaims;
+    payload: ClockifyHandlerPayloadFor<Kind>;
+    eventType?: undefined;
+} : Kind extends "webhook" ? {
+    claims: ClockifyAddonClaims;
+    payload?: undefined;
+    eventType: string;
+} : {
+    claims: ClockifyAddonClaims;
+    payload?: undefined;
+    eventType?: string;
+};
+export type ClockifyHandler<Kind extends ClockifyHandlerKind = ClockifyHandlerKind> = (request: AddonRequest, context: ClockifyHandlerContext<Kind>) => AddonResponse | Promise<AddonResponse>;
+export {};
 ```
 
 ### clockify/clockify-request-verifiers.d.ts

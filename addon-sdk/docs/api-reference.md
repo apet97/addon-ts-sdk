@@ -90,11 +90,16 @@ row-per-kind below) without changing or removing any wrapper.
 | Signed request + stored webhook auth token           | `X-Clockify-Signature` + event header + `X-Clockify-Webhook-Event-Token` | `withClockifyVerifiedWebhookRequest`          | `"webhook"`                  | `(request, claims, { claims, eventType })`        |
 
 `withClockifyHandler(parser, { kind, ...options }, handler)` always calls
-`handler(request, context)`, where `context: ClockifyHandlerContext` carries `claims` (and
-`payload`/`eventType` when the underlying wrapper supplies them). Reach for it when a single
-normalized handler shape is more convenient than matching each wrapper's own arity; reach for the
-specific `withClockify*` wrapper when its extra positional arguments (payload, claims) read more
-naturally at the call site.
+`handler(request, context)`, where `context: ClockifyHandlerContext<typeof kind>` carries `claims`
+(and `payload`/`eventType` when the underlying wrapper supplies them). `ClockifyHandlerContext` is
+parameterized on `kind`, so TypeScript keeps the same narrowing the wrapped `withClockify*` call
+already gives: the four lifecycle-payload kinds (`installed`, `statusChanged`, `settingsUpdated`,
+`deleted`) get `claims.workspaceId`/`claims.addonId` as required `string` (via
+`ClockifyLifecycleMatchedClaims`) and `payload` typed to the exact matched payload — not the wider
+`ClockifyAddonClaims | ClockifyLifecycleMatchedClaims` union a naive unification would produce.
+Reach for `withClockifyHandler` when a single normalized handler shape is more convenient than
+matching each wrapper's own arity; reach for the specific `withClockify*` wrapper when its extra
+positional arguments (payload, claims) read more naturally at the call site.
 
 ```ts
 const handleComponent = withClockifyHandler(
