@@ -1207,11 +1207,15 @@ describe("withClockifyHandler (unified arity)", () => {
   it("normalizes the lifecycle kind to (request, context)", async () => {
     const token = await validToken();
     let handled = false;
-    const handler = withClockifyHandler(parser(), { kind: "lifecycle" }, async (_request, context) => {
-      handled = true;
-      expect(context.payload).toBeUndefined();
-      return { status: 200, body: { addonId: context.claims.addonId } };
-    });
+    const handler = withClockifyHandler(
+      parser(),
+      { kind: "lifecycle" },
+      async (_request, context) => {
+        handled = true;
+        expect(context.payload).toBeUndefined();
+        return { status: 200, body: { addonId: context.claims.addonId } };
+      },
+    );
 
     const valid = await handler(request({ [ClockifyHeaders.LIFECYCLE_TOKEN]: token }));
     expect(valid).toEqual({ status: 200, body: { addonId: ADDON_ID } });
@@ -1235,9 +1239,9 @@ describe("withClockifyHandler (unified arity)", () => {
         return { status: 200 };
       },
     );
-    await expect(
-      statusHandler({ ...request(headers), body: statusPayload }),
-    ).resolves.toEqual({ status: 200 });
+    await expect(statusHandler({ ...request(headers), body: statusPayload })).resolves.toEqual({
+      status: 200,
+    });
 
     const settingsPayload: ClockifySettingsUpdatedLifecyclePayload = {
       addonId: ADDON_ID,
@@ -1252,9 +1256,9 @@ describe("withClockifyHandler (unified arity)", () => {
         return { status: 200 };
       },
     );
-    await expect(
-      settingsHandler({ ...request(headers), body: settingsPayload }),
-    ).resolves.toEqual({ status: 200 });
+    await expect(settingsHandler({ ...request(headers), body: settingsPayload })).resolves.toEqual({
+      status: 200,
+    });
 
     const deletedPayload: ClockifyDeletedLifecyclePayload = {
       addonId: ADDON_ID,
@@ -1269,9 +1273,9 @@ describe("withClockifyHandler (unified arity)", () => {
         return { status: 200 };
       },
     );
-    await expect(
-      deletedHandler({ ...request(headers), body: deletedPayload }),
-    ).resolves.toEqual({ status: 200 });
+    await expect(deletedHandler({ ...request(headers), body: deletedPayload })).resolves.toEqual({
+      status: 200,
+    });
   });
 
   it("normalizes the component kind to (request, context)", async () => {

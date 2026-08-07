@@ -186,11 +186,11 @@ this bearer token". The SDK also exports `@deprecated` naming aliases with the "
 shape for those — purely additive, never a replacement for the canonical export, and no call site in
 this package switches to them:
 
-| Wire credential                     | Header/query                     | Canonical helper                   | `@deprecated` alias      |
-| ------------------------------------ | ---------------------------------- | ------------------------------------ | -------------------------- |
-| Component user token                 | `auth_token` query param           | `verifyClockifyComponentRequest()`   | `verifyComponentToken`     |
-| Lifecycle token (no `exp` by default) | `x-addon-lifecycle-token` header   | `verifyClockifyLifecycleRequest()`   | `verifyLifecycleToken`     |
-| Webhook signature + stored token     | `clockify-signature` header + stored token | `verifyClockifyWebhookRequest()` | `verifyWebhookToken`       |
+| Wire credential                       | Header/query                               | Canonical helper                   | `@deprecated` alias    |
+| ------------------------------------- | ------------------------------------------ | ---------------------------------- | ---------------------- |
+| Component user token                  | `auth_token` query param                   | `verifyClockifyComponentRequest()` | `verifyComponentToken` |
+| Lifecycle token (no `exp` by default) | `x-addon-lifecycle-token` header           | `verifyClockifyLifecycleRequest()` | `verifyLifecycleToken` |
+| Webhook signature + stored token      | `clockify-signature` header + stored token | `verifyClockifyWebhookRequest()`   | `verifyWebhookToken`   |
 
 Each alias is a direct reference to its canonical function (`export const verifyComponentToken =
 verifyClockifyComponentRequest`), so both names share one implementation and one set of test
