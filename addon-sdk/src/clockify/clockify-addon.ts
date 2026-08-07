@@ -71,6 +71,13 @@ function registerManifestRoute<T extends { readonly path: string }>(
  *   new ClockifyAddon(ClockifyManifest.v1_5Builder()....build())  // M inferred as the v1.5 manifest
  *
  * The `register*` methods are then typed against that same version.
+ *
+ * This constructor does NOT validate the manifest against the Clockify schema — the manifest
+ * builders already enforce required fields at the type level, and a router built from a manifest
+ * that a downstream tool intentionally serves unvalidated (a captured example, a hand-authored
+ * fixture) must still start. Use {@link createValidatedClockifyAddon} instead when the manifest's
+ * shape is not statically known (built at runtime from configuration, deserialized JSON) and you
+ * want a schema violation to fail fast at startup rather than surface later as a rejected install.
  */
 export class ClockifyAddon<
   M extends { readonly schemaVersion: ClockifySchemaVersion } = ClockifyManifest<"1.4">,
