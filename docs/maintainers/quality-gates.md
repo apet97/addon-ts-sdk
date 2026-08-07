@@ -15,7 +15,7 @@ consumer, audit, or live-schema checks.
 1. **`npm run verify:deps`** — `npm ls --workspaces --depth=0`. Confirms the workspace dependency
    tree resolves before the heavier package checks run.
 2. **`npm run type-check`** — `tsc -p tsconfig.typecheck.json`. Compiles `src`, the generator,
-   `examples`, and the type-state probes under `tests/types/*.probe.ts` (guarded by
+   `snippets`, and the type-state probes under `tests/types/*.probe.ts` (guarded by
    `tests/typecheck-gate.test.ts`), so a weakened builder fails this gate.
 3. **`npm run verify:generated`** — verifies schema provenance, generates fresh output in a temporary
    directory, compares it with committed `src/clockify/generated/**`, and removes the temporary files

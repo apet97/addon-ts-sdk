@@ -21,13 +21,13 @@ describe("secure server example", () => {
   });
 
   it("does not start a server when the example module is imported", async () => {
-    await import("../examples/secure-server");
+    await import("../snippets/secure-server");
 
     expect(createNodeHttpAddonServer).not.toHaveBeenCalled();
   }, 15_000);
 
   it("finds stored webhook tokens when Clockify reports absolute lifecycle webhook paths", async () => {
-    const { createInMemorySecureServerStore } = await import("../examples/secure-server");
+    const { createInMemorySecureServerStore } = await import("../snippets/secure-server");
     const store = createInMemorySecureServerStore("https://example.com/addon");
 
     await store.saveInstallation(
@@ -69,7 +69,7 @@ describe("secure server example", () => {
 
   it("uses the SDK verification wrappers instead of local payload guards", async () => {
     const source = await import("node:fs/promises").then((fs) =>
-      fs.readFile(new URL("../examples/secure-server/index.ts", import.meta.url), "utf8"),
+      fs.readFile(new URL("../snippets/secure-server/index.ts", import.meta.url), "utf8"),
     );
 
     expect(source).toContain("withClockifyVerifiedComponentRequest");

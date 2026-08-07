@@ -225,6 +225,14 @@ const claims = await new ClockifySignatureParser("my-addon-key", publicKey).pars
 - `create-clockify-addon` scaffolds Node or Worker projects that fail closed until production origin,
   parent-origin, persistence and webhook processing are configured.
 
+## Snippets
+
+`snippets/*` are copy-in reference code, not standalone runnable projects — each imports `../../src`
+directly and has no `package.json` of its own. Copy the file you need into a project that depends on
+`@apet97/clockify-addon-sdk` and adjust the import path. This package's own test suite and
+`npm run dev:clockify-local` run them in place, inside this repository, as regression coverage; that
+in-repo execution is not a claim that the files work unmodified outside it.
+
 ## Local Clockify replay
 
 Run the secure example as a local Clockify emulator/playground:
@@ -233,7 +241,7 @@ Run the secure example as a local Clockify emulator/playground:
 npm run dev:clockify-local
 ```
 
-The command boots `examples/secure-server`, generates fake signed test tokens with the SDK testing
+The command boots `snippets/secure-server`, generates fake signed test tokens with the SDK testing
 helpers, replays manifest/component/lifecycle/webhook requests, prints the status transcript, and
 then keeps the server running for manual inspection. For automation, use:
 

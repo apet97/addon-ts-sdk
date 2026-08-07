@@ -97,8 +97,8 @@ respecting the upstream, generated, historical, and ignored-local boundaries abo
 
 - `addon-sdk/src/` — portable SDK source, runtime adapters, Clockify modules, client, UI, and testing
   exports; generated manifest code lives under `src/clockify/generated/`.
-- `addon-sdk/docs/`, `addon-sdk/examples/`, `addon-sdk/schemas/`, `addon-sdk/tests/`, and
-  `addon-sdk/scripts/` — package reference, runnable examples, vendored schemas/provenance, tests,
+- `addon-sdk/docs/`, `addon-sdk/snippets/`, `addon-sdk/schemas/`, `addon-sdk/tests/`, and
+  `addon-sdk/scripts/` — package reference, copy-in snippets, vendored schemas/provenance, tests,
   and package build/verification tools.
 - `create-clockify-addon/src/` — creator API and generated project templates, including the project
   README; `bin/` is the CLI and `scripts/verify-scaffolds.mjs` owns packed scaffold proof.

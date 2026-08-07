@@ -5,6 +5,6 @@
     "noUnusedLocals": false,
     "noUnusedParameters": false
   },
-  "include": ["src/**/*", "scripts/**/*", "examples/**/*", "tests/types/*.probe.ts"],
+  "include": ["src/**/*", "scripts/**/*", "snippets/**/*", "tests/types/*.probe.ts"],
   "exclude": ["node_modules", "dist"]
 }

@@ -1,10 +1,10 @@
 // End-to-end request/JWT path: drives the ported EXPENSE_CREATED webhook handler
-// (examples/expense-webhook) through addon.handle() with REAL RS256 tokens, mirroring
+// (snippets/expense-webhook) through addon.handle() with REAL RS256 tokens, mirroring
 // mileage-for-clockify's MileageWebhookIntegrationTest.
 import { describe, it, expect, beforeAll } from "vitest";
 import type { ClockifyWebhookAuthTokenLookup } from "../../src";
 import { generateTestKeys, signTestToken } from "../../src/testing";
-import { createExpenseWebhookAddon, ConvertFn } from "../../examples/expense-webhook";
+import { createExpenseWebhookAddon, ConvertFn } from "../../snippets/expense-webhook";
 
 const KEY = "mileage-for-clockify";
 
