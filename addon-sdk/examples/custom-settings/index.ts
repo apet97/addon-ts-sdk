@@ -11,6 +11,9 @@ const manifest = ClockifyManifest.v1_4Builder()
 const addon = new ClockifyAddon(manifest);
 
 // Register a custom settings endpoint
+// WARNING: INSECURE — for brevity, this handler skips verifying Clockify's signed
+// `auth_token` query value, the same way a component route must. See
+// examples/secure-server for the verified pattern.
 addon.registerCustomSettings("/settings/custom", async () => {
   return {
     status: 200,

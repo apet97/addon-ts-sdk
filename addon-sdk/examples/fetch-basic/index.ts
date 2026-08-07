@@ -10,6 +10,10 @@ export function createFetchBasicAddon(): ClockifyAddon<ClockifyManifest<"1.5">> 
     .build();
 
   const addon = new ClockifyAddon(manifest);
+  // WARNING: INSECURE — for brevity, this handler skips verifying Clockify's signed
+  // `auth_token` query value. A real component route must call
+  // verifyClockifyComponentRequest() (or withClockifyVerifiedComponentRequest()) before
+  // returning the response; see examples/secure-server for the verified pattern.
   addon.registerComponent(
     ClockifyComponent.v1_5Builder()
       .activityTab()
