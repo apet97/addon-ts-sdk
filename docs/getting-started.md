@@ -31,7 +31,9 @@ npm create clockify-addon@latest my-addon -- --runtime worker --features minimal
 | `--runtime`  | `node` or `worker` | `node`  | Generates a Node HTTP or Fetch/Worker bootstrap               |
 | `--features` | `all` or `minimal` | `all`   | Includes lifecycle and webhook routes, or the component alone |
 
-All generated variants use the SDK's schema 1.5 manifest builders.
+All generated variants use the SDK's schema 1.5 manifest builders. Schema 1.6 builders are also
+available and additive — see `addon-sdk/docs/manifest-builders.md` — if your project needs a newer
+field before the scaffold's default moves.
 
 ## Understand the generated files
 
@@ -71,6 +73,10 @@ npm install
 cp .env.example .env
 npm start
 ```
+
+The Node server listens on `PORT` (default `8080`) — set it in `.env` if you need a different port.
+`PORT` must be an integer from 1 to 65535; the generated bootstrap does not validate it further, so
+an invalid value surfaces as Node's own listen error.
 
 In a second terminal, probe the running server:
 

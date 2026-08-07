@@ -155,6 +155,13 @@ export abstract class Addon<M> {
     this.middlewares.push(middleware);
   }
 
+  /**
+   * The `Allow` header (on `204` for `OPTIONS` and `405`) lists synthetic
+   * methods: `HEAD` is synthesized for every registered `GET` route, and
+   * `OPTIONS` for every path. {@link getRegisteredRequests} reflects only
+   * explicitly registered handlers — `Allow` reflects this wider, synthetic
+   * view.
+   */
   async handle(request: AddonRequest): Promise<AddonResponse> {
     try {
       const path = trimTrailingSlash(request.path);

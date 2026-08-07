@@ -274,6 +274,10 @@ console.log(manifestSchema15.version);
 console.log(schemaProvenance.supportedVersions);
 ```
 
+These direct JSON imports are untyped data (`any`) — no `.d.ts` is generated for them. For a typed
+manifest shape, use the generated TS models (`ClockifyManifest`, `ClockifyManifest.v1_5Builder()`,
+etc.) instead of reading the schema JSON directly.
+
 ## Documentation
 
 - [Builder getting started](https://github.com/apet97/addon-ts-sdk/blob/main/docs/getting-started.md)

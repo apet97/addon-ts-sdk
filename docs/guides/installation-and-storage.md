@@ -54,7 +54,18 @@ older save must not replace a newer generation, and a qualified delete must comp
 generation atomically.
 
 Keep installation and webhook credentials server-side. Never copy them into component HTML,
-browser storage, logs, or error messages.
+browser storage, logs, or error messages. The SDK redacts what it knows about (`authToken`,
+`x-addon-token`, `clockify-signature`, and similar) before its own `onError` reporter sees a
+request, but it cannot redact a request or store record your application logs directly:
+
+```typescript
+// WRONG — logs the raw authToken and every webhooks[].authToken:
+console.log(request.body);
+
+// RIGHT — logs the same request with known secret fields replaced:
+import { redactAddonRequest } from "@apet97/clockify-addon-sdk";
+console.log(redactAddonRequest(request));
+```
 
 ## Smallest correct path
 

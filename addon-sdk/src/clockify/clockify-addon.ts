@@ -51,6 +51,10 @@ function registerManifestRoute<T extends { readonly path: string }>(
   // is a no-op: the router already holds this exact path+method, and the
   // underlying registerHandler unconditionally rejects any second call at
   // the same path+method regardless of whether the descriptor matches.
+  // Handler identity is intentionally ignored here — the new `handler`
+  // argument is discarded and the previously bound one stays active. This
+  // avoids the router's duplicate-bind throw on hot-reload; pass a new
+  // path if a redeclaration needs a new handler to actually take effect.
   const methodUpper = method.toUpperCase();
   const alreadyRouted = addon
     .getRegisteredRequests()
@@ -78,6 +82,11 @@ function registerManifestRoute<T extends { readonly path: string }>(
  * fixture) must still start. Use {@link createValidatedClockifyAddon} instead when the manifest's
  * shape is not statically known (built at runtime from configuration, deserialized JSON) and you
  * want a schema violation to fail fast at startup rather than surface later as a rejected install.
+ *
+ * The default `M` (when constructed without an explicit manifest, which the type inference above
+ * makes unnecessary in practice) is the 1.4 manifest shape, kept only for backward compatibility.
+ * New code should let `M` infer from a real manifest, or parameterize explicitly with
+ * `ClockifyManifest<"1.5">` / `ClockifyManifest<"1.6">`.
  */
 export class ClockifyAddon<
   M extends { readonly schemaVersion: ClockifySchemaVersion } = ClockifyManifest<"1.4">,

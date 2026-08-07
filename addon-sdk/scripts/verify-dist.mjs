@@ -27,7 +27,11 @@ const expectObj = (label, v) => {
 // --- 0. The portable root entry's transitive graph must never import node:*. ---
 // Walks only relative specifiers from dist/esm/index.js; a node:* import
 // anywhere in that closure would mean a Worker/browser consumer of the bare
-// package import silently pulls in a Node-only module.
+// package import silently pulls in a Node-only module. `client` and `testing`
+// are deprecated re-exports from the root (src/index.ts), but the walk keeps
+// covering them for as long as they stay reachable from index.js — so a
+// future node:* import inside either one remains visible here rather than
+// only in a package.json comment.
 function assertNoNodeImportsInPortableGraph() {
   const entry = path.join(dist, "esm", "index.js");
   const visited = new Set();

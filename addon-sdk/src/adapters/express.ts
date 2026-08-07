@@ -39,6 +39,12 @@ function queryParamsFromExpressRequest(req: ExpressLikeRequest, requestUrl: URL)
   return requestUrl.searchParams;
 }
 
+/**
+ * Unlike the Fetch and Node adapters, this handler enforces no body-size limit itself — it trusts
+ * `req.body`/`req.rawBody` exactly as Express (or an upstream middleware) already produced them.
+ * The host application must configure a limit before this handler runs, e.g.
+ * `app.use(express.json({ limit: "1mb" }))`. Without one, a request body is unbounded.
+ */
 export function createExpressAddonHandler(
   addon: Addon<unknown>,
   options: { readonly onError?: AddonErrorReporter } = {},

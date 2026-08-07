@@ -50,6 +50,25 @@ describe("create-clockify-addon", () => {
     );
   });
 
+  it("scaffolds with a default sdkSpec that matches the current addon-sdk package version", async () => {
+    const addonSdkPackageJson = JSON.parse(
+      await readFile(resolve(import.meta.dirname, "../package.json"), "utf8"),
+    );
+    const parent = await mkdtemp(join(tmpdir(), "clockify-addon-creator-"));
+    const directory = join(parent, "default-spec-addon");
+    try {
+      // No sdkSpec override — exercises the same default `npm create clockify-addon` uses.
+      await scaffoldClockifyAddon({ directory, runtime: "node", features: "minimal" });
+      const packageJson = JSON.parse(await readFile(join(directory, "package.json"), "utf8"));
+
+      expect(packageJson.dependencies["@apet97/clockify-addon-sdk"]).toBe(
+        `^${addonSdkPackageJson.version}`,
+      );
+    } finally {
+      await rm(parent, { recursive: true, force: true });
+    }
+  });
+
   it.each(["node", "worker"] as const)("creates a fail-closed %s project", async (runtime) => {
     const parent = await mkdtemp(join(tmpdir(), "clockify-addon-creator-"));
     const directory = join(parent, `${runtime}-addon`);

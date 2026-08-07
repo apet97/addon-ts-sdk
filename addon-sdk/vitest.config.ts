@@ -8,7 +8,7 @@ export default defineConfig({
       provider: "v8",
       reporter: ["text", "json-summary"],
       include: ["src/**/*.ts"],
-      exclude: ["src/clockify/generated/**", "src/**/*.d.ts"],
+      exclude: ["src/clockify/generated/**", "src/**/*.d.ts", "src/testing/**"],
       thresholds: {
         statements: 97,
         branches: 92,

@@ -26,7 +26,9 @@ The creator emits two bootstraps:
 `resolveClockifyPublicOrigin()` requires an explicit HTTPS `PUBLIC_BASE_URL` for production. A
 request-derived origin is available only with explicit local opt-in and only for canonical loopback
 hosts. The Node and Fetch adapters enforce a configurable body limit before dispatch; the default is
-1 MiB.
+1 MiB. The Express adapter enforces no limit of its own — it trusts `req.body` exactly as Express
+already produced it, so set one with `app.use(express.json({ limit: "1mb" }))` (or equivalent)
+before the add-on handler.
 
 The SDK contains router and adapter failures as stable responses and offers `onError` hooks. It does
 not install a logger, database, queue, health route, or monitoring service.

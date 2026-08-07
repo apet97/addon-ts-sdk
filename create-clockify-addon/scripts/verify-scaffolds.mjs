@@ -20,6 +20,7 @@ import {
   parseWorkerManifest,
   terminateChildProcessTree,
 } from "./scaffold-runtime-helpers.mjs";
+import { WRANGLER_COMPATIBILITY_DATE } from "../src/wrangler-date.mjs";
 
 const root = fileURLToPath(new URL("../..", import.meta.url));
 const tsxCli = fileURLToPath(import.meta.resolve("tsx/cli"));
@@ -208,7 +209,7 @@ async function verifyWorkerThroughWrangler(directory, variant) {
       "--port",
       String(port),
       "--compatibility-date",
-      "2026-07-12",
+      WRANGLER_COMPATIBILITY_DATE,
       "--var",
       "PUBLIC_BASE_URL:https://generated-addon.example",
       "--var",
@@ -346,7 +347,7 @@ try {
           "--name",
           variant.name,
           "--compatibility-date",
-          "2026-07-12",
+          WRANGLER_COMPATIBILITY_DATE,
           "--outdir",
           bundleDirectory,
           "--dry-run",

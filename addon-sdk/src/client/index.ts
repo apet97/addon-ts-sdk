@@ -31,7 +31,13 @@ export interface ClockifyAddonClientOptions {
   readonly onRetry?: (info: ClockifyAddonClientRetryInfo) => void;
 }
 
-/** HTTP failure returned by a Clockify add-on API call. */
+/**
+ * HTTP failure returned by a Clockify add-on API call.
+ *
+ * `responseBody` is read in full via `response.text()` with no size cap — the Clockify backend is
+ * trusted, but a misconfigured proxy or a network failure mid-response could still return a large
+ * body, which is buffered entirely before this error is thrown.
+ */
 export class ClockifyAddonHttpError extends Error {
   readonly status: number;
   readonly responseBody: string;
@@ -156,7 +162,21 @@ function sleepOrAbort(
   });
 }
 
-/** Fetch-based client for Marketplace-specific add-on token, settings, and generic API calls. */
+/**
+ * Fetch-based client for Marketplace-specific add-on token, settings, and generic API calls.
+ *
+ * A request can reject with:
+ * - {@link ClockifyAddonHttpError} on a non-`ok` HTTP status.
+ * - `Error("Clockify add-on request timed out.")` — a generic `Error`, matched by `/timed out/i` —
+ *   when one attempt exceeds `timeoutMs`.
+ * - `signal.reason` (identity preserved, may be a `DOMException`) when the caller's `signal` aborts.
+ * - `Error` with `cause` set to the original parse error when `getSettings`/`updateSettings` receive
+ *   a `200` response whose body is not valid JSON.
+ *
+ * The `sleep` constructor option exists to let tests control backoff timing; a production override
+ * must not throw or reject — if it does, that rejection propagates as-is instead of one of the
+ * shapes above.
+ */
 export class ClockifyAddonClient {
   private readonly token: string;
   private readonly backendUrl: URL;

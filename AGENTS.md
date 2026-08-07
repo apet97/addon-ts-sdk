@@ -59,6 +59,10 @@ diff. Intentional schema/model changes start from the vendored schema or generat
 - `docs/archive/**` is historical evidence. Ignored local files such as `.superpowers/**`,
   `GOAL.md`, and `verification_report.md` are execution notes, not repository documentation.
 
+The canonical exclusion list (skipped directories, ignored locals, stale claims) is
+`scripts/verify-docs.mjs` (`SKIP_DIRECTORIES`, `excluded()`, `STALE_CLAIMS`). Treat the gate as
+authoritative if this prose and the gate ever disagree.
+
 Run `npm run verify:docs` after authored Markdown changes. Its active-document gate checks local
 links and anchors, the builder index, the shared agent body, and configured stale claims while
 respecting the upstream, generated, historical, and ignored-local boundaries above.

@@ -1,5 +1,6 @@
 import { mkdir, readdir, writeFile } from "node:fs/promises";
 import { basename, resolve } from "node:path";
+import { WRANGLER_COMPATIBILITY_DATE } from "./wrangler-date.mjs";
 
 function packageName(directory) {
   return (
@@ -293,7 +294,7 @@ function tsconfig(runtime) {
 function wranglerToml(name) {
   return `name = "${name}"
 main = "src/index.ts"
-compatibility_date = "2026-07-12"
+compatibility_date = "${WRANGLER_COMPATIBILITY_DATE}"
 `;
 }
 

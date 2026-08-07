@@ -74,6 +74,9 @@ framework middleware with the host application.
 
 ## Failure model
 
+Canonical HTTP-status table for the SDK's own failure responses; each guide's own "Failure
+behavior" section adds detail specific to that guide's topic rather than repeating this table.
+
 - `400 Bad Request`: the Node adapter rejects a malformed declared content length, and the Fetch
   adapter rejects request-body read failures before routing.
 - `401 Unauthorized`: verified component, lifecycle, and webhook wrappers reject missing, duplicate,
