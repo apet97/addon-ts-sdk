@@ -70,6 +70,13 @@ reference code rather than runnable projects (P4.1). All four are additive or do
 none change a canonical export's name or signature. `npm run release:verify` was re-run and passed
 end to end after this pass, confirmed twice in a row to rule out a flake.
 
+A further documentation-only pass refreshed all 13 `MARKETPLACE_DOCS/` snapshots from a 2026-08-07
+re-scrape of Clockify's developer docs, added the previously-uncaptured `14-manifest.md`, fixed a
+wire-header naming defect in `addon-sdk/docs/api-reference.md`'s P2.6 mapping table introduced by
+the prior pass, and removed `docs/superpowers/**` and an orphaned stale `docs/product-surface.json`
+that were not customer-facing. No `src/**` change; `npm run ci:verify` passed end to end
+afterward.
+
 ## 1.0.5 release evidence
 
 Release source commit `d46723956b9b5ff7fb5587bdc03fc8858c90113f` reorganizes the active
