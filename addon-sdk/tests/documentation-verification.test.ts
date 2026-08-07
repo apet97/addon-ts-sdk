@@ -496,7 +496,6 @@ describe("documentation verification", () => {
     const root = await fixture({
       "docs/README.md": "# Docs\n",
       "docs/archive/old.md": stale,
-      "docs/superpowers/plan.md": stale,
       "MARKETPLACE_DOCS/01-upstream.md": stale,
       ".superpowers/sdd/task.md": stale,
     });

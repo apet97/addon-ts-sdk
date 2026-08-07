@@ -44,10 +44,9 @@ configuration, request flow, and production storage checklist.
   snapshot and provenance source. It is not authored builder documentation.
 - `addon-sdk/public-api.snapshot.md` is generated API-surface evidence checked by repository gates;
   do not edit it by hand.
-- `docs/superpowers/` contains historical design and implementation evidence, not the active
-  builder journey.
 - Ignored local working notes such as `GOAL.md` and `verification_report.md` are not repository
-  documentation and are not part of this index.
+  documentation, are not tracked in Git, and are not part of this index. Past session planning and
+  design records are kept out of the shipped repository rather than tracked as historical material.
 
 Run `npm run verify:docs` after active authored Markdown changes. It checks local links and anchors,
 required builder navigation, documentation ownership contracts, and configured stale claims without
