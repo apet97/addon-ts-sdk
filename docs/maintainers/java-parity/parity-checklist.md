@@ -69,7 +69,7 @@ Each row: what Java does, what TS does, and why the TS behavior is deliberate ra
 | `scopes` requiredness | Schema 1.2's manifest requires `scopes` | Schema 1.3+ makes `scopes` optional | Vendored schema fact, not a TS behavior choice — verified directly against `schemas/clockify-manifests/1.2.json` (`required` includes `scopes`) vs 1.5 (it does not). A manifest ported from 1.2 to a later version may drop `scopes` without a validation error |
 | `component.label` requiredness | Schema 1.2's component does not require `label` | Schema 1.4+ requires `label` | Vendored schema fact — verified directly against `schemas/clockify-manifests/1.2.json` vs `1.4.json`'s component `required` array. A 1.2 manifest that omits `label` fails validation once ported to 1.4+ |
 
-## Latest Manifest 1.5 Proof
+## Manifest 1.5 Proof
 
 - [x] v1.5 webhook builders expose latest events such as `TIME_ENTRY_SPLIT`
 - [x] v1.5 lifecycle builders expose `STATUS_CHANGED`

@@ -6,19 +6,20 @@ guarantees.
 
 ## Published dependency boundary
 
-The published package currently declares `jose`, `ajv`, and `ajv-draft-04` as direct
-dependencies. Express is a separate optional peer. Consumers therefore install the three declared
-dependencies even though their runtime roles differ:
+The published package declares `jose` as its one direct dependency. Express is a separate optional
+peer. `ajv` and `ajv-draft-04` are `devDependencies`: repository code generation uses them to produce
+the committed schema 1.2-1.6 validators, but consumers never install them.
 
 - Signing and verification paths dynamically import ESM-only `jose@6`.
 - Repository code generation uses AJV Draft-04 and AJV standalone output to create the committed
-  schema 1.2-1.6 validators.
+  schema 1.2-1.6 validators at generation time, not at consumer install time.
 - Runtime manifest validation imports those static generated validators. It does not import an AJV
   compiler, call `eval` or `Function`, or generate code at request time, which keeps the validation
   path compatible with Workers that prohibit string code generation.
 
-Do not describe the package as dependency-free or as loading AJV at runtime. Dependency placement is
-a package decision separate from the Worker-safe runtime implementation.
+Do not describe the package as loading AJV at runtime, and do not add `ajv`/`ajv-draft-04` back as
+direct dependencies without deliberate review. Dependency placement is a package decision separate
+from the Worker-safe runtime implementation.
 
 ## `jose`
 

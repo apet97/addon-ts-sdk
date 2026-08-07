@@ -45,10 +45,10 @@ atomic; an unguarded read-then-write is not a valid distributed adapter.
 
 ## Known bundle-size debt
 
-`clockify-manifest-validation.ts` statically imports all four generated per-schema-version
-validators (`manifest-validators.ts`, ~491 KB unminified in `dist/esm`) so `validateClockifyManifest`
+`clockify-manifest-validation.ts` statically imports all five generated per-schema-version
+validators (`manifest-validators.ts`, ~600 KB unminified in `dist/esm`) so `validateClockifyManifest`
 and `assertClockifyManifest` stay fully synchronous — every consumer pays for validating versions
-1.2–1.4 even when they only ever build a 1.5 manifest. `generated/manifest-schemas.ts` (~48 KB) is
+1.2–1.4 and 1.6 even when they only ever build a 1.5 manifest. `generated/manifest-schemas.ts` (~48 KB) is
 also always reachable through the root barrel (`generated` namespace), though nothing in the
 runtime validation path reads it.
 

@@ -34,7 +34,7 @@ Clockify. The SDK and the `create-clockify-addon` creator are published to the n
   app.
 - Optional `onError(error, context)` reporting for handled router, Fetch, and Node adapter errors.
 - Package documentation and vendored manifest schemas.
-- Runtime draft-04 manifest validation through generated static 1.2-1.5 validators. Runtime
+- Runtime draft-04 manifest validation through generated static 1.2-1.6 validators. Runtime
   validation does not load an AJV compiler or use string code generation, so the same public API is
   usable in Node and Worker runtimes.
 - Hardened HTML/JSON responses, SDK-owned CSP directives that cannot be overridden, and fail-closed

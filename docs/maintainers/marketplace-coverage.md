@@ -32,6 +32,16 @@ the caller supplies `installedAt`; omitting it intentionally performs unconditio
 cleanup. The generated development scaffold keeps that normal uninstall cleanup and therefore does
 not claim protection from delayed events belonging to an earlier installation.
 
+## 1.1.0 lifecycle evidence pointer
+
+A cloudflared-tunnel developer-workspace pass against an unpublished-tarball scaffold exercised
+installation, component authentication, webhook delivery, and uninstall cleanup for the 1.1.0
+release source before publication. This is now the latest lifecycle evidence, superseding the 1.0.3
+receipt referenced below. See the "1.1.0 release evidence" section of `release-readiness.md` for the
+publish record; this repository does not hold a sanitized route/status log for that pass (unlike the
+1.0.3 and final-SHA receipts below), because the tunnel and server were already torn down before the
+publisher's confirmation was recorded.
+
 ## 1.0.5 registry-only evidence boundary
 
 Release source commit `d46723956b9b5ff7fb5587bdc03fc8858c90113f` passed the full local release
