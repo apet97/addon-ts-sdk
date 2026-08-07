@@ -4,6 +4,8 @@ All notable changes to this SDK are recorded here.
 
 ## Unreleased
 
+## 1.2.0 - 2026-08-07
+
 - Compared webhook and lookup-token secrets with a constant-time equality check instead of `===`,
   closing a timing side-channel; captured the signature header once before verification so the
   compared value cannot change between the check and the comparison.

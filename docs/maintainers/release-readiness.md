@@ -7,8 +7,8 @@ Historical receipts below prove only the source SHA and environment they name.
 
 The latest registry publication is:
 
-- `@apet97/clockify-addon-sdk@1.1.0`
-- `create-clockify-addon@1.1.0`
+- `@apet97/clockify-addon-sdk@1.2.0`
+- `create-clockify-addon@1.2.0`
 
 Install the SDK with `npm install @apet97/clockify-addon-sdk` or create a project with
 `npm create clockify-addon@latest`. npm versions are immutable: every future release requires a
