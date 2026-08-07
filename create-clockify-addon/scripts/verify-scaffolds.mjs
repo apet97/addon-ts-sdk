@@ -322,6 +322,14 @@ try {
       cwd: directory,
       stdio: "inherit",
     });
+    if (variant.features === "all") {
+      const addonSource = readFileSync(join(directory, "src", "addon.ts"), "utf8");
+      assert.match(
+        addonSource,
+        /runClockifyIdempotentWebhook/,
+        `${variant.name}: generated src/addon.ts must teach idempotent webhook processing.`,
+      );
+    }
     if (variant.runtime === "worker") {
       const wranglerToml = readFileSync(join(directory, "wrangler.toml"), "utf8");
       assert.match(wranglerToml, /^main = "src\/index\.ts"$/m);

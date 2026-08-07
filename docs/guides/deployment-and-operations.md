@@ -83,6 +83,41 @@ export default {
 Replace development storage before installation, configure secrets through the platform, and probe
 the deployed `/manifest` before registering its URL with Clockify.
 
+### Liveness, readiness, and shutdown recipe
+
+The generated Node bootstrap has no health route and does not drain in-flight requests on
+`SIGTERM` — both are your deployment's job. Mount health checks on their own port outside the
+add-on router, so a store outage that fails the add-on's requests does not also fail
+`/health/live`:
+
+```typescript
+import { createServer } from "node:http";
+import { createNodeHttpAddonServer } from "@apet97/clockify-addon-sdk/adapters/node";
+import { createAddon } from "./addon.js";
+
+const addonServer = createNodeHttpAddonServer(createAddon(process.env));
+addonServer.listen(Number(process.env.PORT ?? 8080));
+
+const healthServer = createServer((request, response) => {
+  if (request.url === "/health/live") return void response.writeHead(200).end("ok");
+  if (request.url === "/health/ready") {
+    // Probe your durable installation/lease store here; 200 only if it answers.
+    return void response.writeHead(200).end("ok");
+  }
+  response.writeHead(404).end();
+});
+healthServer.listen(Number(process.env.HEALTH_PORT ?? 8081));
+
+process.on("SIGTERM", () => {
+  addonServer.close();
+  healthServer.close();
+  setTimeout(() => process.exit(1), 10_000).unref(); // hard exit if a request hangs
+});
+```
+
+A Worker deployment gets liveness for free from the platform; add `/health/ready` as an explicit
+route in `fetch()` if the store it probes can fail independently of the platform.
+
 ## Failure behavior
 
 - Missing or invalid production `PUBLIC_BASE_URL` fails closed instead of trusting an arbitrary

@@ -84,12 +84,24 @@ function commonSource(features) {
           )?.authToken;
         },
       },
-      async () => ({
-        status: environment.ALLOW_EPHEMERAL_STORAGE === "true" ? 204 : 503,
-        ...(environment.ALLOW_EPHEMERAL_STORAGE === "true"
-          ? {}
-          : { body: "Configure stored-token verification and background processing." }),
-      }),
+      async () => {
+        // TODO(prod): make webhook processing idempotent — Clockify can redeliver an
+        // event. Claim a lease keyed by a stable identifier from the payload (not the
+        // request) before doing work, with a durable ClockifyIdempotencyLeaseStore:
+        //
+        //   const result = await runClockifyIdempotentWebhook(
+        //     leaseStore,
+        //     { key: stableEventKey, owner: crypto.randomUUID(), leaseMs: 30_000 },
+        //     () => handleBusinessLogic(request.body, claims),
+        //   );
+        //   if (result.status === "duplicate") return { status: 204 };
+        return {
+          status: environment.ALLOW_EPHEMERAL_STORAGE === "true" ? 204 : 503,
+          ...(environment.ALLOW_EPHEMERAL_STORAGE === "true"
+            ? {}
+            : { body: "Configure stored-token verification and background processing." }),
+        };
+      },
     ),
   );`
     : "";
