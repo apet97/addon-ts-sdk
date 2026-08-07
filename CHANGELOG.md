@@ -78,6 +78,25 @@ All notable changes to this SDK are recorded here.
 - Applied `npm audit fix` for three pre-existing transitive dev-only advisories (`brace-expansion`,
   `fast-uri`, `postcss`): all three moved by a patch version within their existing majors. The
   packed production dependency tree (`jose` alone) already had 0 vulnerabilities.
+- Added `withClockifyHandler()` as an additive unified alternative to the `withClockify*` wrappers:
+  it normalizes every verification kind (`verified`, `component`, `lifecycle`, `installed`,
+  `statusChanged`, `settingsUpdated`, `deleted`, `webhook`) to one `(request, context)` handler
+  signature. No existing wrapper's signature changed. Documented the wire → header → wrapper →
+  handler mapping in `addon-sdk/docs/api-reference.md`.
+- Narrowed generated `Record<string, any>` component `options` fields to `Record<string, unknown>`
+  across schema versions 1.2–1.6 by fixing the emitter in `generate-clockify-manifest.ts`. Added a
+  runtime `typeof` guard to `createClockifyTextSetting` so a JavaScript (non-TS-checked) caller
+  passing a non-string `value` gets a `ValidationException` instead of a silently malformed
+  manifest.
+- Added `@deprecated` naming aliases `verifyComponentToken`, `verifyLifecycleToken`, and
+  `verifyWebhookToken` for `verifyClockifyComponentRequest`, `verifyClockifyLifecycleRequest`, and
+  `verifyClockifyWebhookRequest`. Additive only — each alias is a direct reference to its canonical
+  function, and no call site in this package switched to an alias. Documented the wire → header →
+  helper table in `addon-sdk/docs/token-validation.md`.
+- Renamed `addon-sdk/examples/` to `addon-sdk/snippets/` and documented the directory as copy-in
+  reference code rather than standalone runnable projects — each file imports `../../src` directly
+  and has no `package.json` of its own. The packed tarball's `files` array never listed this
+  directory, so publication is unaffected.
 
 ## 1.0.5 - 2026-07-14
 

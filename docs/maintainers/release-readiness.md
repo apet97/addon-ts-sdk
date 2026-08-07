@@ -40,7 +40,7 @@ section above remains the accurate record of what the registry currently serves.
 `npm run release:verify` (`ci:verify && verify:schema-live && release:dry-run`) now **passes end to
 end**:
 
-- `ci:verify` passes with 470 tests, thresholded coverage, lint, format, build, the public API
+- `ci:verify` passes with 477 tests, thresholded coverage, lint, format, build, the public API
   snapshot, `verify:dist`, `pack:dry-run`, package-lint, package-consumer, all four packed
   Node/Worker scaffolds (including real `workerd` routes), and both `npm audit --omit=dev` and the
   full-tree `npm audit` (0 vulnerabilities each; the production dependency tree remains `jose`
@@ -60,6 +60,15 @@ Any future `src/**` change (as opposed to a documentation-only pass) requires a 
 — an authenticated install exercising installation, component authentication, webhook delivery, and
 uninstall cleanup — before that release counts as Marketplace-proven; see the Future release
 checklist below. This candidate does not yet have a 1.1.0 live receipt.
+
+A later pass on the same branch added `withClockifyHandler()` (a unified additive alternative to
+the `withClockify*` wrappers, P2.6), narrowed generated `Record<string, any>` `options` fields to
+`Record<string, unknown>` across schema versions 1.2–1.6 (P2.11), added `@deprecated`
+`verifyComponentToken`/`verifyLifecycleToken`/`verifyWebhookToken` naming aliases (P2.12), and
+renamed `addon-sdk/examples/` to `addon-sdk/snippets/` with README documentation as copy-in
+reference code rather than runnable projects (P4.1). All four are additive or documentation-only;
+none change a canonical export's name or signature. `npm run release:verify` was re-run and passed
+end to end after this pass, confirmed twice in a row to rule out a flake.
 
 ## 1.0.5 release evidence
 
