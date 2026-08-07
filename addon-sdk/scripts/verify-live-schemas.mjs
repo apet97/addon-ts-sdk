@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 
 const packageRoot = join(fileURLToPath(new URL(".", import.meta.url)), "..");
 const DEFAULT_BASE_URL = "https://api.clockify.me/api/addons/manifest-schema";
-const DEFAULT_UNSUPPORTED_VERSION = "1.6";
+const DEFAULT_UNSUPPORTED_VERSION = "1.7";
 const DEFAULT_TIMEOUT_MS = 15_000;
 
 function argValue(name) {

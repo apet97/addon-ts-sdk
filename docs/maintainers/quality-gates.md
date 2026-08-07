@@ -15,7 +15,7 @@ consumer, audit, or live-schema checks.
 1. **`npm run verify:deps`** — `npm ls --workspaces --depth=0`. Confirms the workspace dependency
    tree resolves before the heavier package checks run.
 2. **`npm run type-check`** — `tsc -p tsconfig.typecheck.json`. Compiles `src`, the generator,
-   `examples`, and the type-state probes under `tests/types/*.probe.ts` (guarded by
+   `snippets`, and the type-state probes under `tests/types/*.probe.ts` (guarded by
    `tests/typecheck-gate.test.ts`), so a weakened builder fails this gate.
 3. **`npm run verify:generated`** — verifies schema provenance, generates fresh output in a temporary
    directory, compares it with committed `src/clockify/generated/**`, and removes the temporary files
@@ -69,11 +69,12 @@ consumer, audit, or live-schema checks.
 Manual freshness check:
 
 - **`npm run verify:schema-live`** — fetches the live Clockify manifest schema endpoint, verifies
-  versions 1.2–1.5 are structurally identical to the vendored schemas, and confirms version 1.6 still
+  versions 1.2–1.6 are structurally identical to the vendored schemas, and confirms version 1.7 still
   returns HTTP 400. This is intentionally outside `ci:verify` so CI remains deterministic and does not
   depend on Clockify network availability. `.github/workflows/schema-live.yml` runs this check on a
-  Monday schedule and on manual dispatch; failures should be triaged as possible upstream schema
-  drift or network outages, not as deterministic SDK regressions.
+  Monday schedule, on manual dispatch, and (non-blocking) on pull requests that touch vendored
+  schemas or generated manifest code; failures should be triaged as possible upstream schema drift
+  or network outages, not as deterministic SDK regressions.
 
 Documentation-only maintenance against unchanged published workspace versions runs
 `npm run ci:verify` and `npm run verify:schema-live` as separate checks. Do not run

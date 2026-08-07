@@ -66,6 +66,19 @@ describe("Builders", () => {
     expect(manifest.minimalSubscriptionPlan).toBe("FREE");
   });
 
+  it("exposes ClockifyManifest.builder() as the canonical alias for the current schema version", () => {
+    expect(ClockifyManifest.builder).toBe(ClockifyManifest.v1_5Builder);
+
+    const manifest = ClockifyManifest.builder()
+      .key("canonical")
+      .name("Canonical")
+      .baseUrl("https://example.com/addon")
+      .requireFreePlan()
+      .build();
+
+    expect(manifest.schemaVersion).toBe("1.5");
+  });
+
   it("should build v1.5 component and settings tab", () => {
     const component = ClockifyComponent.v1_5Builder()
       .invoicesAction()
@@ -157,6 +170,32 @@ describe("Builders", () => {
 
     expect(structured.settings).toEqual(settings);
     expect(selfHosted.settings).toBe("/iframe/settings");
+  });
+
+  it("should build v1.6 manifest with the new time-off-started webhook and uiblocks component", () => {
+    const manifest = ClockifyManifest.v1_6Builder()
+      .key("my-addon-v6")
+      .name("My Addon V6")
+      .baseUrl("https://example.com/addon")
+      .requireFreePlan()
+      .build();
+
+    expect(manifest.schemaVersion).toBe("1.6");
+    expect(manifest.key).toBe("my-addon-v6");
+
+    const webhook = ClockifyWebhook.v1_6Builder()
+      .onTimeOffRequestStarted()
+      .path("/webhooks/time-off-started")
+      .build();
+    expect(webhook.event).toBe("TIME_OFF_REQUEST_STARTED");
+
+    const component = ClockifyComponent.v1_6Builder()
+      .timeentriesActionUiblocks()
+      .allowEveryone()
+      .path("/timeentries/uiblocks")
+      .label("Time entry UI blocks")
+      .build();
+    expect(component.type).toBe("timeentries.action.uiblocks");
   });
 
   it("should build setting drop-down multiple with asDropdownMultiple", () => {

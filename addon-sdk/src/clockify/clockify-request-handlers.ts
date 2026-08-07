@@ -1,5 +1,6 @@
 import type { AddonResponse } from "../shared/response";
 import type { RequestHandler } from "../shared/handler";
+import { reportAddonError } from "../shared/addon";
 import type { ClockifySignatureParser } from "./clockify-signature-parser";
 import type { ClockifyLifecycleMatchedClaims } from "./clockify-lifecycle";
 import {
@@ -11,6 +12,8 @@ import {
 } from "./clockify-lifecycle";
 import {
   ClockifyDeletedLifecycleRequestHandler,
+  ClockifyHandler,
+  ClockifyHandlerOptions,
   ClockifyInstalledLifecycleRequestHandler,
   ClockifyRequestVerificationOptions,
   ClockifySettingsUpdatedLifecycleRequestHandler,
@@ -28,6 +31,7 @@ import {
   verifyClockifyRequest,
   verifyClockifyWebhookRequest,
 } from "./clockify-request-verifiers";
+import { ClockifyHeaders, getClockifyHeaderValues } from "./clockify-request-wire";
 
 function unauthorizedResponse(): AddonResponse {
   return { status: 401, body: "Unauthorized" };
@@ -176,20 +180,25 @@ export function withClockifyVerifiedWebhookRequest(
   options: ClockifyVerifiedWebhookRequestOptions,
   handler: ClockifyVerifiedWebhookRequestHandler,
 ): RequestHandler {
+  // These are configuration mistakes, not verification failures: a request-time
+  // 401 would hide a broken webhook registration behind an opaque
+  // "Unauthorized" for every delivery until someone reads the logs. Failing
+  // at wiring time surfaces the mistake immediately, during startup.
+  if (options == null || !isNonEmptyString(options.expectedEventType)) {
+    throw new Error("withClockifyVerifiedWebhookRequest requires a nonblank expectedEventType.");
+  }
+  const hasFixedToken = options.expectedWebhookAuthToken !== undefined;
+  const hasTokenLookup = options.getExpectedWebhookAuthToken !== undefined;
+  if (hasFixedToken === hasTokenLookup) {
+    throw new Error(
+      "withClockifyVerifiedWebhookRequest requires exactly one of expectedWebhookAuthToken or getExpectedWebhookAuthToken.",
+    );
+  }
+  if (hasTokenLookup && typeof options.getExpectedWebhookAuthToken !== "function") {
+    throw new Error("getExpectedWebhookAuthToken must be a function.");
+  }
+
   return async (request) => {
-    if (options == null || !isNonEmptyString(options.expectedEventType)) {
-      return unauthorizedResponse();
-    }
-
-    const hasFixedToken = options.expectedWebhookAuthToken !== undefined;
-    const hasTokenLookup = options.getExpectedWebhookAuthToken !== undefined;
-    if (hasFixedToken === hasTokenLookup) {
-      return unauthorizedResponse();
-    }
-    if (hasTokenLookup && typeof options.getExpectedWebhookAuthToken !== "function") {
-      return unauthorizedResponse();
-    }
-
     if (options.getExpectedWebhookAuthToken === undefined) {
       const result = await verifyClockifyWebhookRequest(parser, request, options);
       if (!result.ok) {
@@ -228,22 +237,122 @@ export function withClockifyVerifiedWebhookRequest(
       eventType,
     });
     if (!isNonEmptyString(expectedWebhookAuthToken)) {
+      reportAddonError(
+        options.onError,
+        new Error(
+          `getExpectedWebhookAuthToken returned no stored token for workspace ${workspaceId}, add-on ${addonId}, event ${eventType}.`,
+        ),
+        { source: "router", request },
+      );
       return unauthorizedResponse();
     }
 
-    const verified = await verifyClockifyWebhookRequest(parser, request, {
-      ...firstPassOptions,
-      expectedWorkspaceId: workspaceId,
-      expectedAddonId: addonId,
-      expectedWebhookAuthToken,
-    });
-    if (!verified.ok) {
+    // firstPass already verified the JWT and confirmed the signature header is
+    // unambiguous, so the raw token can be read directly instead of paying for
+    // a second full verifyClockifyWebhookRequest (and its second JWT verify).
+    const signatureHeader = firstPassOptions.signatureHeader ?? ClockifyHeaders.SIGNATURE;
+    const token = getClockifyHeaderValues(request.headers, signatureHeader)[0];
+    if (token !== expectedWebhookAuthToken) {
       return unauthorizedResponse();
     }
 
-    return handler(request, verified.claims, {
-      claims: verified.claims,
-      eventType: verified.eventType,
+    return handler(request, firstPass.claims, {
+      claims: firstPass.claims,
+      eventType,
     });
   };
+}
+
+/**
+ * Unified alternative to the `withClockify*` wrappers above: always calls
+ * `handler(request, context)`, regardless of which verification `kind` ran.
+ * Additive only — every existing `withClockify*` export keeps its own arity
+ * and signature; use this when a single normalized shape is more convenient
+ * than matching each wrapper's specific handler arity.
+ *
+ * @example
+ * ```ts
+ * const handleComponent = withClockifyHandler(
+ *   parser,
+ *   { kind: "component" },
+ *   (request, { claims }) => ({ status: 200, body: `hello ${claims.addonId}` }),
+ * );
+ * ```
+ */
+export function withClockifyHandler<Kind extends ClockifyHandlerOptions["kind"]>(
+  parser: ClockifySignatureParser,
+  options: Extract<ClockifyHandlerOptions, { kind: Kind }>,
+  handler: ClockifyHandler<Kind>,
+): RequestHandler;
+// Runtime implementation signature: intentionally non-generic. A generic function body cannot
+// narrow its own type parameter from a `switch` on a sibling value, so the implementation below
+// is checked against the widest (default `Kind`) overload instead; each case's context literal
+// still matches its exact narrowed member of that union structurally, so no cast is needed.
+export function withClockifyHandler(
+  parser: ClockifySignatureParser,
+  options: ClockifyHandlerOptions,
+  handler: ClockifyHandler,
+): RequestHandler {
+  switch (options.kind) {
+    case "verified": {
+      const { kind: _kind, ...rest } = options;
+      return withClockifyVerifiedRequest(parser, rest, (request, _claims, context) =>
+        handler(request, context),
+      );
+    }
+    case "component": {
+      const { kind: _kind, ...rest } = options;
+      return withClockifyVerifiedComponentRequest(
+        parser,
+        (request, _claims, context) => handler(request, context),
+        rest,
+      );
+    }
+    case "lifecycle": {
+      const { kind: _kind, ...rest } = options;
+      return withClockifyVerifiedLifecycleRequest(
+        parser,
+        (request, _claims, context) => handler(request, context),
+        rest,
+      );
+    }
+    case "installed": {
+      const { kind: _kind, ...rest } = options;
+      return withClockifyInstalledLifecycleRequest(
+        parser,
+        (request, _payload, _claims, context) => handler(request, context),
+        rest,
+      );
+    }
+    case "statusChanged": {
+      const { kind: _kind, ...rest } = options;
+      return withClockifyStatusChangedLifecycleRequest(
+        parser,
+        (request, _payload, _claims, context) => handler(request, context),
+        rest,
+      );
+    }
+    case "settingsUpdated": {
+      const { kind: _kind, ...rest } = options;
+      return withClockifySettingsUpdatedLifecycleRequest(
+        parser,
+        (request, _payload, _claims, context) => handler(request, context),
+        rest,
+      );
+    }
+    case "deleted": {
+      const { kind: _kind, ...rest } = options;
+      return withClockifyDeletedLifecycleRequest(
+        parser,
+        (request, _payload, _claims, context) => handler(request, context),
+        rest,
+      );
+    }
+    case "webhook": {
+      const { kind: _kind, ...rest } = options;
+      return withClockifyVerifiedWebhookRequest(parser, rest, (request, _claims, context) =>
+        handler(request, context),
+      );
+    }
+  }
 }

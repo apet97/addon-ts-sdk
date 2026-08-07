@@ -3,6 +3,7 @@ import { ClockifyAddon, ClockifyManifest } from "../src";
 import {
   DEFAULT_MAX_BODY_BYTES,
   InvalidContentLengthError,
+  InvalidRequestTargetError,
   PayloadTooLargeError,
   createExpressAddonHandler,
   fromNodeRequest,
@@ -55,6 +56,18 @@ describe("Adapters", () => {
     expect(dispatched).toBe(false);
   });
 
+  it("rejects an absolute-form Node request-target before it can pick its own host", async () => {
+    // A "/..." or "//..." target is always prefixed with http://localhost, so
+    // it can never resolve to a foreign host. Only a full "scheme://host/..."
+    // target bypasses that prefix entirely.
+    const mockReq = new IncomingMessage(new Socket());
+    mockReq.headers = { host: "localhost" };
+    mockReq.url = "http://evil.example/manifest";
+    mockReq.method = "GET";
+
+    await expect(fromNodeRequest(mockReq)).rejects.toBeInstanceOf(InvalidRequestTargetError);
+  });
+
   it("rejects Node HTTP requests with oversized content-length before body parsing", async () => {
     const mockReq = new IncomingMessage(new Socket());
     mockReq.headers = { host: "localhost", "content-length": "8" };
@@ -84,6 +97,45 @@ describe("Adapters", () => {
     const hugePromise = fromNodeRequest(huge);
     huge.emit("end");
     await expect(hugePromise).rejects.toBeInstanceOf(InvalidContentLengthError);
+  });
+
+  it("rejects Node HTTP requests with a duplicate content-length header", async () => {
+    // Node's IncomingMessage.headers silently keeps only the first content-length
+    // value; the duplicate is only visible on rawHeaders.
+    const mockReq = new IncomingMessage(new Socket());
+    mockReq.headers = { host: "localhost", "content-length": "5" };
+    mockReq.rawHeaders = ["host", "localhost", "content-length", "5", "content-length", "6"];
+    mockReq.url = "/webhook";
+    mockReq.method = "POST";
+
+    const promise = fromNodeRequest(mockReq);
+    mockReq.emit("end");
+
+    await expect(promise).rejects.toBeInstanceOf(InvalidContentLengthError);
+  });
+
+  it("delivers a Fetch request's raw (possibly comma-joined) header value to the handler", async () => {
+    // The Fetch Headers object folds a repeated header into one comma-joined
+    // string before the SDK ever sees it; verifying that duplicate signatures
+    // are rejected as ambiguous is covered in request-verification.test.ts,
+    // against the same comma-joined shape asserted here.
+    const addon = new ClockifyAddon(mockManifest);
+    let receivedSignature: string | string[] | undefined;
+    addon.registerHandler("/component", "GET", (req) => {
+      receivedSignature = req.headers["clockify-signature"];
+      return { status: 200, body: "ok" };
+    });
+
+    const request = new Request("https://example.com/component", {
+      headers: [
+        ["clockify-signature", "jwt1.jwt1.jwt1"],
+        ["clockify-signature", "jwt2.jwt2.jwt2"],
+      ],
+    });
+
+    const response = await handleFetchRequest(addon, request);
+    expect(response.status).toBe(200);
+    expect(receivedSignature).toBe("jwt1.jwt1.jwt1, jwt2.jwt2.jwt2");
   });
 
   it("rejects Node HTTP requests that stream past maxBodyBytes without content-length", async () => {
@@ -567,6 +619,40 @@ describe("Adapters", () => {
 
     expect(response.status).toBe(204);
     expect(response.headers.get("x-clockify-trace")).toBe("first, second");
+  });
+
+  it("reports an Express adapter error via onError before falling through to next()", async () => {
+    // addon.handle() reports errors from inside the handler chain via the
+    // ClockifyAddon-level onError; this covers what happens before dispatch —
+    // here, a malformed absolute-form request target rejected by
+    // parseHttpRequestTarget.
+    const addon = new ClockifyAddon(mockManifest);
+    const onError = vi.fn();
+    const handler = createExpressAddonHandler(addon, { onError });
+
+    const mockReq = {
+      method: "GET",
+      url: "http://evil.example/manifest",
+      headers: {},
+      query: {},
+    };
+    const next = vi.fn();
+    const mockRes = {
+      status: vi.fn().mockReturnThis(),
+      set: vi.fn().mockReturnThis(),
+      json: vi.fn().mockReturnThis(),
+      send: vi.fn().mockReturnThis(),
+      end: vi.fn().mockReturnThis(),
+    };
+
+    await handler(mockReq as any, mockRes as any, next);
+
+    expect(onError).toHaveBeenCalledExactlyOnceWith(
+      expect.any(Error),
+      expect.objectContaining({ source: "router", nativeRequest: mockReq }),
+    );
+    expect(next).toHaveBeenCalledExactlyOnceWith(expect.any(Error));
+    expect(mockRes.status).not.toHaveBeenCalled();
   });
 
   it("sends Uint8Array response bodies as raw bytes via the Express adapter", async () => {

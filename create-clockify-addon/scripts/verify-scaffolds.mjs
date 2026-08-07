@@ -1,3 +1,4 @@
+import assert from "node:assert/strict";
 import { execFileSync, spawn } from "node:child_process";
 import { once } from "node:events";
 import {
@@ -321,7 +322,18 @@ try {
       cwd: directory,
       stdio: "inherit",
     });
+    if (variant.features === "all") {
+      const addonSource = readFileSync(join(directory, "src", "addon.ts"), "utf8");
+      assert.match(
+        addonSource,
+        /runClockifyIdempotentWebhook/,
+        `${variant.name}: generated src/addon.ts must teach idempotent webhook processing.`,
+      );
+    }
     if (variant.runtime === "worker") {
+      const wranglerToml = readFileSync(join(directory, "wrangler.toml"), "utf8");
+      assert.match(wranglerToml, /^main = "src\/index\.ts"$/m);
+      assert.match(wranglerToml, /^compatibility_date = "\d{4}-\d{2}-\d{2}"$/m);
       const bundleDirectory = join(directory, ".wrangler-verify-bundle");
       execFileSync(
         "npm",

@@ -42,11 +42,14 @@ The signature parser checks that:
 5. An `exp` claim, when present, has not expired.
 
 `ClockifySignatureParser.parseClaims()` does not require an `exp` claim by itself.
-`verifyClockifyComponentRequest()` and `verifyClockifyLifecycleRequest()` default
-`requireExpiration` to `true`, so their normal request paths reject a missing expiration as well as
-an expired token. The webhook verifier requires nonblank signed installation context but does not
-add a missing-expiration requirement; an expired `exp`, if supplied, still fails signature parsing.
-Low-level callers can set `requireExpiration` on `verifyClockifyToken()`.
+`verifyClockifyComponentRequest()` defaults `requireExpiration` to `true`, so its normal request
+path rejects a missing expiration as well as an expired token — component tokens are interactive
+and short-lived. `verifyClockifyLifecycleRequest()` defaults `requireExpiration` to `false` because
+the lifecycle `authToken` (read from the `INSTALLED` payload) does not expire; pass
+`{ requireExpiration: true }` if a custom signer adds `exp` to lifecycle tokens. The webhook
+verifier requires nonblank signed installation context but does not add a missing-expiration
+requirement; an expired `exp`, if supplied, still fails signature parsing. Low-level callers can set
+`requireExpiration` on `verifyClockifyToken()`.
 
 The parser verifies tokens only; it does not store secrets or perform transport. The separate
 `ClockifyAddonClient` uses a server-held installation token for Marketplace-specific token
@@ -174,6 +177,24 @@ shape and let you bind a lifecycle body to already verified `workspaceId` and `a
 persisting installation data or webhook `authToken` values. After
 `clockifyLifecyclePayloadMatchesClaims()` returns true, TypeScript treats the claims as carrying
 required `workspaceId` and `addonId` strings.
+
+## Wire → header → helper
+
+`verifyClockify*Request()` reads naturally as "verify this signed request", which fits the general
+and webhook cases but reads awkwardly for the component/lifecycle cases, which are really "check
+this bearer token". The SDK also exports `@deprecated` naming aliases with the "verify ... token"
+shape for those — purely additive, never a replacement for the canonical export, and no call site in
+this package switches to them:
+
+| Wire credential                       | Header/query                               | Canonical helper                   | `@deprecated` alias    |
+| ------------------------------------- | ------------------------------------------ | ---------------------------------- | ---------------------- |
+| Component user token                  | `auth_token` query param                   | `verifyClockifyComponentRequest()` | `verifyComponentToken` |
+| Lifecycle token (no `exp` by default) | `x-addon-lifecycle-token` header           | `verifyClockifyLifecycleRequest()` | `verifyLifecycleToken` |
+| Webhook signature + stored token      | `clockify-signature` header + stored token | `verifyClockifyWebhookRequest()`   | `verifyWebhookToken`   |
+
+Each alias is a direct reference to its canonical function (`export const verifyComponentToken =
+verifyClockifyComponentRequest`), so both names share one implementation and one set of test
+coverage — calling the alias is identical to calling the canonical export.
 
 ## Environments and Regions
 

@@ -1,4 +1,4 @@
-import { Addon } from "../shared/addon";
+import { Addon, AddonErrorReporter, reportAddonError } from "../shared/addon";
 import { AddonRequest } from "../shared/request";
 import { AddonResponse, isJsonBody } from "../shared/response";
 import { parseHttpRequestTarget } from "./request-target";
@@ -39,7 +39,10 @@ function queryParamsFromExpressRequest(req: ExpressLikeRequest, requestUrl: URL)
   return requestUrl.searchParams;
 }
 
-export function createExpressAddonHandler(addon: Addon<unknown>) {
+export function createExpressAddonHandler(
+  addon: Addon<unknown>,
+  options: { readonly onError?: AddonErrorReporter } = {},
+) {
   return async function clockifyAddonExpressHandler(
     req: ExpressLikeRequest,
     res: ExpressLikeResponse,
@@ -78,6 +81,11 @@ export function createExpressAddonHandler(addon: Addon<unknown>) {
         res.end();
       }
     } catch (e) {
+      // addon.handle() already reports errors from inside the handler/middleware
+      // chain through its own onError (set on the ClockifyAddon/Addon instance).
+      // This covers what that path can't see: an error thrown before dispatch
+      // (e.g. a malformed request target) or while writing the response.
+      reportAddonError(options.onError, e, { source: "router", nativeRequest: req });
       if (next) {
         next(e);
       } else {

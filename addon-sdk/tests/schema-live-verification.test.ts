@@ -45,7 +45,7 @@ describe("live schema verification script", () => {
     expect(rootPackageJson.scripts["ci:verify"]).not.toContain("verify:schema-live");
   });
 
-  it("has a scheduled/manual GitHub workflow outside deterministic CI", () => {
+  it("has a scheduled/manual GitHub workflow outside deterministic CI, plus a non-blocking PR check", () => {
     const workflow = readFileSync(
       resolve(repoRoot, ".github", "workflows", "schema-live.yml"),
       "utf8",
@@ -56,20 +56,24 @@ describe("live schema verification script", () => {
     expect(workflow).toContain("schedule:");
     expect(workflow).toContain("node-version: 24.x");
     expect(workflow).toContain("npm run verify:schema-live");
+    expect(workflow).toContain("pull_request:");
+    expect(workflow).toContain("addon-sdk/schemas/**");
+    expect(workflow).toContain("addon-sdk/src/clockify/generated/**");
+    expect(workflow).toContain("continue-on-error: ${{ github.event_name == 'pull_request' }}");
   });
 
-  it("accepts structurally equal live schemas and rejects unsupported 1.6", async () => {
+  it("accepts structurally equal live schemas and rejects unsupported 1.7", async () => {
     const server = createServer((req, res) => {
       const url = new URL(req.url ?? "/", "http://127.0.0.1");
       const version = url.searchParams.get("version");
 
-      if (version === "1.6") {
+      if (version === "1.7") {
         res.writeHead(400, { "content-type": "application/json" });
         res.end(JSON.stringify({ message: "Unsupported manifest schema version" }));
         return;
       }
 
-      if (version && ["1.2", "1.3", "1.4", "1.5"].includes(version)) {
+      if (version && ["1.2", "1.3", "1.4", "1.5", "1.6"].includes(version)) {
         const schema = JSON.parse(readFileSync(resolve(schemasDir, `${version}.json`), "utf8"));
         res.writeHead(200, { "content-type": "application/json" });
         res.end(JSON.stringify(schema));
@@ -91,7 +95,7 @@ describe("live schema verification script", () => {
           "--base-url",
           `http://127.0.0.1:${port}/manifest-schema`,
           "--unsupported-version",
-          "1.6",
+          "1.7",
         ],
         { cwd: packageRoot, encoding: "utf8" },
       );
@@ -119,11 +123,15 @@ describe("live schema verification script", () => {
             "--base-url",
             `http://127.0.0.1:${port}/manifest-schema`,
             "--unsupported-version",
-            "1.6",
+            "1.7",
             "--timeout-ms",
             "20",
           ],
-          { cwd: packageRoot, encoding: "utf8", timeout: 1_000 },
+          // The outer timeout is a safety net, not the assertion: the script's own --timeout-ms
+          // bounds each version's fetch to 20ms, so it always exits well before this fires. Kept
+          // generous so CPU contention across a full test run can't race the outer net closed
+          // before the script's first per-version timeout even lands.
+          { cwd: packageRoot, encoding: "utf8", timeout: 15_000 },
         ),
       ).rejects.toMatchObject({
         code: 1,
@@ -132,5 +140,5 @@ describe("live schema verification script", () => {
     } finally {
       await close(server);
     }
-  }, 5_000);
+  }, 20_000);
 });

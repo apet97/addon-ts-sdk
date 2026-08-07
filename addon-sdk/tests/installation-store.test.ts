@@ -1,7 +1,8 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   InMemoryClockifyInstallationStore,
   createClockifyAesGcmTokenCodec,
+  createRotatingClockifyTokenCodec,
   wrapClockifyInstallationStoreWithEncryption,
   type ClockifyInstallationContext,
 } from "../src";
@@ -82,7 +83,41 @@ describe("installation stores", () => {
     ).resolves.toBe("deleted");
   });
 
-  it("fails open-null when encrypted storage is corrupt and rejects empty writes", async () => {
+  it("round-trips the AES-GCM codec without a global Buffer (browser/workerd shape)", async () => {
+    const originalBuffer = globalThis.Buffer;
+    // @ts-expect-error simulating a runtime with no Node Buffer global
+    delete globalThis.Buffer;
+    try {
+      const key = await crypto.subtle.generateKey({ name: "AES-GCM", length: 256 }, false, [
+        "encrypt",
+        "decrypt",
+      ]);
+      const codec = createClockifyAesGcmTokenCodec(key);
+      const encoded = await codec.encode("installation-secret");
+      expect(encoded).not.toContain("installation-secret");
+      await expect(codec.decode(encoded)).resolves.toBe("installation-secret");
+    } finally {
+      globalThis.Buffer = originalBuffer;
+    }
+  });
+
+  it("rejects encoding when Web Crypto's getRandomValues is unavailable", async () => {
+    const key = await crypto.subtle.generateKey({ name: "AES-GCM", length: 256 }, false, [
+      "encrypt",
+      "decrypt",
+    ]);
+    const codec = createClockifyAesGcmTokenCodec(key);
+    // getRandomValues lives on Crypto.prototype, so deleting the instance
+    // property is a no-op; stub the whole global instead.
+    vi.stubGlobal("crypto", { ...globalThis.crypto, getRandomValues: undefined });
+    try {
+      await expect(codec.encode("installation-secret")).rejects.toThrow(/Web Crypto is required/);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("fails closed to null when encrypted storage is corrupt and rejects empty writes", async () => {
     const raw = new InMemoryClockifyInstallationStore();
     const key = await crypto.subtle.generateKey({ name: "AES-GCM", length: 256 }, false, [
       "encrypt",
@@ -99,5 +134,60 @@ describe("installation stores", () => {
     );
     await raw.save(context(100, "enc:v1:not-valid"));
     await expect(encrypted.load("workspace-1", "addon-1")).resolves.toBeNull();
+  });
+
+  it("reports corrupt-decode events via onDecodeError without changing the null result", async () => {
+    const raw = new InMemoryClockifyInstallationStore();
+    const key = await crypto.subtle.generateKey({ name: "AES-GCM", length: 256 }, false, [
+      "encrypt",
+      "decrypt",
+    ]);
+    const onDecodeError = vi.fn();
+    const encrypted = wrapClockifyInstallationStoreWithEncryption(
+      raw,
+      createClockifyAesGcmTokenCodec(key),
+      onDecodeError,
+    );
+
+    await raw.save(context(100, "enc:v1:not-valid"));
+    await expect(encrypted.load("workspace-1", "addon-1")).resolves.toBeNull();
+    expect(onDecodeError).toHaveBeenCalledTimes(1);
+    expect(onDecodeError).toHaveBeenCalledWith(expect.anything(), "workspace-1", "addon-1");
+  });
+
+  it("rotates encryption keys by decoding old-key rows and encoding new ones with the new key", async () => {
+    const oldKey = await crypto.subtle.generateKey({ name: "AES-GCM", length: 256 }, false, [
+      "encrypt",
+      "decrypt",
+    ]);
+    const newKey = await crypto.subtle.generateKey({ name: "AES-GCM", length: 256 }, false, [
+      "encrypt",
+      "decrypt",
+    ]);
+    const oldCodec = createClockifyAesGcmTokenCodec(oldKey);
+    const newCodec = createClockifyAesGcmTokenCodec(newKey);
+    const rotating = createRotatingClockifyTokenCodec(newCodec, oldCodec);
+
+    // A row encrypted before the rotation must still decode.
+    const legacyEncoded = await oldCodec.encode("pre-rotation-secret");
+    await expect(rotating.decode(legacyEncoded)).resolves.toBe("pre-rotation-secret");
+
+    // A newly encoded row must be decryptable with only the new key, proving
+    // encode() never falls back to the old codec.
+    const rotatedEncoded = await rotating.encode("post-rotation-secret");
+    await expect(newCodec.decode(rotatedEncoded)).resolves.toBe("post-rotation-secret");
+    await expect(oldCodec.decode(rotatedEncoded)).rejects.toThrow();
+
+    const raw = new InMemoryClockifyInstallationStore();
+    const store = wrapClockifyInstallationStoreWithEncryption(raw, rotating);
+    const legacyWebhookEncoded = await oldCodec.encode("webhook-secret");
+    await raw.save({
+      ...context(100, legacyEncoded),
+      webhooks: [{ path: "/expense", webhookType: "ADDON", authToken: legacyWebhookEncoded }],
+    });
+    await expect(store.load("workspace-1", "addon-1")).resolves.toMatchObject({
+      authToken: "pre-rotation-secret",
+      webhooks: [{ authToken: "webhook-secret" }],
+    });
   });
 });

@@ -54,6 +54,7 @@ function prepareConsumer(name, type, tarball) {
     "utf8",
   );
   for (const copyright of [
+    "Copyright (c) 2018 Filip Skokan",
     "Copyright (c) 2015-2021 Evgeny Poberezkin",
     "Copyright (c) 2017 Evgeny Poberezkin",
   ]) {

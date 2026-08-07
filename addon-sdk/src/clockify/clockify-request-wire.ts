@@ -1,4 +1,4 @@
-import { isCanonicalLoopbackHostname } from "../shared/loopback";
+import { isHttpsOrLoopbackHttp } from "../shared/loopback";
 import type { AddonRequest } from "../shared/request";
 import type { ClockifyAddonClaims } from "./clockify-signature-parser";
 
@@ -43,7 +43,12 @@ export function getClockifyHeaderValues(headers: AddonRequest["headers"], name: 
     if (Array.isArray(value)) {
       values.push(...value);
     } else if (value !== undefined) {
-      values.push(value);
+      // Node and the Fetch Headers object both fold a client-repeated header into
+      // one comma-joined string instead of an array. None of Clockify's signature,
+      // event-type, or lifecycle-token values ever legitimately contain a comma, so
+      // splitting here surfaces every value the client actually sent for the
+      // ambiguity checks below.
+      values.push(...value.split(","));
     }
   }
 
@@ -76,8 +81,7 @@ function normalizeClockifyVersionedBaseUrl(value: unknown): string | undefined {
     return undefined;
   }
 
-  const loopback = isCanonicalLoopbackHostname(url.hostname);
-  if (url.protocol !== "https:" && !(url.protocol === "http:" && loopback)) return undefined;
+  if (!isHttpsOrLoopbackHttp(url)) return undefined;
   if (url.username !== "" || url.password !== "" || url.search !== "" || url.hash !== "") {
     return undefined;
   }

@@ -29,7 +29,10 @@ function descriptorsEqual(left: unknown, right: unknown): boolean {
 }
 
 function registerManifestRoute<T extends { readonly path: string }>(
-  addon: { registerHandler(path: string, method: string, handler: RequestHandler): void },
+  addon: {
+    registerHandler(path: string, method: string, handler: RequestHandler): void;
+    getRegisteredRequests(): Array<{ path: string; method: string }>;
+  },
   kind: string,
   entries: T[] | undefined,
   descriptor: T,
@@ -43,6 +46,16 @@ function registerManifestRoute<T extends { readonly path: string }>(
       `Conflicting ${kind} is already declared for path ${descriptor.path}.`,
     );
   }
+
+  // An identical redeclaration (e.g. a module re-evaluated during hot reload)
+  // is a no-op: the router already holds this exact path+method, and the
+  // underlying registerHandler unconditionally rejects any second call at
+  // the same path+method regardless of whether the descriptor matches.
+  const methodUpper = method.toUpperCase();
+  const alreadyRouted = addon
+    .getRegisteredRequests()
+    .some((entry) => entry.path === descriptor.path && entry.method === methodUpper);
+  if (existing && alreadyRouted) return manifestEntries;
 
   addon.registerHandler(descriptor.path, method, handler);
   if (!existing) manifestEntries.push(descriptor);
@@ -58,6 +71,13 @@ function registerManifestRoute<T extends { readonly path: string }>(
  *   new ClockifyAddon(ClockifyManifest.v1_5Builder()....build())  // M inferred as the v1.5 manifest
  *
  * The `register*` methods are then typed against that same version.
+ *
+ * This constructor does NOT validate the manifest against the Clockify schema — the manifest
+ * builders already enforce required fields at the type level, and a router built from a manifest
+ * that a downstream tool intentionally serves unvalidated (a captured example, a hand-authored
+ * fixture) must still start. Use {@link createValidatedClockifyAddon} instead when the manifest's
+ * shape is not statically known (built at runtime from configuration, deserialized JSON) and you
+ * want a schema violation to fail fast at startup rather than surface later as a rejected install.
  */
 export class ClockifyAddon<
   M extends { readonly schemaVersion: ClockifySchemaVersion } = ClockifyManifest<"1.4">,

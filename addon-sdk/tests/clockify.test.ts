@@ -1,5 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { ClockifyAddon, ClockifyManifest, createValidatedClockifyAddon } from "../src";
+import {
+  ClockifyAddon,
+  ClockifyManifest,
+  IllegalArgumentException,
+  createValidatedClockifyAddon,
+} from "../src";
 import { generated } from "../src";
 
 describe("Clockify Addon Hooks", () => {
@@ -275,5 +280,34 @@ describe("Clockify Addon Hooks", () => {
     // Check manifest components list was NOT mutated to include the duplicate
     expect(addon.getManifest().components?.length).toBe(1);
     expect(addon.getManifest().components?.[0]).toEqual(component1);
+  });
+
+  it("allows an identical webhook redeclaration without throwing, still rejects a conflicting one", () => {
+    const manifest = getCleanManifest();
+    const addon = new ClockifyAddon(manifest);
+
+    const webhook = generated.v1_4
+      .ClockifyWebhookBuilder()
+      .event("NEW_PROJECT")
+      .path("/hooks/p")
+      .build();
+    const handler = () => ({ status: 200 });
+
+    addon.registerWebhook(webhook, handler);
+    // Re-declaring the exact same webhook (e.g. a module re-evaluated during
+    // hot reload) must be a no-op, not throw "Handler has already been
+    // registered" from the underlying router.
+    expect(() => addon.registerWebhook(webhook, handler)).not.toThrow();
+    expect(addon.getManifest().webhooks).toHaveLength(1);
+    expect(addon.getRegisteredRequests().filter((r) => r.path === "/hooks/p")).toHaveLength(1);
+
+    const conflicting = generated.v1_4
+      .ClockifyWebhookBuilder()
+      .event("NEW_TASK")
+      .path("/hooks/p")
+      .build();
+    expect(() => addon.registerWebhook(conflicting, handler)).toThrow(IllegalArgumentException);
+    expect(addon.getManifest().webhooks).toHaveLength(1);
+    expect(addon.getManifest().webhooks?.[0]).toEqual(webhook);
   });
 });

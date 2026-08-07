@@ -6,7 +6,7 @@ import { createNodeHttpAddonServer } from "../src/adapters";
 import {
   createInMemorySecureServerStore,
   createSecureServerAddon,
-} from "../examples/secure-server";
+} from "../snippets/secure-server";
 import { generateTestKeys, signTestToken } from "../src/testing";
 
 const ADDON_KEY = "secure-addon";

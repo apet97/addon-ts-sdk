@@ -83,6 +83,41 @@ export default {
 Replace development storage before installation, configure secrets through the platform, and probe
 the deployed `/manifest` before registering its URL with Clockify.
 
+### Liveness, readiness, and shutdown recipe
+
+The generated Node bootstrap has no health route and does not drain in-flight requests on
+`SIGTERM` — both are your deployment's job. Mount health checks on their own port outside the
+add-on router, so a store outage that fails the add-on's requests does not also fail
+`/health/live`:
+
+```typescript
+import { createServer } from "node:http";
+import { createNodeHttpAddonServer } from "@apet97/clockify-addon-sdk/adapters/node";
+import { createAddon } from "./addon.js";
+
+const addonServer = createNodeHttpAddonServer(createAddon(process.env));
+addonServer.listen(Number(process.env.PORT ?? 8080));
+
+const healthServer = createServer((request, response) => {
+  if (request.url === "/health/live") return void response.writeHead(200).end("ok");
+  if (request.url === "/health/ready") {
+    // Probe your durable installation/lease store here; 200 only if it answers.
+    return void response.writeHead(200).end("ok");
+  }
+  response.writeHead(404).end();
+});
+healthServer.listen(Number(process.env.HEALTH_PORT ?? 8081));
+
+process.on("SIGTERM", () => {
+  addonServer.close();
+  healthServer.close();
+  setTimeout(() => process.exit(1), 10_000).unref(); // hard exit if a request hangs
+});
+```
+
+A Worker deployment gets liveness for free from the platform; add `/health/ready` as an explicit
+route in `fetch()` if the store it probes can fail independently of the platform.
+
 ## Failure behavior
 
 - Missing or invalid production `PUBLIC_BASE_URL` fails closed instead of trusting an arbitrary
@@ -97,6 +132,26 @@ the deployed `/manifest` before registering its URL with Clockify.
   instances. Treat that as unsupported production configuration, not an availability strategy.
 - Unexpected handler/router/adapter errors become `500`; use redacted `onError` reporting to retain
   diagnostic context without changing the response contract.
+
+## Public key rotation
+
+`createClockifySignatureParser` verifies every add-on JWT against
+`CLOCKIFY_PLATFORM_PUBLIC_KEY_PEM` by default. `CLOCKIFY_PLATFORM_PUBLIC_KEY_SHA256` pins its
+DER/SPKI fingerprint; both are covered by a test that recomputes the fingerprint from the PEM and
+compares it against the vendored Marketplace authentication docs, so a corrupted or stale key fails
+CI before it ships.
+
+If Clockify ever rotates the platform signing key, do not edit the vendored constant in place —
+the SDK release that carries the new key is the trust boundary, and applications must upgrade to
+it deliberately, not pick it up silently. To roll it out without a verification gap:
+
+1. Pass the new key via `createClockifySignatureParser(key, { publicKey: newKeyPem })` (or a dual
+   verifier trying the new key, then the old one) ahead of the platform's cut-over date, so your
+   deployment already accepts tokens signed by either key.
+2. After Clockify's cut-over, drop the old-key fallback and upgrade to the SDK release that vendors
+   the new default.
+3. Track the exact cut-over date and both fingerprints in your own change log; this SDK's
+   `CLOCKIFY_PLATFORM_PUBLIC_KEY_SHA256` only ever reflects the currently vendored key.
 
 ## Prove it
 

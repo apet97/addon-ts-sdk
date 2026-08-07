@@ -1,4 +1,4 @@
-import { isCanonicalLoopbackHostname } from "../shared/loopback";
+import { isHttpsOrLoopbackHttp } from "../shared/loopback";
 
 /** The supported message envelope sent by Clockify to an iframe component. */
 export interface ClockifyWindowMessage {
@@ -33,10 +33,17 @@ export interface CreateClockifyBridgeOptions {
   readonly parentOrigin: string;
 }
 
+/**
+ * The add-on-dispatchable event names Clockify's window-messaging bridge documents. See
+ * `MARKETPLACE_DOCS/10-window-events.md`'s "Event dispatch" section — Clockify states this list is
+ * not final and is subject to change.
+ */
+export type ClockifyBridgeAction = "refreshAddonToken" | "preview" | "navigate" | "toastrPop";
+
 /** Typed Clockify iframe messaging surface. */
 export interface ClockifyBridge {
   subscribe(title: string, handler: (body: unknown) => void): () => void;
-  dispatch(action: string, payload?: unknown): void;
+  dispatch(action: ClockifyBridgeAction, payload?: unknown): void;
   refreshAddonToken(): void;
   preview(): void;
   navigate(type: "tracker"): void;
@@ -47,8 +54,7 @@ export interface ClockifyBridge {
 function assertParentOrigin(value: string): string {
   if (value === "*") throw new Error("A specific Clockify parent origin is required.");
   const url = new URL(value);
-  const local = isCanonicalLoopbackHostname(url.hostname);
-  if (url.protocol !== "https:" && !(local && url.protocol === "http:")) {
+  if (!isHttpsOrLoopbackHttp(url)) {
     throw new Error("Clockify parent origin must use HTTPS outside localhost.");
   }
   if (url.origin !== value) throw new Error("Clockify parent origin must not include a path.");
@@ -86,7 +92,7 @@ export function createClockifyBridge(options: CreateClockifyBridgeOptions): Cloc
   };
   options.window.addEventListener("message", listener);
 
-  const dispatch = (action: string, payload?: unknown): void => {
+  const dispatch = (action: ClockifyBridgeAction, payload?: unknown): void => {
     const envelope = payload === undefined ? { action } : { action, payload };
     options.window.parent.postMessage(JSON.stringify(envelope), origin);
   };
@@ -129,14 +135,23 @@ export function applyClockifyLanguage(
   language: string | undefined,
   root: Pick<ClockifyDocumentRoot, "lang">,
 ): void {
-  root.lang = (language?.trim() || "EN").toLowerCase().replace("_", "-");
+  root.lang = (language?.trim() || "EN").toLowerCase().replaceAll("_", "-");
 }
 
-/** Formats a date using the user's locale while permitting explicit timezone policy. */
+/**
+ * Formats a date using the user's locale while permitting explicit timezone policy. Falls back to
+ * `"en"` if `locale` is not a well-formed BCP 47 tag `Intl.DateTimeFormat` accepts.
+ */
 export function formatClockifyDate(
   value: Date | number,
   locale: string,
   options: Intl.DateTimeFormatOptions = {},
 ): string {
-  return new Intl.DateTimeFormat(locale, { dateStyle: "medium", ...options }).format(value);
+  let formatter: Intl.DateTimeFormat;
+  try {
+    formatter = new Intl.DateTimeFormat(locale, { dateStyle: "medium", ...options });
+  } catch {
+    formatter = new Intl.DateTimeFormat("en", { dateStyle: "medium", ...options });
+  }
+  return formatter.format(value);
 }

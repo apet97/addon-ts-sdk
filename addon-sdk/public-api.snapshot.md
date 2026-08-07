@@ -14,7 +14,15 @@ export * from "./shared/response.js";
 export * from "./shared/handler.js";
 export * from "./shared/errors.js";
 export * from "./clockify/index.js";
+/**
+ * @deprecated Import from `@apet97/clockify-addon-sdk/client` instead. Kept here for backward
+ * compatibility; scheduled for removal in a future major version.
+ */
 export * from "./client/index.js";
+/**
+ * @deprecated Import from `@apet97/clockify-addon-sdk/testing` instead. Kept here for backward
+ * compatibility; scheduled for removal in a future major version.
+ */
 export * as testing from "./testing/index.js";
 ```
 
@@ -34,6 +42,8 @@ export type AddonErrorReporter = (error: unknown, context: AddonErrorContext) =>
 export interface AddonOptions {
     readonly onError?: AddonErrorReporter;
 }
+/** Strips Clockify credentials from a request before an error reporter sees it. */
+export declare function redactAddonRequest(request: AddonRequest): AddonRequest;
 export declare function reportAddonError(reporter: AddonErrorReporter | undefined, error: unknown, context: AddonErrorContext): void;
 export declare abstract class Addon<M> {
     static readonly PATH_MANIFEST = "/manifest";
@@ -43,6 +53,7 @@ export declare abstract class Addon<M> {
     private readonly options;
     private readonly requestHandlers;
     private readonly middlewares;
+    private readonly allowedMethodsByPath;
     constructor(manifest: M, manifestPath?: string, options?: AddonOptions);
     getManifest(): M;
     registerHandler(path: string, method: string, handler: RequestHandler): void;
@@ -97,6 +108,8 @@ export declare class ValidationException extends Error {
 export declare class IllegalArgumentException extends Error {
     constructor(message: string);
 }
+/** True for the SDK's own registration/input-validation errors (bad wiring), never a runtime verification failure. */
+export declare function isAddonInputError(error: unknown): error is ValidationException | IllegalArgumentException;
 ```
 
 ### clockify/index.d.ts
@@ -136,6 +149,13 @@ import { ClockifyWebhook, ClockifyLifecycleEvent, ClockifyComponent } from "./cl
  *   new ClockifyAddon(ClockifyManifest.v1_5Builder()....build())  // M inferred as the v1.5 manifest
  *
  * The `register*` methods are then typed against that same version.
+ *
+ * This constructor does NOT validate the manifest against the Clockify schema — the manifest
+ * builders already enforce required fields at the type level, and a router built from a manifest
+ * that a downstream tool intentionally serves unvalidated (a captured example, a hand-authored
+ * fixture) must still start. Use {@link createValidatedClockifyAddon} instead when the manifest's
+ * shape is not statically known (built at runtime from configuration, deserialized JSON) and you
+ * want a schema violation to fail fast at startup rather than surface later as a rejected install.
  */
 export declare class ClockifyAddon<M extends {
     readonly schemaVersion: ClockifySchemaVersion;
@@ -156,13 +176,16 @@ export declare function createValidatedClockifyAddon<M extends {
 
 ```ts
 import * as generated from "./generated/index.js";
-export type ClockifySchemaVersion = "1.2" | "1.3" | "1.4" | "1.5";
-export type ClockifyManifest<V extends ClockifySchemaVersion = "1.4"> = V extends "1.2" ? generated.v1_2.ClockifyManifest : V extends "1.3" ? generated.v1_3.ClockifyManifest : V extends "1.4" ? generated.v1_4.ClockifyManifest : generated.v1_5.ClockifyManifest;
+export type ClockifySchemaVersion = "1.2" | "1.3" | "1.4" | "1.5" | "1.6";
+export type ClockifyManifest<V extends ClockifySchemaVersion = "1.4"> = V extends "1.2" ? generated.v1_2.ClockifyManifest : V extends "1.3" ? generated.v1_3.ClockifyManifest : V extends "1.4" ? generated.v1_4.ClockifyManifest : V extends "1.5" ? generated.v1_5.ClockifyManifest : generated.v1_6.ClockifyManifest;
 export declare const ClockifyManifest: {
+    /** Canonical entry point: the current schema version's builder (currently 1.5). */
+    builder: typeof generated.v1_5.ClockifyManifest.builder;
     v1_2Builder: typeof generated.v1_2.ClockifyManifest.builder;
     v1_3Builder: typeof generated.v1_3.ClockifyManifest.builder;
     v1_4Builder: typeof generated.v1_4.ClockifyManifest.builder;
     v1_5Builder: typeof generated.v1_5.ClockifyManifest.builder;
+    v1_6Builder: typeof generated.v1_6.ClockifyManifest.builder;
 };
 ```
 
@@ -271,7 +294,7 @@ export * from "./clockify-request-wire.js";
 ```ts
 import type { RequestHandler } from "../shared/handler.js";
 import type { ClockifySignatureParser } from "./clockify-signature-parser.js";
-import { ClockifyDeletedLifecycleRequestHandler, ClockifyInstalledLifecycleRequestHandler, ClockifyRequestVerificationOptions, ClockifySettingsUpdatedLifecycleRequestHandler, ClockifyStatusChangedLifecycleRequestHandler, ClockifyTokenVerificationOptions, ClockifyVerifiedComponentRequestHandler, ClockifyVerifiedLifecycleRequestHandler, ClockifyVerifiedRequestHandler, ClockifyVerifiedWebhookRequestHandler, ClockifyVerifiedWebhookRequestOptions } from "./clockify-request-types.js";
+import { ClockifyDeletedLifecycleRequestHandler, ClockifyHandler, ClockifyHandlerOptions, ClockifyInstalledLifecycleRequestHandler, ClockifyRequestVerificationOptions, ClockifySettingsUpdatedLifecycleRequestHandler, ClockifyStatusChangedLifecycleRequestHandler, ClockifyTokenVerificationOptions, ClockifyVerifiedComponentRequestHandler, ClockifyVerifiedLifecycleRequestHandler, ClockifyVerifiedRequestHandler, ClockifyVerifiedWebhookRequestHandler, ClockifyVerifiedWebhookRequestOptions } from "./clockify-request-types.js";
 export declare function withClockifyVerifiedRequest(parser: ClockifySignatureParser, options: ClockifyRequestVerificationOptions, handler: ClockifyVerifiedRequestHandler): RequestHandler;
 export declare function withClockifyVerifiedComponentRequest(parser: ClockifySignatureParser, handler: ClockifyVerifiedComponentRequestHandler, options?: ClockifyTokenVerificationOptions): RequestHandler;
 export declare function withClockifyVerifiedLifecycleRequest(parser: ClockifySignatureParser, handler: ClockifyVerifiedLifecycleRequestHandler, options?: ClockifyTokenVerificationOptions): RequestHandler;
@@ -280,11 +303,31 @@ export declare function withClockifyStatusChangedLifecycleRequest(parser: Clocki
 export declare function withClockifySettingsUpdatedLifecycleRequest(parser: ClockifySignatureParser, handler: ClockifySettingsUpdatedLifecycleRequestHandler, options?: ClockifyTokenVerificationOptions): RequestHandler;
 export declare function withClockifyDeletedLifecycleRequest(parser: ClockifySignatureParser, handler: ClockifyDeletedLifecycleRequestHandler, options?: ClockifyTokenVerificationOptions): RequestHandler;
 export declare function withClockifyVerifiedWebhookRequest(parser: ClockifySignatureParser, options: ClockifyVerifiedWebhookRequestOptions, handler: ClockifyVerifiedWebhookRequestHandler): RequestHandler;
+/**
+ * Unified alternative to the `withClockify*` wrappers above: always calls
+ * `handler(request, context)`, regardless of which verification `kind` ran.
+ * Additive only — every existing `withClockify*` export keeps its own arity
+ * and signature; use this when a single normalized shape is more convenient
+ * than matching each wrapper's specific handler arity.
+ *
+ * @example
+ * ```ts
+ * const handleComponent = withClockifyHandler(
+ *   parser,
+ *   { kind: "component" },
+ *   (request, { claims }) => ({ status: 200, body: `hello ${claims.addonId}` }),
+ * );
+ * ```
+ */
+export declare function withClockifyHandler<Kind extends ClockifyHandlerOptions["kind"]>(parser: ClockifySignatureParser, options: Extract<ClockifyHandlerOptions, {
+    kind: Kind;
+}>, handler: ClockifyHandler<Kind>): RequestHandler;
 ```
 
 ### clockify/clockify-request-types.d.ts
 
 ```ts
+import type { AddonErrorReporter } from "../shared/addon.js";
 import type { AddonRequest } from "../shared/request.js";
 import type { AddonResponse } from "../shared/response.js";
 import type { ClockifyAddonClaims } from "./clockify-signature-parser.js";
@@ -376,15 +419,62 @@ export interface ClockifyWebhookAuthTokenLookupInput {
 export type ClockifyWebhookAuthTokenLookup = (input: ClockifyWebhookAuthTokenLookupInput) => string | undefined | Promise<string | undefined>;
 export type ClockifyVerifiedWebhookRequestOptions = (ClockifyWebhookVerificationOptions & {
     getExpectedWebhookAuthToken?: undefined;
+    /** Observes a misconfigured token lookup (e.g. an empty/missing stored token). */
+    onError?: AddonErrorReporter;
 }) | (Omit<ClockifyWebhookVerificationOptions, "expectedWebhookAuthToken"> & {
     getExpectedWebhookAuthToken: ClockifyWebhookAuthTokenLookup;
     expectedWebhookAuthToken?: never;
+    /** Observes a misconfigured token lookup (e.g. an empty/missing stored token). */
+    onError?: AddonErrorReporter;
 });
 export interface ClockifyVerifiedWebhookRequestContext {
     claims: ClockifyAddonClaims;
     eventType: string;
 }
 export type ClockifyVerifiedWebhookRequestHandler = (request: AddonRequest, claims: ClockifyAddonClaims, context: ClockifyVerifiedWebhookRequestContext) => AddonResponse | Promise<AddonResponse>;
+export type ClockifyHandlerOptions = ({
+    kind: "verified";
+} & ClockifyRequestVerificationOptions) | ({
+    kind: "component";
+} & ClockifyTokenVerificationOptions) | ({
+    kind: "lifecycle";
+} & ClockifyTokenVerificationOptions) | ({
+    kind: "installed";
+} & ClockifyTokenVerificationOptions) | ({
+    kind: "statusChanged";
+} & ClockifyTokenVerificationOptions) | ({
+    kind: "settingsUpdated";
+} & ClockifyTokenVerificationOptions) | ({
+    kind: "deleted";
+} & ClockifyTokenVerificationOptions) | ({
+    kind: "webhook";
+} & ClockifyVerifiedWebhookRequestOptions);
+type ClockifyHandlerKind = ClockifyHandlerOptions["kind"];
+type ClockifyLifecyclePayloadHandlerKind = "installed" | "statusChanged" | "settingsUpdated" | "deleted";
+type ClockifyHandlerPayloadFor<Kind extends ClockifyLifecyclePayloadHandlerKind> = Kind extends "installed" ? ClockifyInstalledLifecyclePayload : Kind extends "statusChanged" ? ClockifyStatusChangedLifecyclePayload : Kind extends "settingsUpdated" ? ClockifySettingsUpdatedLifecyclePayload : ClockifyDeletedLifecyclePayload;
+/**
+ * Normalized handler context for `withClockifyHandler`, parameterized on `Kind` so `claims` keeps
+ * the same narrowing each underlying `withClockify*` wrapper already provides: a lifecycle-payload
+ * kind gets required `workspaceId`/`addonId` via `ClockifyLifecycleMatchedClaims` and its exact
+ * matched `payload` type; every other kind gets plain `ClockifyAddonClaims` and no `payload`.
+ * `eventType` is required only for `"webhook"` (matching `ClockifyVerifiedWebhookRequestContext`);
+ * `"verified"` carries it optionally, matching `ClockifyVerifiedRequestContext`.
+ */
+export type ClockifyHandlerContext<Kind extends ClockifyHandlerKind = ClockifyHandlerKind> = Kind extends ClockifyLifecyclePayloadHandlerKind ? {
+    claims: ClockifyLifecycleMatchedClaims;
+    payload: ClockifyHandlerPayloadFor<Kind>;
+    eventType?: undefined;
+} : Kind extends "webhook" ? {
+    claims: ClockifyAddonClaims;
+    payload?: undefined;
+    eventType: string;
+} : {
+    claims: ClockifyAddonClaims;
+    payload?: undefined;
+    eventType?: string;
+};
+export type ClockifyHandler<Kind extends ClockifyHandlerKind = ClockifyHandlerKind> = (request: AddonRequest, context: ClockifyHandlerContext<Kind>) => AddonResponse | Promise<AddonResponse>;
+export {};
 ```
 
 ### clockify/clockify-request-verifiers.d.ts
@@ -398,6 +488,12 @@ export declare function verifyClockifyWebhookRequest(parser: ClockifySignaturePa
 export declare function verifyClockifyToken(parser: ClockifySignatureParser, token: string | undefined | null, options?: ClockifyTokenVerificationOptions): Promise<ClockifyTokenVerificationResult>;
 export declare function verifyClockifyComponentRequest(parser: ClockifySignatureParser, request: AddonRequest, options?: ClockifyTokenVerificationOptions): Promise<ClockifyTokenVerificationResult>;
 export declare function verifyClockifyLifecycleRequest(parser: ClockifySignatureParser, request: AddonRequest, options?: ClockifyTokenVerificationOptions): Promise<ClockifyTokenVerificationResult>;
+/** @deprecated Alias of {@link verifyClockifyComponentRequest}. */
+export declare const verifyComponentToken: typeof verifyClockifyComponentRequest;
+/** @deprecated Alias of {@link verifyClockifyLifecycleRequest}. */
+export declare const verifyLifecycleToken: typeof verifyClockifyLifecycleRequest;
+/** @deprecated Alias of {@link verifyClockifyWebhookRequest}. */
+export declare const verifyWebhookToken: typeof verifyClockifyWebhookRequest;
 ```
 
 ### clockify/clockify-request-wire.d.ts
@@ -498,61 +594,69 @@ export declare function clockifyLifecyclePayloadMatchesClaims(payload: unknown, 
 ```ts
 import * as generated from "./generated/index.js";
 import { ClockifySchemaVersion } from "./clockify-manifest.js";
-export type ClockifyWebhook<V extends ClockifySchemaVersion = "1.4"> = V extends "1.2" ? generated.v1_2.ClockifyWebhook : V extends "1.3" ? generated.v1_3.ClockifyWebhook : V extends "1.4" ? generated.v1_4.ClockifyWebhook : generated.v1_5.ClockifyWebhook;
+export type ClockifyWebhook<V extends ClockifySchemaVersion = "1.4"> = V extends "1.2" ? generated.v1_2.ClockifyWebhook : V extends "1.3" ? generated.v1_3.ClockifyWebhook : V extends "1.4" ? generated.v1_4.ClockifyWebhook : V extends "1.5" ? generated.v1_5.ClockifyWebhook : generated.v1_6.ClockifyWebhook;
 export declare const ClockifyWebhook: {
     v1_2Builder: typeof generated.v1_2.ClockifyWebhook.builder;
     v1_3Builder: typeof generated.v1_3.ClockifyWebhook.builder;
     v1_4Builder: typeof generated.v1_4.ClockifyWebhook.builder;
     v1_5Builder: typeof generated.v1_5.ClockifyWebhook.builder;
+    v1_6Builder: typeof generated.v1_6.ClockifyWebhook.builder;
 };
-export type ClockifyLifecycleEvent<V extends ClockifySchemaVersion = "1.4"> = V extends "1.2" ? generated.v1_2.ClockifyLifecycleEvent : V extends "1.3" ? generated.v1_3.ClockifyLifecycleEvent : V extends "1.4" ? generated.v1_4.ClockifyLifecycleEvent : generated.v1_5.ClockifyLifecycleEvent;
+export type ClockifyLifecycleEvent<V extends ClockifySchemaVersion = "1.4"> = V extends "1.2" ? generated.v1_2.ClockifyLifecycleEvent : V extends "1.3" ? generated.v1_3.ClockifyLifecycleEvent : V extends "1.4" ? generated.v1_4.ClockifyLifecycleEvent : V extends "1.5" ? generated.v1_5.ClockifyLifecycleEvent : generated.v1_6.ClockifyLifecycleEvent;
 export declare const ClockifyLifecycleEvent: {
     v1_2Builder: typeof generated.v1_2.ClockifyLifecycleEvent.builder;
     v1_3Builder: typeof generated.v1_3.ClockifyLifecycleEvent.builder;
     v1_4Builder: typeof generated.v1_4.ClockifyLifecycleEvent.builder;
     v1_5Builder: typeof generated.v1_5.ClockifyLifecycleEvent.builder;
+    v1_6Builder: typeof generated.v1_6.ClockifyLifecycleEvent.builder;
 };
-export type ClockifyComponent<V extends ClockifySchemaVersion = "1.4"> = V extends "1.2" ? generated.v1_2.ClockifyComponent : V extends "1.3" ? generated.v1_3.ClockifyComponent : V extends "1.4" ? generated.v1_4.ClockifyComponent : generated.v1_5.ClockifyComponent;
+export type ClockifyComponent<V extends ClockifySchemaVersion = "1.4"> = V extends "1.2" ? generated.v1_2.ClockifyComponent : V extends "1.3" ? generated.v1_3.ClockifyComponent : V extends "1.4" ? generated.v1_4.ClockifyComponent : V extends "1.5" ? generated.v1_5.ClockifyComponent : generated.v1_6.ClockifyComponent;
 export declare const ClockifyComponent: {
     v1_2Builder: typeof generated.v1_2.ClockifyComponent.builder;
     v1_3Builder: typeof generated.v1_3.ClockifyComponent.builder;
     v1_4Builder: typeof generated.v1_4.ClockifyComponent.builder;
     v1_5Builder: typeof generated.v1_5.ClockifyComponent.builder;
+    v1_6Builder: typeof generated.v1_6.ClockifyComponent.builder;
 };
-export type ClockifySetting<V extends ClockifySchemaVersion = "1.4"> = V extends "1.2" ? generated.v1_2.ClockifySetting : V extends "1.3" ? generated.v1_3.ClockifySetting : V extends "1.4" ? generated.v1_4.ClockifySetting : generated.v1_5.ClockifySetting;
+export type ClockifySetting<V extends ClockifySchemaVersion = "1.4"> = V extends "1.2" ? generated.v1_2.ClockifySetting : V extends "1.3" ? generated.v1_3.ClockifySetting : V extends "1.4" ? generated.v1_4.ClockifySetting : V extends "1.5" ? generated.v1_5.ClockifySetting : generated.v1_6.ClockifySetting;
 export declare const ClockifySetting: {
     v1_2Builder: typeof generated.v1_2.ClockifySetting.builder;
     v1_3Builder: typeof generated.v1_3.ClockifySetting.builder;
     v1_4Builder: typeof generated.v1_4.ClockifySetting.builder;
     v1_5Builder: typeof generated.v1_5.ClockifySetting.builder;
+    v1_6Builder: typeof generated.v1_6.ClockifySetting.builder;
 };
-export type ClockifySettingsHeader<V extends ClockifySchemaVersion = "1.4"> = V extends "1.2" ? generated.v1_2.ClockifySettingsHeader : V extends "1.3" ? generated.v1_3.ClockifySettingsHeader : V extends "1.4" ? generated.v1_4.ClockifySettingsHeader : generated.v1_5.ClockifySettingsHeader;
+export type ClockifySettingsHeader<V extends ClockifySchemaVersion = "1.4"> = V extends "1.2" ? generated.v1_2.ClockifySettingsHeader : V extends "1.3" ? generated.v1_3.ClockifySettingsHeader : V extends "1.4" ? generated.v1_4.ClockifySettingsHeader : V extends "1.5" ? generated.v1_5.ClockifySettingsHeader : generated.v1_6.ClockifySettingsHeader;
 export declare const ClockifySettingsHeader: {
     v1_2Builder: typeof generated.v1_2.ClockifySettingsHeader.builder;
     v1_3Builder: typeof generated.v1_3.ClockifySettingsHeader.builder;
     v1_4Builder: typeof generated.v1_4.ClockifySettingsHeader.builder;
     v1_5Builder: typeof generated.v1_5.ClockifySettingsHeader.builder;
+    v1_6Builder: typeof generated.v1_6.ClockifySettingsHeader.builder;
 };
-export type ClockifySettingsGroup<V extends ClockifySchemaVersion = "1.4"> = V extends "1.2" ? generated.v1_2.ClockifySettingsGroup : V extends "1.3" ? generated.v1_3.ClockifySettingsGroup : V extends "1.4" ? generated.v1_4.ClockifySettingsGroup : generated.v1_5.ClockifySettingsGroup;
+export type ClockifySettingsGroup<V extends ClockifySchemaVersion = "1.4"> = V extends "1.2" ? generated.v1_2.ClockifySettingsGroup : V extends "1.3" ? generated.v1_3.ClockifySettingsGroup : V extends "1.4" ? generated.v1_4.ClockifySettingsGroup : V extends "1.5" ? generated.v1_5.ClockifySettingsGroup : generated.v1_6.ClockifySettingsGroup;
 export declare const ClockifySettingsGroup: {
     v1_2Builder: typeof generated.v1_2.ClockifySettingsGroup.builder;
     v1_3Builder: typeof generated.v1_3.ClockifySettingsGroup.builder;
     v1_4Builder: typeof generated.v1_4.ClockifySettingsGroup.builder;
     v1_5Builder: typeof generated.v1_5.ClockifySettingsGroup.builder;
+    v1_6Builder: typeof generated.v1_6.ClockifySettingsGroup.builder;
 };
-export type ClockifySettingsTab<V extends ClockifySchemaVersion = "1.4"> = V extends "1.2" ? generated.v1_2.ClockifySettingsTab : V extends "1.3" ? generated.v1_3.ClockifySettingsTab : V extends "1.4" ? generated.v1_4.ClockifySettingsTab : generated.v1_5.ClockifySettingsTab;
+export type ClockifySettingsTab<V extends ClockifySchemaVersion = "1.4"> = V extends "1.2" ? generated.v1_2.ClockifySettingsTab : V extends "1.3" ? generated.v1_3.ClockifySettingsTab : V extends "1.4" ? generated.v1_4.ClockifySettingsTab : V extends "1.5" ? generated.v1_5.ClockifySettingsTab : generated.v1_6.ClockifySettingsTab;
 export declare const ClockifySettingsTab: {
     v1_2Builder: typeof generated.v1_2.ClockifySettingsTab.builder;
     v1_3Builder: typeof generated.v1_3.ClockifySettingsTab.builder;
     v1_4Builder: typeof generated.v1_4.ClockifySettingsTab.builder;
     v1_5Builder: typeof generated.v1_5.ClockifySettingsTab.builder;
+    v1_6Builder: typeof generated.v1_6.ClockifySettingsTab.builder;
 };
-export type ClockifySettings<V extends ClockifySchemaVersion = "1.4"> = V extends "1.2" ? generated.v1_2.ClockifySettings : V extends "1.3" ? generated.v1_3.ClockifySettings : V extends "1.4" ? generated.v1_4.ClockifySettings : generated.v1_5.ClockifySettings;
+export type ClockifySettings<V extends ClockifySchemaVersion = "1.4"> = V extends "1.2" ? generated.v1_2.ClockifySettings : V extends "1.3" ? generated.v1_3.ClockifySettings : V extends "1.4" ? generated.v1_4.ClockifySettings : V extends "1.5" ? generated.v1_5.ClockifySettings : generated.v1_6.ClockifySettings;
 export declare const ClockifySettings: {
     v1_2Builder: typeof generated.v1_2.ClockifySettings.builder;
     v1_3Builder: typeof generated.v1_3.ClockifySettings.builder;
     v1_4Builder: typeof generated.v1_4.ClockifySettings.builder;
     v1_5Builder: typeof generated.v1_5.ClockifySettings.builder;
+    v1_6Builder: typeof generated.v1_6.ClockifySettings.builder;
 };
 export declare const ClockifyScope: {
     readonly CLIENT_READ: "CLIENT_READ";
@@ -682,12 +786,24 @@ export declare function assertClockifyManifest(value: unknown): asserts value is
 import type { AddonResponse } from "../shared/response.js";
 /** Options for the SDK's browser-facing response security baseline. */
 export interface ClockifySecurityHeaderOptions {
+    /**
+     * CSP `frame-ancestors` values. Omitting this defaults to `["'none'"]` —
+     * deny all embedding, including Clockify's own iframe. Pass the exact
+     * verified Clockify parent origin (e.g. `[parentOrigin]`) to allow the
+     * component to actually load inside Clockify.
+     */
     readonly frameAncestors?: readonly string[];
     readonly contentSecurityPolicy?: Readonly<Record<string, readonly string[]>>;
 }
 /** Builds the secure default headers for Clockify iframe HTML and browser-facing JSON. */
 export declare function buildClockifySecurityHeaders(options?: ClockifySecurityHeaderOptions): Record<string, string>;
-/** Creates a no-store HTML response with the SDK security baseline. */
+/**
+ * Creates a no-store HTML response with the SDK security baseline.
+ *
+ * @param options.frameAncestors Omit this and the response denies all embedding — the iframe
+ * will NOT load in Clockify. Pass `[parentOrigin]` (the exact verified Clockify parent origin)
+ * for a component response that Clockify actually embeds.
+ */
 export declare function createClockifyHtmlResponse(body: string, options?: ClockifySecurityHeaderOptions & {
     readonly status?: number;
 }): AddonResponse;
@@ -762,8 +878,24 @@ export interface ClockifyTokenCodec {
 }
 /** Creates an AES-256-GCM token codec backed exclusively by Web Crypto. */
 export declare function createClockifyAesGcmTokenCodec(key: ClockifyAesGcmKey): ClockifyTokenCodec;
-/** Wraps a store so installation and nested webhook credentials are encrypted at rest. */
-export declare function wrapClockifyInstallationStoreWithEncryption(store: ClockifyInstallationStore, codec: ClockifyTokenCodec): ClockifyInstallationStore;
+/**
+ * Composes two codecs to support key rotation without a storage migration.
+ * Encodes only with `newCodec`; decodes by trying `newCodec` first, falling
+ * back to `oldCodec` for a row encrypted before the rotation. Once every
+ * stored row has been re-saved (and so re-encrypted with the new key), drop
+ * `oldCodec` and use `newCodec` alone. See the public-key-rotation
+ * deployment guide for the equivalent recipe applied to signature keys.
+ */
+export declare function createRotatingClockifyTokenCodec(newCodec: ClockifyTokenCodec, oldCodec: ClockifyTokenCodec): ClockifyTokenCodec;
+/**
+ * Wraps a store so installation and nested webhook credentials are encrypted at rest.
+ *
+ * A `load()` whose stored row fails to decode (wrong key, tampering, corruption) returns `null`,
+ * the same result as "no installation" — the caller must fail closed either way. Pass
+ * `onDecodeError` to observe the difference for operational alerting; it does not change what
+ * `load()` returns.
+ */
+export declare function wrapClockifyInstallationStoreWithEncryption(store: ClockifyInstallationStore, codec: ClockifyTokenCodec, onDecodeError?: (error: unknown, workspaceId: string, addonId: string) => void): ClockifyInstallationStore;
 ```
 
 ### clockify/clockify-webhook-idempotency.d.ts
@@ -775,7 +907,13 @@ export interface ClockifyIdempotencyLeaseStore {
     complete(key: string, owner: string): Promise<boolean>;
     release(key: string, owner: string): Promise<boolean>;
 }
-/** In-memory lease store for tests and single-process deployments. */
+/**
+ * In-memory lease store for tests and single-process deployments. Completed
+ * entries are retained forever (no TTL) so a replayed webhook is always
+ * recognized as a duplicate; a long-lived process therefore grows this map
+ * without bound. Use a durable store with a TTL on completed entries for
+ * production.
+ */
 export declare class InMemoryClockifyIdempotencyLeaseStore implements ClockifyIdempotencyLeaseStore {
     private readonly leases;
     private readonly now;
@@ -808,6 +946,7 @@ export * as v1_2 from "./v1_2.js";
 export * as v1_3 from "./v1_3.js";
 export * as v1_4 from "./v1_4.js";
 export * as v1_5 from "./v1_5.js";
+export * as v1_6 from "./v1_6.js";
 export { clockifyManifestSchemas } from "./manifest-schemas.js";
 ```
 
@@ -874,7 +1013,7 @@ export interface ClockifyComponent extends ClockifyResource {
     /** Specifies which kind of component will be rendered. If component is 'tab', it also comes with the name of Clockify page where 'tab' component will be rendered. */
     readonly type: "sidebar" | "widget" | "timeoff.tab" | "schedule.tab" | "approvals.tab" | "reports.tab" | "activity.tab" | "team.tab" | "projects.tab";
     /** If you want to define some component-specific options for component that holds your addon app, this is the place to define them. */
-    readonly options?: Record<string, any>;
+    readonly options?: Record<string, unknown>;
     /** Label of the component e.g. if component is 'tab', value of 'label' property will be shown in UI. Label is not required for WIDGET component type. */
     readonly label?: string;
     /** Specifies who can access addon component. You can either choose to give access only to Clockify workspace admins, or everyone. */
@@ -1132,7 +1271,7 @@ export interface ClockifyComponentBuilder_path {
 }
 export interface ClockifyComponentBuilder_Optional {
     /** If you want to define some component-specific options for component that holds your addon app, this is the place to define them. */
-    options(value: Record<string, any>): ClockifyComponentBuilder_Optional;
+    options(value: Record<string, unknown>): ClockifyComponentBuilder_Optional;
     /** Label of the component e.g. if component is 'tab', value of 'label' property will be shown in UI. Label is not required for WIDGET component type. */
     label(value: string): ClockifyComponentBuilder_Optional;
     /** Path to addon hosted image which will serve as an icon for Clockify component. Path is part of the url from which the image will be served. Full url is constructed by concatenating addon 'baseUrl' and path. */
@@ -1386,7 +1525,7 @@ export interface ClockifyComponent extends ClockifyResource {
     /** Specifies which kind of component will be rendered. If component is 'tab', it also comes with the name of Clockify page where 'tab' component will be rendered. */
     readonly type: "sidebar" | "widget" | "timeoff.tab" | "schedule.tab" | "approvals.tab" | "reports.tab" | "activity.tab" | "team.tab" | "projects.tab";
     /** If you want to define some component-specific options for component that holds your addon app, this is the place to define them. */
-    readonly options?: Record<string, any>;
+    readonly options?: Record<string, unknown>;
     /** Label of the component e.g. if component is 'tab', value of 'label' property will be shown in UI. Label is not required for WIDGET component type. */
     readonly label: string;
     /** Specifies who can access addon component. You can either choose to give access only to Clockify workspace admins, or everyone. */
@@ -1608,7 +1747,7 @@ export interface ClockifyComponentBuilder_label {
 }
 export interface ClockifyComponentBuilder_Optional {
     /** If you want to define some component-specific options for component that holds your addon app, this is the place to define them. */
-    options(value: Record<string, any>): ClockifyComponentBuilder_Optional;
+    options(value: Record<string, unknown>): ClockifyComponentBuilder_Optional;
     /** Path to addon hosted image which will serve as an icon for Clockify component. Path is part of the url from which the image will be served. Full url is constructed by concatenating addon 'baseUrl' and path. */
     iconPath(value: string): ClockifyComponentBuilder_Optional;
     /** Defines rendered component width expressed in 'vw'. Applicable only to WIDGET components. */
@@ -1858,7 +1997,7 @@ export interface ClockifyComponent extends ClockifyResource {
     /** Specifies which kind of component will be rendered. If component is 'tab', it also comes with the name of Clockify page where 'tab' component will be rendered. */
     readonly type: "sidebar" | "widget" | "timeoff.tab" | "schedule.tab" | "approvals.tab" | "reports.tab" | "activity.tab" | "team.tab" | "projects.tab" | "invoices.action";
     /** If you want to define some component-specific options for component that holds your addon app, this is the place to define them. */
-    readonly options?: Record<string, any>;
+    readonly options?: Record<string, unknown>;
     /** Label of the component e.g. if component is 'tab', value of 'label' property will be shown in UI. Label is not required for WIDGET component type. */
     readonly label: string;
     /** Specifies who can access addon component. You can either choose to give access only to Clockify workspace admins, or everyone. */
@@ -2082,7 +2221,7 @@ export interface ClockifyComponentBuilder_label {
 }
 export interface ClockifyComponentBuilder_Optional {
     /** If you want to define some component-specific options for component that holds your addon app, this is the place to define them. */
-    options(value: Record<string, any>): ClockifyComponentBuilder_Optional;
+    options(value: Record<string, unknown>): ClockifyComponentBuilder_Optional;
     /** Path to addon hosted image which will serve as an icon for Clockify component. Path is part of the url from which the image will be served. Full url is constructed by concatenating addon 'baseUrl' and path. */
     iconPath(value: string): ClockifyComponentBuilder_Optional;
     /** Defines rendered component width expressed in 'vw'. Applicable only to WIDGET components. */
@@ -2332,7 +2471,7 @@ export interface ClockifyComponent extends ClockifyResource {
     /** Specifies which kind of component will be rendered. If component is 'tab', it also comes with the name of Clockify page where 'tab' component will be rendered. */
     readonly type: "sidebar" | "widget" | "timeoff.tab" | "schedule.tab" | "approvals.tab" | "reports.tab" | "activity.tab" | "team.tab" | "projects.tab" | "invoices.action";
     /** If you want to define some component-specific options for component that holds your addon app, this is the place to define them. */
-    readonly options?: Record<string, any>;
+    readonly options?: Record<string, unknown>;
     /** Label of the component e.g. if component is 'tab', value of 'label' property will be shown in UI. Label is not required for WIDGET component type. */
     readonly label: string;
     /** Specifies who can access addon component. You can either choose to give access only to Clockify workspace admins, or everyone. */
@@ -2612,7 +2751,541 @@ export interface ClockifyComponentBuilder_label {
 }
 export interface ClockifyComponentBuilder_Optional {
     /** If you want to define some component-specific options for component that holds your addon app, this is the place to define them. */
-    options(value: Record<string, any>): ClockifyComponentBuilder_Optional;
+    options(value: Record<string, unknown>): ClockifyComponentBuilder_Optional;
+    /** Path to addon hosted image which will serve as an icon for Clockify component. Path is part of the url from which the image will be served. Full url is constructed by concatenating addon 'baseUrl' and path. */
+    iconPath(value: string): ClockifyComponentBuilder_Optional;
+    /** Defines rendered component width expressed in 'vw'. Applicable only to WIDGET components. */
+    width(value: number): ClockifyComponentBuilder_Optional;
+    /** Defines rendered component height expressed in 'vw'. Applicable only to WIDGET components. */
+    height(value: number): ClockifyComponentBuilder_Optional;
+    build(): ClockifyComponent;
+}
+export declare namespace ClockifyComponent {
+    function builder(): ClockifyComponentBuilder_type;
+}
+export declare function ClockifyComponentBuilder(): ClockifyComponentBuilder_type;
+export interface ClockifySettingBuilder_id {
+    /** Setting unique identifier. */
+    id(value: string): ClockifySettingBuilder_name;
+}
+export interface ClockifySettingBuilder_name {
+    /** Setting name. */
+    name(value: string): ClockifySettingBuilder_accessLevel;
+}
+export interface ClockifySettingBuilder_accessLevel {
+    /** Specifies who can access addon settings. You can either choose to give access only to Clockify workspace admins, or everyone. */
+    accessLevel(value: "ADMINS" | "EVERYONE"): ClockifySettingBuilder_type;
+    /** Specifies who can access addon settings. You can either choose to give access only to Clockify workspace admins, or everyone. */
+    allowAdmins(): ClockifySettingBuilder_type;
+    /** Specifies who can access addon settings. You can either choose to give access only to Clockify workspace admins, or everyone. */
+    allowEveryone(): ClockifySettingBuilder_type;
+}
+export interface ClockifySettingBuilder_type {
+    /** Specifies setting value type. Each type is shown differently in UI and value must be compatible with a specified type e.g. if 'type' is TXT, 'value' must be 'string', if 'type' is DROPDOWN, 'value' must be 'array'. */
+    type(value: "TXT" | "NUMBER" | "DROPDOWN_SINGLE" | "DROPDOWN_MULTIPLE" | "CHECKBOX" | "LINK" | "USER_DROPDOWN_SINGLE" | "USER_DROPDOWN_MULTIPLE"): ClockifySettingBuilder_value;
+    /** Specifies setting value type. Each type is shown differently in UI and value must be compatible with a specified type e.g. if 'type' is TXT, 'value' must be 'string', if 'type' is DROPDOWN, 'value' must be 'array'. */
+    asTxt(): ClockifySettingBuilder_value;
+    /** Specifies setting value type. Each type is shown differently in UI and value must be compatible with a specified type e.g. if 'type' is TXT, 'value' must be 'string', if 'type' is DROPDOWN, 'value' must be 'array'. */
+    asNumber(): ClockifySettingBuilder_value;
+    /** Specifies setting value type. Each type is shown differently in UI and value must be compatible with a specified type e.g. if 'type' is TXT, 'value' must be 'string', if 'type' is DROPDOWN, 'value' must be 'array'. */
+    asDropdownSingle(): ClockifySettingBuilder_value;
+    /** Specifies setting value type. Each type is shown differently in UI and value must be compatible with a specified type e.g. if 'type' is TXT, 'value' must be 'string', if 'type' is DROPDOWN, 'value' must be 'array'. */
+    asDropdownMultiple(): ClockifySettingBuilder_value;
+    /** Specifies setting value type. Each type is shown differently in UI and value must be compatible with a specified type e.g. if 'type' is TXT, 'value' must be 'string', if 'type' is DROPDOWN, 'value' must be 'array'. */
+    asCheckbox(): ClockifySettingBuilder_value;
+    /** Specifies setting value type. Each type is shown differently in UI and value must be compatible with a specified type e.g. if 'type' is TXT, 'value' must be 'string', if 'type' is DROPDOWN, 'value' must be 'array'. */
+    asLink(): ClockifySettingBuilder_value;
+    /** Specifies setting value type. Each type is shown differently in UI and value must be compatible with a specified type e.g. if 'type' is TXT, 'value' must be 'string', if 'type' is DROPDOWN, 'value' must be 'array'. */
+    asUserDropdownSingle(): ClockifySettingBuilder_value;
+    /** Specifies setting value type. Each type is shown differently in UI and value must be compatible with a specified type e.g. if 'type' is TXT, 'value' must be 'string', if 'type' is DROPDOWN, 'value' must be 'array'. */
+    asUserDropdownMultiple(): ClockifySettingBuilder_value;
+}
+export interface ClockifySettingBuilder_value {
+    /** Value of the setting. Value must be of type 'setting.type' e.g. For USER_DROPDOWN, value will be the user ID of the installer upon installation. */
+    value(value: string | number | any[] | boolean): ClockifySettingBuilder_Optional;
+}
+export interface ClockifySettingBuilder_Optional {
+    /** Brief description of setting. What is it used for, what does it affect, etc. */
+    description(value: string): ClockifySettingBuilder_Optional;
+    /** Text that is shown in UI form field if setting has no value. */
+    placeholder(value: string): ClockifySettingBuilder_Optional;
+    /** Serves as key for setting that represents key-value pair e.g. if you have documentation addon which shows document corresponding to the Clockify page i.e. you need to match the Clockify page to the url of the document describing how to use that page. In that case, key would be 'Clockify page', and 'value' would be 'url of the document'. */
+    key(value: string): ClockifySettingBuilder_Optional;
+    /** Required if 'setting.type' is DROPDOWN_SINGLE or DROPDOWN_MULTIPLE. Specifies which options will be shown in dropdown. */
+    allowedValues(value: string[]): ClockifySettingBuilder_Optional;
+    /** Toggles whether setting value is required or not. */
+    required(value: boolean): ClockifySettingBuilder_Optional;
+    /** Toggles whether setting value will be shown with 'Copy' button for easier copying. */
+    copyable(value: boolean): ClockifySettingBuilder_Optional;
+    /** Toggles whether setting value is read-only i.e. setting value cannot be updated. */
+    readOnly(value: boolean): ClockifySettingBuilder_Optional;
+    build(): ClockifySetting;
+}
+export declare namespace ClockifySetting {
+    function builder(): ClockifySettingBuilder_id;
+}
+export declare function ClockifySettingBuilder(): ClockifySettingBuilder_id;
+export interface ClockifySettingsHeaderBuilder_title {
+    /** Text shown in banner. */
+    title(value: string): ClockifySettingsHeaderBuilder_Build;
+}
+export interface ClockifySettingsHeaderBuilder_Build {
+    build(): ClockifySettingsHeader;
+}
+export declare namespace ClockifySettingsHeader {
+    function builder(): ClockifySettingsHeaderBuilder_title;
+}
+export declare function ClockifySettingsHeaderBuilder(): ClockifySettingsHeaderBuilder_title;
+export interface ClockifySettingsGroupBuilder_id {
+    /** Group identifier. */
+    id(value: string): ClockifySettingsGroupBuilder_title;
+}
+export interface ClockifySettingsGroupBuilder_title {
+    /** Group title. Shown in UI. */
+    title(value: string): ClockifySettingsGroupBuilder_settings;
+}
+export interface ClockifySettingsGroupBuilder_settings {
+    /** List of settings the group contains */
+    settings(value: ClockifySetting[]): ClockifySettingsGroupBuilder_Optional;
+}
+export interface ClockifySettingsGroupBuilder_Optional {
+    /** Brief description of the settings that given group contains. */
+    description(value: string): ClockifySettingsGroupBuilder_Optional;
+    /** Banner with info text shown before all settings that given group contains. */
+    header(value: ClockifySettingsHeader): ClockifySettingsGroupBuilder_Optional;
+    build(): ClockifySettingsGroup;
+}
+export declare namespace ClockifySettingsGroup {
+    function builder(): ClockifySettingsGroupBuilder_id;
+}
+export declare function ClockifySettingsGroupBuilder(): ClockifySettingsGroupBuilder_id;
+export interface ClockifySettingsTabBuilder_id {
+    /** Tab identifier. */
+    id(value: string): ClockifySettingsTabBuilder_name;
+}
+export interface ClockifySettingsTabBuilder_name {
+    /** Tab name shown in UI. */
+    name(value: string): ClockifySettingsTabBuilder_Optional;
+}
+export interface ClockifySettingsTabBuilder_Optional {
+    /** Banner with info text shown before all settings and groups contained in tab. */
+    header(value: ClockifySettingsHeader): ClockifySettingsTabBuilder_Optional;
+    /** List of setting groups contained in tab. */
+    groups(value: ClockifySettingsGroup[]): ClockifySettingsTabBuilder_Optional;
+    /** List of settings contained in tab */
+    settings(value: ClockifySetting[]): ClockifySettingsTabBuilder_Optional;
+    build(): ClockifySettingsTab;
+}
+export declare namespace ClockifySettingsTab {
+    function builder(): ClockifySettingsTabBuilder_id;
+}
+export declare function ClockifySettingsTabBuilder(): ClockifySettingsTabBuilder_id;
+export interface ClockifySettingsBuilder_tabs {
+    tabs(value: ClockifySettingsTab[]): ClockifySettingsBuilder_Build;
+}
+export interface ClockifySettingsBuilder_Build {
+    build(): ClockifySettings;
+}
+export declare namespace ClockifySettings {
+    function builder(): ClockifySettingsBuilder_tabs;
+}
+export declare function ClockifySettingsBuilder(): ClockifySettingsBuilder_tabs;
+export interface ClockifyManifestBuilder_key {
+    /** Serves as addon identifier. All addons must have unique key. */
+    key(value: string): ClockifyManifestBuilder_name;
+}
+export interface ClockifyManifestBuilder_name {
+    /** Addon name */
+    name(value: string): ClockifyManifestBuilder_baseUrl;
+}
+export interface ClockifyManifestBuilder_baseUrl {
+    /** Base url on which addon app is hosted. This url with 'path' from the following entities is used when constructing urls for webhooks, components, lifecycle hooks, etc. */
+    baseUrl(value: string): ClockifyManifestBuilder_minimalSubscriptionPlan;
+}
+export interface ClockifyManifestBuilder_minimalSubscriptionPlan {
+    /** Minimal Clockify's subscription plan that is required for addon. This plan is used when checking if user's current plan is at least equal to the plan required by addon. */
+    minimalSubscriptionPlan(value: ClockifyMinimalSubscriptionPlan): ClockifyManifestBuilder_Optional;
+    /** Minimal Clockify's subscription plan that is required for addon. This plan is used when checking if user's current plan is at least equal to the plan required by addon. */
+    requireFreePlan(): ClockifyManifestBuilder_Optional;
+    /** Minimal Clockify's subscription plan that is required for addon. This plan is used when checking if user's current plan is at least equal to the plan required by addon. */
+    requireBasicPlan(): ClockifyManifestBuilder_Optional;
+    /** Minimal Clockify's subscription plan that is required for addon. This plan is used when checking if user's current plan is at least equal to the plan required by addon. */
+    requireStandardPlan(): ClockifyManifestBuilder_Optional;
+    /** Minimal Clockify's subscription plan that is required for addon. This plan is used when checking if user's current plan is at least equal to the plan required by addon. */
+    requireProPlan(): ClockifyManifestBuilder_Optional;
+    /** Minimal Clockify's subscription plan that is required for addon. This plan is used when checking if user's current plan is at least equal to the plan required by addon. */
+    requireEnterprisePlan(): ClockifyManifestBuilder_Optional;
+}
+export interface ClockifyManifestBuilder_Optional {
+    /** API scopes that addon is using. */
+    scopes(value: ClockifyScope[]): ClockifyManifestBuilder_Optional;
+    /** Brief description of given addon functionalities and purpose. */
+    description(value: string): ClockifyManifestBuilder_Optional;
+    /** Path to addon icon. Path is part of the url where image icon is being hosted. Full url is constructed by concatenating addon 'baseUrl' and path. */
+    iconPath(value: string): ClockifyManifestBuilder_Optional;
+    /** List of defined lifecycle hooks for given addon. */
+    lifecycle(value: ClockifyLifecycleEvent[]): ClockifyManifestBuilder_Optional;
+    /** List of defined webhooks for given addon. */
+    webhooks(value: ClockifyWebhook[]): ClockifyManifestBuilder_Optional;
+    /** List of defined components for given addon. */
+    components(value: ClockifyComponent[]): ClockifyManifestBuilder_Optional;
+    settings(value: string | ClockifySettings): ClockifyManifestBuilder_Optional;
+    build(): ClockifyManifest;
+}
+export declare namespace ClockifyManifest {
+    function builder(): ClockifyManifestBuilder_key;
+}
+export declare function ClockifyManifestBuilder(): ClockifyManifestBuilder_key;
+```
+
+### clockify/generated/v1_6.d.ts
+
+```ts
+import { ClockifyResource } from "../clockify-resource.js";
+export declare const ClockifyScope: {
+    readonly CLIENT_READ: "CLIENT_READ";
+    readonly CLIENT_WRITE: "CLIENT_WRITE";
+    readonly PROJECT_READ: "PROJECT_READ";
+    readonly PROJECT_WRITE: "PROJECT_WRITE";
+    readonly TAG_READ: "TAG_READ";
+    readonly TAG_WRITE: "TAG_WRITE";
+    readonly TASK_READ: "TASK_READ";
+    readonly TASK_WRITE: "TASK_WRITE";
+    readonly TIME_ENTRY_READ: "TIME_ENTRY_READ";
+    readonly TIME_ENTRY_WRITE: "TIME_ENTRY_WRITE";
+    readonly EXPENSE_READ: "EXPENSE_READ";
+    readonly EXPENSE_WRITE: "EXPENSE_WRITE";
+    readonly INVOICE_READ: "INVOICE_READ";
+    readonly INVOICE_WRITE: "INVOICE_WRITE";
+    readonly USER_READ: "USER_READ";
+    readonly USER_WRITE: "USER_WRITE";
+    readonly GROUP_READ: "GROUP_READ";
+    readonly GROUP_WRITE: "GROUP_WRITE";
+    readonly WORKSPACE_READ: "WORKSPACE_READ";
+    readonly WORKSPACE_WRITE: "WORKSPACE_WRITE";
+    readonly CUSTOM_FIELDS_READ: "CUSTOM_FIELDS_READ";
+    readonly CUSTOM_FIELDS_WRITE: "CUSTOM_FIELDS_WRITE";
+    readonly APPROVAL_READ: "APPROVAL_READ";
+    readonly APPROVAL_WRITE: "APPROVAL_WRITE";
+    readonly SCHEDULING_READ: "SCHEDULING_READ";
+    readonly SCHEDULING_WRITE: "SCHEDULING_WRITE";
+    readonly REPORTS_READ: "REPORTS_READ";
+    readonly REPORTS_WRITE: "REPORTS_WRITE";
+    readonly TIME_OFF_READ: "TIME_OFF_READ";
+    readonly TIME_OFF_WRITE: "TIME_OFF_WRITE";
+};
+export type ClockifyScope = typeof ClockifyScope[keyof typeof ClockifyScope];
+export declare const ClockifyMinimalSubscriptionPlan: {
+    readonly FREE: "FREE";
+    readonly BASIC: "BASIC";
+    readonly STANDARD: "STANDARD";
+    readonly PRO: "PRO";
+    readonly ENTERPRISE: "ENTERPRISE";
+};
+export type ClockifyMinimalSubscriptionPlan = typeof ClockifyMinimalSubscriptionPlan[keyof typeof ClockifyMinimalSubscriptionPlan];
+export interface ClockifyWebhook extends ClockifyResource {
+    /** Clockify event that triggers webhook is sending to specified url. Url is constructed by concatenating addon 'baseUrl' and 'webhook.path'. */
+    readonly event: "APPROVAL_REQUEST_STATUS_UPDATED" | "ASSIGNMENT_CREATED" | "ASSIGNMENT_DELETED" | "ASSIGNMENT_PUBLISHED" | "ASSIGNMENT_UPDATED" | "BALANCE_UPDATED" | "BILLABLE_RATE_UPDATED" | "CLIENT_DELETED" | "CLIENT_UPDATED" | "COST_RATE_UPDATED" | "EXPENSE_CREATED" | "EXPENSE_DELETED" | "EXPENSE_RESTORED" | "EXPENSE_UPDATED" | "INVOICE_UPDATED" | "LIMITED_USERS_ADDED_TO_WORKSPACE" | "NEW_APPROVAL_REQUEST" | "NEW_CLIENT" | "NEW_INVOICE" | "NEW_PROJECT" | "NEW_TAG" | "NEW_TASK" | "NEW_TIME_ENTRY" | "NEW_TIMER_STARTED" | "PROJECT_DELETED" | "PROJECT_UPDATED" | "TAG_DELETED" | "TAG_UPDATED" | "TASK_DELETED" | "TASK_UPDATED" | "TIME_ENTRY_DELETED" | "TIME_ENTRY_RESTORED" | "TIME_ENTRY_SPLIT" | "TIME_ENTRY_UPDATED" | "TIME_OFF_REQUEST_APPROVED" | "TIME_OFF_REQUEST_REJECTED" | "TIME_OFF_REQUEST_STARTED" | "TIME_OFF_REQUEST_UPDATED" | "TIME_OFF_REQUEST_WITHDRAWN" | "TIME_OFF_REQUESTED" | "TIMER_STOPPED" | "USER_ACTIVATED_ON_WORKSPACE" | "USER_DEACTIVATED_ON_WORKSPACE" | "USER_DELETED_FROM_WORKSPACE" | "USER_EMAIL_CHANGED" | "USER_GROUP_CREATED" | "USER_GROUP_DELETED" | "USER_GROUP_UPDATED" | "USER_JOINED_WORKSPACE" | "USER_UPDATED" | "USERS_INVITED_TO_WORKSPACE";
+    /** Path to addon endpoint designated for receiving webhooks from Clockify side. Path is just part of url to which webhook will be sent. Full url is constructed by concatenating addon 'baseUrl' and path. */
+    readonly path: string;
+}
+/** Specialized webhook triggered on addon lifecycle event. */
+export interface ClockifyLifecycleEvent extends ClockifyResource {
+    /** Path to addon endpoint designated for receiving lifecycle hooks from Clockify side. Path is just part of url to which a lifecycle hook will be sent. Full url is constructed by concatenating addon 'baseUrl' and path. */
+    readonly path: string;
+    /** Specifies addon lifecycle event you want to be notified by Clockify. */
+    readonly type: "INSTALLED" | "DELETED" | "SETTINGS_UPDATED" | "STATUS_CHANGED";
+}
+/** UI element shown in Clockify web app. It serves as a placeholder for addon app i.e. addon app will be rendered inside Clockify component. */
+export interface ClockifyComponent extends ClockifyResource {
+    /** Specifies which kind of component will be rendered. If component is 'tab', it also comes with the name of Clockify page where 'tab' component will be rendered. */
+    readonly type: "sidebar" | "widget" | "timeoff.tab" | "schedule.tab" | "approvals.tab" | "reports.tab" | "activity.tab" | "team.tab" | "projects.tab" | "invoices.action" | "timeentries.action.uiblocks";
+    /** If you want to define some component-specific options for component that holds your addon app, this is the place to define them. */
+    readonly options?: Record<string, unknown>;
+    /** Label of the component e.g. if component is 'tab', value of 'label' property will be shown in UI. Label is not required for WIDGET component type. */
+    readonly label: string;
+    /** Specifies who can access addon component. You can either choose to give access only to Clockify workspace admins, or everyone. */
+    readonly accessLevel: "ADMINS" | "EVERYONE";
+    /** Path to addon web app that will be rendered inside Clockify component. Path is part of the url from which component content will be served. Full url is constructed by concatenating addon 'baseUrl' and path. */
+    readonly path: string;
+    /** Path to addon hosted image which will serve as an icon for Clockify component. Path is part of the url from which the image will be served. Full url is constructed by concatenating addon 'baseUrl' and path. */
+    readonly iconPath?: string;
+    /** Defines rendered component width expressed in 'vw'. Applicable only to WIDGET components. */
+    readonly width?: number;
+    /** Defines rendered component height expressed in 'vw'. Applicable only to WIDGET components. */
+    readonly height?: number;
+}
+/** This is definition of Clockify addon setting. Each setting must have id, name, type and value. Value and type of setting must be compatible. */
+export interface ClockifySetting {
+    /** Setting unique identifier. */
+    readonly id: string;
+    /** Setting name. */
+    readonly name: string;
+    /** Brief description of setting. What is it used for, what does it affect, etc. */
+    readonly description?: string;
+    /** Text that is shown in UI form field if setting has no value. */
+    readonly placeholder?: string;
+    /** Specifies who can access addon settings. You can either choose to give access only to Clockify workspace admins, or everyone. */
+    readonly accessLevel: "ADMINS" | "EVERYONE";
+    /** Specifies setting value type. Each type is shown differently in UI and value must be compatible with a specified type e.g. if 'type' is TXT, 'value' must be 'string', if 'type' is DROPDOWN, 'value' must be 'array'. */
+    readonly type: "TXT" | "NUMBER" | "DROPDOWN_SINGLE" | "DROPDOWN_MULTIPLE" | "CHECKBOX" | "LINK" | "USER_DROPDOWN_SINGLE" | "USER_DROPDOWN_MULTIPLE";
+    /** Serves as key for setting that represents key-value pair e.g. if you have documentation addon which shows document corresponding to the Clockify page i.e. you need to match the Clockify page to the url of the document describing how to use that page. In that case, key would be 'Clockify page', and 'value' would be 'url of the document'. */
+    readonly key?: string;
+    /** Value of the setting. Value must be of type 'setting.type' e.g. For USER_DROPDOWN, value will be the user ID of the installer upon installation. */
+    readonly value: string | number | any[] | boolean;
+    /** Required if 'setting.type' is DROPDOWN_SINGLE or DROPDOWN_MULTIPLE. Specifies which options will be shown in dropdown. */
+    readonly allowedValues?: string[];
+    /** Toggles whether setting value is required or not. */
+    readonly required?: boolean;
+    /** Toggles whether setting value will be shown with 'Copy' button for easier copying. */
+    readonly copyable?: boolean;
+    /** Toggles whether setting value is read-only i.e. setting value cannot be updated. */
+    readonly readOnly?: boolean;
+}
+/** Setting banner that shows info about setting group or tab. It is shown as a blue banner before all settings contained in a given group. */
+export interface ClockifySettingsHeader {
+    /** Text shown in banner. */
+    readonly title: string;
+}
+/** Serves as another level of hierarchy when defining settings. Group can be part of tabs, and one tab can contain multiple groups. */
+export interface ClockifySettingsGroup {
+    /** Group identifier. */
+    readonly id: string;
+    /** Group title. Shown in UI. */
+    readonly title: string;
+    /** Brief description of the settings that given group contains. */
+    readonly description?: string;
+    /** Banner with info text shown before all settings that given group contains. */
+    readonly header?: ClockifySettingsHeader;
+    /** List of settings the group contains */
+    readonly settings: ClockifySetting[];
+}
+/** Serves as top level of hierarchy when defining settings. Tabs cannot be nested in other tabs or groups. */
+export interface ClockifySettingsTab {
+    /** Tab identifier. */
+    readonly id: string;
+    /** Tab name shown in UI. */
+    readonly name: string;
+    /** Banner with info text shown before all settings and groups contained in tab. */
+    readonly header?: ClockifySettingsHeader;
+    /** List of setting groups contained in tab. */
+    readonly groups?: ClockifySettingsGroup[];
+    /** List of settings contained in tab */
+    readonly settings?: ClockifySetting[];
+}
+/** Top level settings property. All settings grouped in tabs are defined here. */
+export interface ClockifySettings {
+    readonly tabs: ClockifySettingsTab[];
+}
+export interface ClockifyManifest {
+    readonly schemaVersion: "1.6";
+    /** Serves as addon identifier. All addons must have unique key. */
+    readonly key: string;
+    /** Addon name */
+    readonly name: string;
+    /** Base url on which addon app is hosted. This url with 'path' from the following entities is used when constructing urls for webhooks, components, lifecycle hooks, etc. */
+    readonly baseUrl: string;
+    /** Minimal Clockify's subscription plan that is required for addon. This plan is used when checking if user's current plan is at least equal to the plan required by addon. */
+    readonly minimalSubscriptionPlan: ClockifyMinimalSubscriptionPlan;
+    /** API scopes that addon is using. */
+    readonly scopes?: ClockifyScope[];
+    /** Brief description of given addon functionalities and purpose. */
+    readonly description?: string;
+    /** Path to addon icon. Path is part of the url where image icon is being hosted. Full url is constructed by concatenating addon 'baseUrl' and path. */
+    readonly iconPath?: string;
+    /** List of defined lifecycle hooks for given addon. */
+    readonly lifecycle?: ClockifyLifecycleEvent[];
+    /** List of defined webhooks for given addon. */
+    readonly webhooks?: ClockifyWebhook[];
+    /** List of defined components for given addon. */
+    readonly components?: ClockifyComponent[];
+    readonly settings?: string | ClockifySettings;
+}
+export interface ClockifyWebhookBuilder_event {
+    /** Clockify event that triggers webhook is sending to specified url. Url is constructed by concatenating addon 'baseUrl' and 'webhook.path'. */
+    event(value: "APPROVAL_REQUEST_STATUS_UPDATED" | "ASSIGNMENT_CREATED" | "ASSIGNMENT_DELETED" | "ASSIGNMENT_PUBLISHED" | "ASSIGNMENT_UPDATED" | "BALANCE_UPDATED" | "BILLABLE_RATE_UPDATED" | "CLIENT_DELETED" | "CLIENT_UPDATED" | "COST_RATE_UPDATED" | "EXPENSE_CREATED" | "EXPENSE_DELETED" | "EXPENSE_RESTORED" | "EXPENSE_UPDATED" | "INVOICE_UPDATED" | "LIMITED_USERS_ADDED_TO_WORKSPACE" | "NEW_APPROVAL_REQUEST" | "NEW_CLIENT" | "NEW_INVOICE" | "NEW_PROJECT" | "NEW_TAG" | "NEW_TASK" | "NEW_TIME_ENTRY" | "NEW_TIMER_STARTED" | "PROJECT_DELETED" | "PROJECT_UPDATED" | "TAG_DELETED" | "TAG_UPDATED" | "TASK_DELETED" | "TASK_UPDATED" | "TIME_ENTRY_DELETED" | "TIME_ENTRY_RESTORED" | "TIME_ENTRY_SPLIT" | "TIME_ENTRY_UPDATED" | "TIME_OFF_REQUEST_APPROVED" | "TIME_OFF_REQUEST_REJECTED" | "TIME_OFF_REQUEST_STARTED" | "TIME_OFF_REQUEST_UPDATED" | "TIME_OFF_REQUEST_WITHDRAWN" | "TIME_OFF_REQUESTED" | "TIMER_STOPPED" | "USER_ACTIVATED_ON_WORKSPACE" | "USER_DEACTIVATED_ON_WORKSPACE" | "USER_DELETED_FROM_WORKSPACE" | "USER_EMAIL_CHANGED" | "USER_GROUP_CREATED" | "USER_GROUP_DELETED" | "USER_GROUP_UPDATED" | "USER_JOINED_WORKSPACE" | "USER_UPDATED" | "USERS_INVITED_TO_WORKSPACE"): ClockifyWebhookBuilder_path;
+    /** Clockify event that triggers webhook is sending to specified url. Url is constructed by concatenating addon 'baseUrl' and 'webhook.path'. */
+    onApprovalRequestStatusUpdated(): ClockifyWebhookBuilder_path;
+    /** Clockify event that triggers webhook is sending to specified url. Url is constructed by concatenating addon 'baseUrl' and 'webhook.path'. */
+    onAssignmentCreated(): ClockifyWebhookBuilder_path;
+    /** Clockify event that triggers webhook is sending to specified url. Url is constructed by concatenating addon 'baseUrl' and 'webhook.path'. */
+    onAssignmentDeleted(): ClockifyWebhookBuilder_path;
+    /** Clockify event that triggers webhook is sending to specified url. Url is constructed by concatenating addon 'baseUrl' and 'webhook.path'. */
+    onAssignmentPublished(): ClockifyWebhookBuilder_path;
+    /** Clockify event that triggers webhook is sending to specified url. Url is constructed by concatenating addon 'baseUrl' and 'webhook.path'. */
+    onAssignmentUpdated(): ClockifyWebhookBuilder_path;
+    /** Clockify event that triggers webhook is sending to specified url. Url is constructed by concatenating addon 'baseUrl' and 'webhook.path'. */
+    onBalanceUpdated(): ClockifyWebhookBuilder_path;
+    /** Clockify event that triggers webhook is sending to specified url. Url is constructed by concatenating addon 'baseUrl' and 'webhook.path'. */
+    onBillableRateUpdated(): ClockifyWebhookBuilder_path;
+    /** Clockify event that triggers webhook is sending to specified url. Url is constructed by concatenating addon 'baseUrl' and 'webhook.path'. */
+    onClientDeleted(): ClockifyWebhookBuilder_path;
+    /** Clockify event that triggers webhook is sending to specified url. Url is constructed by concatenating addon 'baseUrl' and 'webhook.path'. */
+    onClientUpdated(): ClockifyWebhookBuilder_path;
+    /** Clockify event that triggers webhook is sending to specified url. Url is constructed by concatenating addon 'baseUrl' and 'webhook.path'. */
+    onCostRateUpdated(): ClockifyWebhookBuilder_path;
+    /** Clockify event that triggers webhook is sending to specified url. Url is constructed by concatenating addon 'baseUrl' and 'webhook.path'. */
+    onExpenseCreated(): ClockifyWebhookBuilder_path;
+    /** Clockify event that triggers webhook is sending to specified url. Url is constructed by concatenating addon 'baseUrl' and 'webhook.path'. */
+    onExpenseDeleted(): ClockifyWebhookBuilder_path;
+    /** Clockify event that triggers webhook is sending to specified url. Url is constructed by concatenating addon 'baseUrl' and 'webhook.path'. */
+    onExpenseRestored(): ClockifyWebhookBuilder_path;
+    /** Clockify event that triggers webhook is sending to specified url. Url is constructed by concatenating addon 'baseUrl' and 'webhook.path'. */
+    onExpenseUpdated(): ClockifyWebhookBuilder_path;
+    /** Clockify event that triggers webhook is sending to specified url. Url is constructed by concatenating addon 'baseUrl' and 'webhook.path'. */
+    onInvoiceUpdated(): ClockifyWebhookBuilder_path;
+    /** Clockify event that triggers webhook is sending to specified url. Url is constructed by concatenating addon 'baseUrl' and 'webhook.path'. */
+    onLimitedUsersAddedToWorkspace(): ClockifyWebhookBuilder_path;
+    /** Clockify event that triggers webhook is sending to specified url. Url is constructed by concatenating addon 'baseUrl' and 'webhook.path'. */
+    onNewApprovalRequest(): ClockifyWebhookBuilder_path;
+    /** Clockify event that triggers webhook is sending to specified url. Url is constructed by concatenating addon 'baseUrl' and 'webhook.path'. */
+    onNewClient(): ClockifyWebhookBuilder_path;
+    /** Clockify event that triggers webhook is sending to specified url. Url is constructed by concatenating addon 'baseUrl' and 'webhook.path'. */
+    onNewInvoice(): ClockifyWebhookBuilder_path;
+    /** Clockify event that triggers webhook is sending to specified url. Url is constructed by concatenating addon 'baseUrl' and 'webhook.path'. */
+    onNewProject(): ClockifyWebhookBuilder_path;
+    /** Clockify event that triggers webhook is sending to specified url. Url is constructed by concatenating addon 'baseUrl' and 'webhook.path'. */
+    onNewTag(): ClockifyWebhookBuilder_path;
+    /** Clockify event that triggers webhook is sending to specified url. Url is constructed by concatenating addon 'baseUrl' and 'webhook.path'. */
+    onNewTask(): ClockifyWebhookBuilder_path;
+    /** Clockify event that triggers webhook is sending to specified url. Url is constructed by concatenating addon 'baseUrl' and 'webhook.path'. */
+    onNewTimeEntry(): ClockifyWebhookBuilder_path;
+    /** Clockify event that triggers webhook is sending to specified url. Url is constructed by concatenating addon 'baseUrl' and 'webhook.path'. */
+    onNewTimerStarted(): ClockifyWebhookBuilder_path;
+    /** Clockify event that triggers webhook is sending to specified url. Url is constructed by concatenating addon 'baseUrl' and 'webhook.path'. */
+    onProjectDeleted(): ClockifyWebhookBuilder_path;
+    /** Clockify event that triggers webhook is sending to specified url. Url is constructed by concatenating addon 'baseUrl' and 'webhook.path'. */
+    onProjectUpdated(): ClockifyWebhookBuilder_path;
+    /** Clockify event that triggers webhook is sending to specified url. Url is constructed by concatenating addon 'baseUrl' and 'webhook.path'. */
+    onTagDeleted(): ClockifyWebhookBuilder_path;
+    /** Clockify event that triggers webhook is sending to specified url. Url is constructed by concatenating addon 'baseUrl' and 'webhook.path'. */
+    onTagUpdated(): ClockifyWebhookBuilder_path;
+    /** Clockify event that triggers webhook is sending to specified url. Url is constructed by concatenating addon 'baseUrl' and 'webhook.path'. */
+    onTaskDeleted(): ClockifyWebhookBuilder_path;
+    /** Clockify event that triggers webhook is sending to specified url. Url is constructed by concatenating addon 'baseUrl' and 'webhook.path'. */
+    onTaskUpdated(): ClockifyWebhookBuilder_path;
+    /** Clockify event that triggers webhook is sending to specified url. Url is constructed by concatenating addon 'baseUrl' and 'webhook.path'. */
+    onTimeEntryDeleted(): ClockifyWebhookBuilder_path;
+    /** Clockify event that triggers webhook is sending to specified url. Url is constructed by concatenating addon 'baseUrl' and 'webhook.path'. */
+    onTimeEntryRestored(): ClockifyWebhookBuilder_path;
+    /** Clockify event that triggers webhook is sending to specified url. Url is constructed by concatenating addon 'baseUrl' and 'webhook.path'. */
+    onTimeEntrySplit(): ClockifyWebhookBuilder_path;
+    /** Clockify event that triggers webhook is sending to specified url. Url is constructed by concatenating addon 'baseUrl' and 'webhook.path'. */
+    onTimeEntryUpdated(): ClockifyWebhookBuilder_path;
+    /** Clockify event that triggers webhook is sending to specified url. Url is constructed by concatenating addon 'baseUrl' and 'webhook.path'. */
+    onTimeOffRequestApproved(): ClockifyWebhookBuilder_path;
+    /** Clockify event that triggers webhook is sending to specified url. Url is constructed by concatenating addon 'baseUrl' and 'webhook.path'. */
+    onTimeOffRequestRejected(): ClockifyWebhookBuilder_path;
+    /** Clockify event that triggers webhook is sending to specified url. Url is constructed by concatenating addon 'baseUrl' and 'webhook.path'. */
+    onTimeOffRequestStarted(): ClockifyWebhookBuilder_path;
+    /** Clockify event that triggers webhook is sending to specified url. Url is constructed by concatenating addon 'baseUrl' and 'webhook.path'. */
+    onTimeOffRequestUpdated(): ClockifyWebhookBuilder_path;
+    /** Clockify event that triggers webhook is sending to specified url. Url is constructed by concatenating addon 'baseUrl' and 'webhook.path'. */
+    onTimeOffRequestWithdrawn(): ClockifyWebhookBuilder_path;
+    /** Clockify event that triggers webhook is sending to specified url. Url is constructed by concatenating addon 'baseUrl' and 'webhook.path'. */
+    onTimeOffRequested(): ClockifyWebhookBuilder_path;
+    /** Clockify event that triggers webhook is sending to specified url. Url is constructed by concatenating addon 'baseUrl' and 'webhook.path'. */
+    onTimerStopped(): ClockifyWebhookBuilder_path;
+    /** Clockify event that triggers webhook is sending to specified url. Url is constructed by concatenating addon 'baseUrl' and 'webhook.path'. */
+    onUserActivatedOnWorkspace(): ClockifyWebhookBuilder_path;
+    /** Clockify event that triggers webhook is sending to specified url. Url is constructed by concatenating addon 'baseUrl' and 'webhook.path'. */
+    onUserDeactivatedOnWorkspace(): ClockifyWebhookBuilder_path;
+    /** Clockify event that triggers webhook is sending to specified url. Url is constructed by concatenating addon 'baseUrl' and 'webhook.path'. */
+    onUserDeletedFromWorkspace(): ClockifyWebhookBuilder_path;
+    /** Clockify event that triggers webhook is sending to specified url. Url is constructed by concatenating addon 'baseUrl' and 'webhook.path'. */
+    onUserEmailChanged(): ClockifyWebhookBuilder_path;
+    /** Clockify event that triggers webhook is sending to specified url. Url is constructed by concatenating addon 'baseUrl' and 'webhook.path'. */
+    onUserGroupCreated(): ClockifyWebhookBuilder_path;
+    /** Clockify event that triggers webhook is sending to specified url. Url is constructed by concatenating addon 'baseUrl' and 'webhook.path'. */
+    onUserGroupDeleted(): ClockifyWebhookBuilder_path;
+    /** Clockify event that triggers webhook is sending to specified url. Url is constructed by concatenating addon 'baseUrl' and 'webhook.path'. */
+    onUserGroupUpdated(): ClockifyWebhookBuilder_path;
+    /** Clockify event that triggers webhook is sending to specified url. Url is constructed by concatenating addon 'baseUrl' and 'webhook.path'. */
+    onUserJoinedWorkspace(): ClockifyWebhookBuilder_path;
+    /** Clockify event that triggers webhook is sending to specified url. Url is constructed by concatenating addon 'baseUrl' and 'webhook.path'. */
+    onUserUpdated(): ClockifyWebhookBuilder_path;
+    /** Clockify event that triggers webhook is sending to specified url. Url is constructed by concatenating addon 'baseUrl' and 'webhook.path'. */
+    onUsersInvitedToWorkspace(): ClockifyWebhookBuilder_path;
+}
+export interface ClockifyWebhookBuilder_path {
+    /** Path to addon endpoint designated for receiving webhooks from Clockify side. Path is just part of url to which webhook will be sent. Full url is constructed by concatenating addon 'baseUrl' and path. */
+    path(value: string): ClockifyWebhookBuilder_Build;
+}
+export interface ClockifyWebhookBuilder_Build {
+    build(): ClockifyWebhook;
+}
+export declare namespace ClockifyWebhook {
+    function builder(): ClockifyWebhookBuilder_event;
+}
+export declare function ClockifyWebhookBuilder(): ClockifyWebhookBuilder_event;
+export interface ClockifyLifecycleEventBuilder_path {
+    /** Path to addon endpoint designated for receiving lifecycle hooks from Clockify side. Path is just part of url to which a lifecycle hook will be sent. Full url is constructed by concatenating addon 'baseUrl' and path. */
+    path(value: string): ClockifyLifecycleEventBuilder_type;
+}
+export interface ClockifyLifecycleEventBuilder_type {
+    /** Specifies addon lifecycle event you want to be notified by Clockify. */
+    type(value: "INSTALLED" | "DELETED" | "SETTINGS_UPDATED" | "STATUS_CHANGED"): ClockifyLifecycleEventBuilder_Build;
+    /** Specifies addon lifecycle event you want to be notified by Clockify. */
+    onInstalled(): ClockifyLifecycleEventBuilder_Build;
+    /** Specifies addon lifecycle event you want to be notified by Clockify. */
+    onDeleted(): ClockifyLifecycleEventBuilder_Build;
+    /** Specifies addon lifecycle event you want to be notified by Clockify. */
+    onSettingsUpdated(): ClockifyLifecycleEventBuilder_Build;
+    /** Specifies addon lifecycle event you want to be notified by Clockify. */
+    onStatusChanged(): ClockifyLifecycleEventBuilder_Build;
+}
+export interface ClockifyLifecycleEventBuilder_Build {
+    build(): ClockifyLifecycleEvent;
+}
+export declare namespace ClockifyLifecycleEvent {
+    function builder(): ClockifyLifecycleEventBuilder_path;
+}
+export declare function ClockifyLifecycleEventBuilder(): ClockifyLifecycleEventBuilder_path;
+export interface ClockifyComponentBuilder_type {
+    /** Specifies which kind of component will be rendered. If component is 'tab', it also comes with the name of Clockify page where 'tab' component will be rendered. */
+    type(value: "sidebar" | "widget" | "timeoff.tab" | "schedule.tab" | "approvals.tab" | "reports.tab" | "activity.tab" | "team.tab" | "projects.tab" | "invoices.action" | "timeentries.action.uiblocks"): ClockifyComponentBuilder_accessLevel;
+    /** Specifies which kind of component will be rendered. If component is 'tab', it also comes with the name of Clockify page where 'tab' component will be rendered. */
+    sidebar(): ClockifyComponentBuilder_accessLevel;
+    /** Specifies which kind of component will be rendered. If component is 'tab', it also comes with the name of Clockify page where 'tab' component will be rendered. */
+    widget(): ClockifyComponentBuilder_accessLevel;
+    /** Specifies which kind of component will be rendered. If component is 'tab', it also comes with the name of Clockify page where 'tab' component will be rendered. */
+    timeoffTab(): ClockifyComponentBuilder_accessLevel;
+    /** Specifies which kind of component will be rendered. If component is 'tab', it also comes with the name of Clockify page where 'tab' component will be rendered. */
+    scheduleTab(): ClockifyComponentBuilder_accessLevel;
+    /** Specifies which kind of component will be rendered. If component is 'tab', it also comes with the name of Clockify page where 'tab' component will be rendered. */
+    approvalsTab(): ClockifyComponentBuilder_accessLevel;
+    /** Specifies which kind of component will be rendered. If component is 'tab', it also comes with the name of Clockify page where 'tab' component will be rendered. */
+    reportsTab(): ClockifyComponentBuilder_accessLevel;
+    /** Specifies which kind of component will be rendered. If component is 'tab', it also comes with the name of Clockify page where 'tab' component will be rendered. */
+    activityTab(): ClockifyComponentBuilder_accessLevel;
+    /** Specifies which kind of component will be rendered. If component is 'tab', it also comes with the name of Clockify page where 'tab' component will be rendered. */
+    teamTab(): ClockifyComponentBuilder_accessLevel;
+    /** Specifies which kind of component will be rendered. If component is 'tab', it also comes with the name of Clockify page where 'tab' component will be rendered. */
+    projectsTab(): ClockifyComponentBuilder_accessLevel;
+    /** Specifies which kind of component will be rendered. If component is 'tab', it also comes with the name of Clockify page where 'tab' component will be rendered. */
+    invoicesAction(): ClockifyComponentBuilder_accessLevel;
+    /** Specifies which kind of component will be rendered. If component is 'tab', it also comes with the name of Clockify page where 'tab' component will be rendered. */
+    timeentriesActionUiblocks(): ClockifyComponentBuilder_accessLevel;
+}
+export interface ClockifyComponentBuilder_accessLevel {
+    /** Specifies who can access addon component. You can either choose to give access only to Clockify workspace admins, or everyone. */
+    accessLevel(value: "ADMINS" | "EVERYONE"): ClockifyComponentBuilder_path;
+    /** Specifies who can access addon component. You can either choose to give access only to Clockify workspace admins, or everyone. */
+    allowAdmins(): ClockifyComponentBuilder_path;
+    /** Specifies who can access addon component. You can either choose to give access only to Clockify workspace admins, or everyone. */
+    allowEveryone(): ClockifyComponentBuilder_path;
+}
+export interface ClockifyComponentBuilder_path {
+    /** Path to addon web app that will be rendered inside Clockify component. Path is part of the url from which component content will be served. Full url is constructed by concatenating addon 'baseUrl' and path. */
+    path(value: string): ClockifyComponentBuilder_label;
+}
+export interface ClockifyComponentBuilder_label {
+    /** Label of the component e.g. if component is 'tab', value of 'label' property will be shown in UI. Label is not required for WIDGET component type. */
+    label(value: string): ClockifyComponentBuilder_Optional;
+}
+export interface ClockifyComponentBuilder_Optional {
+    /** If you want to define some component-specific options for component that holds your addon app, this is the place to define them. */
+    options(value: Record<string, unknown>): ClockifyComponentBuilder_Optional;
     /** Path to addon hosted image which will serve as an icon for Clockify component. Path is part of the url from which the image will be served. Full url is constructed by concatenating addon 'baseUrl' and path. */
     iconPath(value: string): ClockifyComponentBuilder_Optional;
     /** Defines rendered component width expressed in 'vw'. Applicable only to WIDGET components. */
@@ -2803,7 +3476,7 @@ export declare function ClockifyManifestBuilder(): ClockifyManifestBuilder_key;
 
 ```ts
 /** Draft-04 Clockify manifest schemas embedded for runtime-neutral validation. */
-export type ClockifyEmbeddedManifestSchemas = Readonly<Record<"1.2" | "1.3" | "1.4" | "1.5", object>>;
+export type ClockifyEmbeddedManifestSchemas = Readonly<Record<"1.2" | "1.3" | "1.4" | "1.5" | "1.6", object>>;
 /** Supported schemas keyed by the manifest's declared schema version. */
 export declare const clockifyManifestSchemas: ClockifyEmbeddedManifestSchemas;
 ```
@@ -2816,6 +3489,17 @@ export interface ClockifySettingUpdate {
     readonly id: string;
     readonly value: unknown;
 }
+/** Observed just before {@link ClockifyAddonClient} retries a request. */
+export interface ClockifyAddonClientRetryInfo {
+    /** The attempt that just finished (1-indexed); the retry will be `attempt + 1`. */
+    readonly attempt: number;
+    /** The response status that triggered the retry, absent for a network-error retry. */
+    readonly status?: number;
+    /** The response error that triggered the retry, absent for a status-based retry. */
+    readonly error?: unknown;
+    /** Delay before the retry, in milliseconds. */
+    readonly delayMs: number;
+}
 /** Construction options for {@link ClockifyAddonClient}. */
 export interface ClockifyAddonClientOptions {
     readonly token: string;
@@ -2825,6 +3509,8 @@ export interface ClockifyAddonClientOptions {
     readonly timeoutMs?: number;
     readonly maxAttempts?: number;
     readonly sleep?: (milliseconds: number) => Promise<void>;
+    /** Observe retries for metrics/logging. Never affects retry behavior, even if it throws. */
+    readonly onRetry?: (info: ClockifyAddonClientRetryInfo) => void;
 }
 /** HTTP failure returned by a Clockify add-on API call. */
 export declare class ClockifyAddonHttpError extends Error {
@@ -2841,7 +3527,9 @@ export declare class ClockifyAddonClient {
     private readonly timeoutMs;
     private readonly maxAttempts;
     private readonly sleep;
+    private readonly onRetry?;
     constructor(options: ClockifyAddonClientOptions);
+    private notifyRetry;
     private send;
     private expectOk;
     /** Exchanges an installation token for a user-scoped add-on token. */
@@ -2859,12 +3547,22 @@ export declare class ClockifyAddonClient {
 
 ```ts
 import type { ClockifyCryptoKey, ClockifyPrivateKeyInput } from "../clockify/clockify-crypto-key.js";
+import type { ClockifyInstalledLifecyclePayload } from "../clockify/clockify-lifecycle.js";
+import type { AddonRequest } from "../shared/request.js";
 export interface ClockifyTestKeys {
     publicKey: ClockifyCryptoKey;
     privateKey: ClockifyPrivateKeyInput;
     pem: string;
 }
 export declare function generateTestKeys(): Promise<ClockifyTestKeys>;
+/** Builds an `AddonRequest` for a signed component GET request, e.g. `?auth_token=<jwt>`. */
+export declare function createTestComponentRequest(token: string, overrides?: Partial<AddonRequest>): AddonRequest;
+/** Builds an `AddonRequest` for a signed lifecycle POST request carrying `payload`. */
+export declare function createTestLifecycleRequest(token: string, payload: unknown, overrides?: Partial<AddonRequest>): AddonRequest;
+/** Builds an `AddonRequest` for a signed webhook POST delivery carrying `payload`. */
+export declare function createTestWebhookRequest(token: string, eventType: string, payload: unknown, overrides?: Partial<AddonRequest>): AddonRequest;
+/** Builds a documented `INSTALLED` lifecycle payload with sensible test defaults. */
+export declare function buildInstalledPayload(overrides?: Partial<ClockifyInstalledLifecyclePayload>): ClockifyInstalledLifecyclePayload;
 export declare function signTestToken(privateKey: ClockifyPrivateKeyInput, addonKey: string, claims?: Record<string, unknown>, expiresIn?: string): Promise<string>;
 ```
 
@@ -2907,6 +3605,13 @@ import { ClockifyWebhook, ClockifyLifecycleEvent, ClockifyComponent } from "./cl
  *   new ClockifyAddon(ClockifyManifest.v1_5Builder()....build())  // M inferred as the v1.5 manifest
  *
  * The `register*` methods are then typed against that same version.
+ *
+ * This constructor does NOT validate the manifest against the Clockify schema — the manifest
+ * builders already enforce required fields at the type level, and a router built from a manifest
+ * that a downstream tool intentionally serves unvalidated (a captured example, a hand-authored
+ * fixture) must still start. Use {@link createValidatedClockifyAddon} instead when the manifest's
+ * shape is not statically known (built at runtime from configuration, deserialized JSON) and you
+ * want a schema violation to fail fast at startup rather than surface later as a rejected install.
  */
 export declare class ClockifyAddon<M extends {
     readonly schemaVersion: ClockifySchemaVersion;
@@ -2927,13 +3632,16 @@ export declare function createValidatedClockifyAddon<M extends {
 
 ```ts
 import * as generated from "./generated/index.js";
-export type ClockifySchemaVersion = "1.2" | "1.3" | "1.4" | "1.5";
-export type ClockifyManifest<V extends ClockifySchemaVersion = "1.4"> = V extends "1.2" ? generated.v1_2.ClockifyManifest : V extends "1.3" ? generated.v1_3.ClockifyManifest : V extends "1.4" ? generated.v1_4.ClockifyManifest : generated.v1_5.ClockifyManifest;
+export type ClockifySchemaVersion = "1.2" | "1.3" | "1.4" | "1.5" | "1.6";
+export type ClockifyManifest<V extends ClockifySchemaVersion = "1.4"> = V extends "1.2" ? generated.v1_2.ClockifyManifest : V extends "1.3" ? generated.v1_3.ClockifyManifest : V extends "1.4" ? generated.v1_4.ClockifyManifest : V extends "1.5" ? generated.v1_5.ClockifyManifest : generated.v1_6.ClockifyManifest;
 export declare const ClockifyManifest: {
+    /** Canonical entry point: the current schema version's builder (currently 1.5). */
+    builder: typeof generated.v1_5.ClockifyManifest.builder;
     v1_2Builder: typeof generated.v1_2.ClockifyManifest.builder;
     v1_3Builder: typeof generated.v1_3.ClockifyManifest.builder;
     v1_4Builder: typeof generated.v1_4.ClockifyManifest.builder;
     v1_5Builder: typeof generated.v1_5.ClockifyManifest.builder;
+    v1_6Builder: typeof generated.v1_6.ClockifyManifest.builder;
 };
 ```
 
@@ -3042,7 +3750,7 @@ export * from "./clockify-request-wire.js";
 ```ts
 import type { RequestHandler } from "../shared/handler.js";
 import type { ClockifySignatureParser } from "./clockify-signature-parser.js";
-import { ClockifyDeletedLifecycleRequestHandler, ClockifyInstalledLifecycleRequestHandler, ClockifyRequestVerificationOptions, ClockifySettingsUpdatedLifecycleRequestHandler, ClockifyStatusChangedLifecycleRequestHandler, ClockifyTokenVerificationOptions, ClockifyVerifiedComponentRequestHandler, ClockifyVerifiedLifecycleRequestHandler, ClockifyVerifiedRequestHandler, ClockifyVerifiedWebhookRequestHandler, ClockifyVerifiedWebhookRequestOptions } from "./clockify-request-types.js";
+import { ClockifyDeletedLifecycleRequestHandler, ClockifyHandler, ClockifyHandlerOptions, ClockifyInstalledLifecycleRequestHandler, ClockifyRequestVerificationOptions, ClockifySettingsUpdatedLifecycleRequestHandler, ClockifyStatusChangedLifecycleRequestHandler, ClockifyTokenVerificationOptions, ClockifyVerifiedComponentRequestHandler, ClockifyVerifiedLifecycleRequestHandler, ClockifyVerifiedRequestHandler, ClockifyVerifiedWebhookRequestHandler, ClockifyVerifiedWebhookRequestOptions } from "./clockify-request-types.js";
 export declare function withClockifyVerifiedRequest(parser: ClockifySignatureParser, options: ClockifyRequestVerificationOptions, handler: ClockifyVerifiedRequestHandler): RequestHandler;
 export declare function withClockifyVerifiedComponentRequest(parser: ClockifySignatureParser, handler: ClockifyVerifiedComponentRequestHandler, options?: ClockifyTokenVerificationOptions): RequestHandler;
 export declare function withClockifyVerifiedLifecycleRequest(parser: ClockifySignatureParser, handler: ClockifyVerifiedLifecycleRequestHandler, options?: ClockifyTokenVerificationOptions): RequestHandler;
@@ -3051,11 +3759,31 @@ export declare function withClockifyStatusChangedLifecycleRequest(parser: Clocki
 export declare function withClockifySettingsUpdatedLifecycleRequest(parser: ClockifySignatureParser, handler: ClockifySettingsUpdatedLifecycleRequestHandler, options?: ClockifyTokenVerificationOptions): RequestHandler;
 export declare function withClockifyDeletedLifecycleRequest(parser: ClockifySignatureParser, handler: ClockifyDeletedLifecycleRequestHandler, options?: ClockifyTokenVerificationOptions): RequestHandler;
 export declare function withClockifyVerifiedWebhookRequest(parser: ClockifySignatureParser, options: ClockifyVerifiedWebhookRequestOptions, handler: ClockifyVerifiedWebhookRequestHandler): RequestHandler;
+/**
+ * Unified alternative to the `withClockify*` wrappers above: always calls
+ * `handler(request, context)`, regardless of which verification `kind` ran.
+ * Additive only — every existing `withClockify*` export keeps its own arity
+ * and signature; use this when a single normalized shape is more convenient
+ * than matching each wrapper's specific handler arity.
+ *
+ * @example
+ * ```ts
+ * const handleComponent = withClockifyHandler(
+ *   parser,
+ *   { kind: "component" },
+ *   (request, { claims }) => ({ status: 200, body: `hello ${claims.addonId}` }),
+ * );
+ * ```
+ */
+export declare function withClockifyHandler<Kind extends ClockifyHandlerOptions["kind"]>(parser: ClockifySignatureParser, options: Extract<ClockifyHandlerOptions, {
+    kind: Kind;
+}>, handler: ClockifyHandler<Kind>): RequestHandler;
 ```
 
 ### clockify/clockify-request-types.d.ts
 
 ```ts
+import type { AddonErrorReporter } from "../shared/addon.js";
 import type { AddonRequest } from "../shared/request.js";
 import type { AddonResponse } from "../shared/response.js";
 import type { ClockifyAddonClaims } from "./clockify-signature-parser.js";
@@ -3147,15 +3875,62 @@ export interface ClockifyWebhookAuthTokenLookupInput {
 export type ClockifyWebhookAuthTokenLookup = (input: ClockifyWebhookAuthTokenLookupInput) => string | undefined | Promise<string | undefined>;
 export type ClockifyVerifiedWebhookRequestOptions = (ClockifyWebhookVerificationOptions & {
     getExpectedWebhookAuthToken?: undefined;
+    /** Observes a misconfigured token lookup (e.g. an empty/missing stored token). */
+    onError?: AddonErrorReporter;
 }) | (Omit<ClockifyWebhookVerificationOptions, "expectedWebhookAuthToken"> & {
     getExpectedWebhookAuthToken: ClockifyWebhookAuthTokenLookup;
     expectedWebhookAuthToken?: never;
+    /** Observes a misconfigured token lookup (e.g. an empty/missing stored token). */
+    onError?: AddonErrorReporter;
 });
 export interface ClockifyVerifiedWebhookRequestContext {
     claims: ClockifyAddonClaims;
     eventType: string;
 }
 export type ClockifyVerifiedWebhookRequestHandler = (request: AddonRequest, claims: ClockifyAddonClaims, context: ClockifyVerifiedWebhookRequestContext) => AddonResponse | Promise<AddonResponse>;
+export type ClockifyHandlerOptions = ({
+    kind: "verified";
+} & ClockifyRequestVerificationOptions) | ({
+    kind: "component";
+} & ClockifyTokenVerificationOptions) | ({
+    kind: "lifecycle";
+} & ClockifyTokenVerificationOptions) | ({
+    kind: "installed";
+} & ClockifyTokenVerificationOptions) | ({
+    kind: "statusChanged";
+} & ClockifyTokenVerificationOptions) | ({
+    kind: "settingsUpdated";
+} & ClockifyTokenVerificationOptions) | ({
+    kind: "deleted";
+} & ClockifyTokenVerificationOptions) | ({
+    kind: "webhook";
+} & ClockifyVerifiedWebhookRequestOptions);
+type ClockifyHandlerKind = ClockifyHandlerOptions["kind"];
+type ClockifyLifecyclePayloadHandlerKind = "installed" | "statusChanged" | "settingsUpdated" | "deleted";
+type ClockifyHandlerPayloadFor<Kind extends ClockifyLifecyclePayloadHandlerKind> = Kind extends "installed" ? ClockifyInstalledLifecyclePayload : Kind extends "statusChanged" ? ClockifyStatusChangedLifecyclePayload : Kind extends "settingsUpdated" ? ClockifySettingsUpdatedLifecyclePayload : ClockifyDeletedLifecyclePayload;
+/**
+ * Normalized handler context for `withClockifyHandler`, parameterized on `Kind` so `claims` keeps
+ * the same narrowing each underlying `withClockify*` wrapper already provides: a lifecycle-payload
+ * kind gets required `workspaceId`/`addonId` via `ClockifyLifecycleMatchedClaims` and its exact
+ * matched `payload` type; every other kind gets plain `ClockifyAddonClaims` and no `payload`.
+ * `eventType` is required only for `"webhook"` (matching `ClockifyVerifiedWebhookRequestContext`);
+ * `"verified"` carries it optionally, matching `ClockifyVerifiedRequestContext`.
+ */
+export type ClockifyHandlerContext<Kind extends ClockifyHandlerKind = ClockifyHandlerKind> = Kind extends ClockifyLifecyclePayloadHandlerKind ? {
+    claims: ClockifyLifecycleMatchedClaims;
+    payload: ClockifyHandlerPayloadFor<Kind>;
+    eventType?: undefined;
+} : Kind extends "webhook" ? {
+    claims: ClockifyAddonClaims;
+    payload?: undefined;
+    eventType: string;
+} : {
+    claims: ClockifyAddonClaims;
+    payload?: undefined;
+    eventType?: string;
+};
+export type ClockifyHandler<Kind extends ClockifyHandlerKind = ClockifyHandlerKind> = (request: AddonRequest, context: ClockifyHandlerContext<Kind>) => AddonResponse | Promise<AddonResponse>;
+export {};
 ```
 
 ### clockify/clockify-request-verifiers.d.ts
@@ -3169,6 +3944,12 @@ export declare function verifyClockifyWebhookRequest(parser: ClockifySignaturePa
 export declare function verifyClockifyToken(parser: ClockifySignatureParser, token: string | undefined | null, options?: ClockifyTokenVerificationOptions): Promise<ClockifyTokenVerificationResult>;
 export declare function verifyClockifyComponentRequest(parser: ClockifySignatureParser, request: AddonRequest, options?: ClockifyTokenVerificationOptions): Promise<ClockifyTokenVerificationResult>;
 export declare function verifyClockifyLifecycleRequest(parser: ClockifySignatureParser, request: AddonRequest, options?: ClockifyTokenVerificationOptions): Promise<ClockifyTokenVerificationResult>;
+/** @deprecated Alias of {@link verifyClockifyComponentRequest}. */
+export declare const verifyComponentToken: typeof verifyClockifyComponentRequest;
+/** @deprecated Alias of {@link verifyClockifyLifecycleRequest}. */
+export declare const verifyLifecycleToken: typeof verifyClockifyLifecycleRequest;
+/** @deprecated Alias of {@link verifyClockifyWebhookRequest}. */
+export declare const verifyWebhookToken: typeof verifyClockifyWebhookRequest;
 ```
 
 ### clockify/clockify-request-wire.d.ts
@@ -3269,61 +4050,69 @@ export declare function clockifyLifecyclePayloadMatchesClaims(payload: unknown, 
 ```ts
 import * as generated from "./generated/index.js";
 import { ClockifySchemaVersion } from "./clockify-manifest.js";
-export type ClockifyWebhook<V extends ClockifySchemaVersion = "1.4"> = V extends "1.2" ? generated.v1_2.ClockifyWebhook : V extends "1.3" ? generated.v1_3.ClockifyWebhook : V extends "1.4" ? generated.v1_4.ClockifyWebhook : generated.v1_5.ClockifyWebhook;
+export type ClockifyWebhook<V extends ClockifySchemaVersion = "1.4"> = V extends "1.2" ? generated.v1_2.ClockifyWebhook : V extends "1.3" ? generated.v1_3.ClockifyWebhook : V extends "1.4" ? generated.v1_4.ClockifyWebhook : V extends "1.5" ? generated.v1_5.ClockifyWebhook : generated.v1_6.ClockifyWebhook;
 export declare const ClockifyWebhook: {
     v1_2Builder: typeof generated.v1_2.ClockifyWebhook.builder;
     v1_3Builder: typeof generated.v1_3.ClockifyWebhook.builder;
     v1_4Builder: typeof generated.v1_4.ClockifyWebhook.builder;
     v1_5Builder: typeof generated.v1_5.ClockifyWebhook.builder;
+    v1_6Builder: typeof generated.v1_6.ClockifyWebhook.builder;
 };
-export type ClockifyLifecycleEvent<V extends ClockifySchemaVersion = "1.4"> = V extends "1.2" ? generated.v1_2.ClockifyLifecycleEvent : V extends "1.3" ? generated.v1_3.ClockifyLifecycleEvent : V extends "1.4" ? generated.v1_4.ClockifyLifecycleEvent : generated.v1_5.ClockifyLifecycleEvent;
+export type ClockifyLifecycleEvent<V extends ClockifySchemaVersion = "1.4"> = V extends "1.2" ? generated.v1_2.ClockifyLifecycleEvent : V extends "1.3" ? generated.v1_3.ClockifyLifecycleEvent : V extends "1.4" ? generated.v1_4.ClockifyLifecycleEvent : V extends "1.5" ? generated.v1_5.ClockifyLifecycleEvent : generated.v1_6.ClockifyLifecycleEvent;
 export declare const ClockifyLifecycleEvent: {
     v1_2Builder: typeof generated.v1_2.ClockifyLifecycleEvent.builder;
     v1_3Builder: typeof generated.v1_3.ClockifyLifecycleEvent.builder;
     v1_4Builder: typeof generated.v1_4.ClockifyLifecycleEvent.builder;
     v1_5Builder: typeof generated.v1_5.ClockifyLifecycleEvent.builder;
+    v1_6Builder: typeof generated.v1_6.ClockifyLifecycleEvent.builder;
 };
-export type ClockifyComponent<V extends ClockifySchemaVersion = "1.4"> = V extends "1.2" ? generated.v1_2.ClockifyComponent : V extends "1.3" ? generated.v1_3.ClockifyComponent : V extends "1.4" ? generated.v1_4.ClockifyComponent : generated.v1_5.ClockifyComponent;
+export type ClockifyComponent<V extends ClockifySchemaVersion = "1.4"> = V extends "1.2" ? generated.v1_2.ClockifyComponent : V extends "1.3" ? generated.v1_3.ClockifyComponent : V extends "1.4" ? generated.v1_4.ClockifyComponent : V extends "1.5" ? generated.v1_5.ClockifyComponent : generated.v1_6.ClockifyComponent;
 export declare const ClockifyComponent: {
     v1_2Builder: typeof generated.v1_2.ClockifyComponent.builder;
     v1_3Builder: typeof generated.v1_3.ClockifyComponent.builder;
     v1_4Builder: typeof generated.v1_4.ClockifyComponent.builder;
     v1_5Builder: typeof generated.v1_5.ClockifyComponent.builder;
+    v1_6Builder: typeof generated.v1_6.ClockifyComponent.builder;
 };
-export type ClockifySetting<V extends ClockifySchemaVersion = "1.4"> = V extends "1.2" ? generated.v1_2.ClockifySetting : V extends "1.3" ? generated.v1_3.ClockifySetting : V extends "1.4" ? generated.v1_4.ClockifySetting : generated.v1_5.ClockifySetting;
+export type ClockifySetting<V extends ClockifySchemaVersion = "1.4"> = V extends "1.2" ? generated.v1_2.ClockifySetting : V extends "1.3" ? generated.v1_3.ClockifySetting : V extends "1.4" ? generated.v1_4.ClockifySetting : V extends "1.5" ? generated.v1_5.ClockifySetting : generated.v1_6.ClockifySetting;
 export declare const ClockifySetting: {
     v1_2Builder: typeof generated.v1_2.ClockifySetting.builder;
     v1_3Builder: typeof generated.v1_3.ClockifySetting.builder;
     v1_4Builder: typeof generated.v1_4.ClockifySetting.builder;
     v1_5Builder: typeof generated.v1_5.ClockifySetting.builder;
+    v1_6Builder: typeof generated.v1_6.ClockifySetting.builder;
 };
-export type ClockifySettingsHeader<V extends ClockifySchemaVersion = "1.4"> = V extends "1.2" ? generated.v1_2.ClockifySettingsHeader : V extends "1.3" ? generated.v1_3.ClockifySettingsHeader : V extends "1.4" ? generated.v1_4.ClockifySettingsHeader : generated.v1_5.ClockifySettingsHeader;
+export type ClockifySettingsHeader<V extends ClockifySchemaVersion = "1.4"> = V extends "1.2" ? generated.v1_2.ClockifySettingsHeader : V extends "1.3" ? generated.v1_3.ClockifySettingsHeader : V extends "1.4" ? generated.v1_4.ClockifySettingsHeader : V extends "1.5" ? generated.v1_5.ClockifySettingsHeader : generated.v1_6.ClockifySettingsHeader;
 export declare const ClockifySettingsHeader: {
     v1_2Builder: typeof generated.v1_2.ClockifySettingsHeader.builder;
     v1_3Builder: typeof generated.v1_3.ClockifySettingsHeader.builder;
     v1_4Builder: typeof generated.v1_4.ClockifySettingsHeader.builder;
     v1_5Builder: typeof generated.v1_5.ClockifySettingsHeader.builder;
+    v1_6Builder: typeof generated.v1_6.ClockifySettingsHeader.builder;
 };
-export type ClockifySettingsGroup<V extends ClockifySchemaVersion = "1.4"> = V extends "1.2" ? generated.v1_2.ClockifySettingsGroup : V extends "1.3" ? generated.v1_3.ClockifySettingsGroup : V extends "1.4" ? generated.v1_4.ClockifySettingsGroup : generated.v1_5.ClockifySettingsGroup;
+export type ClockifySettingsGroup<V extends ClockifySchemaVersion = "1.4"> = V extends "1.2" ? generated.v1_2.ClockifySettingsGroup : V extends "1.3" ? generated.v1_3.ClockifySettingsGroup : V extends "1.4" ? generated.v1_4.ClockifySettingsGroup : V extends "1.5" ? generated.v1_5.ClockifySettingsGroup : generated.v1_6.ClockifySettingsGroup;
 export declare const ClockifySettingsGroup: {
     v1_2Builder: typeof generated.v1_2.ClockifySettingsGroup.builder;
     v1_3Builder: typeof generated.v1_3.ClockifySettingsGroup.builder;
     v1_4Builder: typeof generated.v1_4.ClockifySettingsGroup.builder;
     v1_5Builder: typeof generated.v1_5.ClockifySettingsGroup.builder;
+    v1_6Builder: typeof generated.v1_6.ClockifySettingsGroup.builder;
 };
-export type ClockifySettingsTab<V extends ClockifySchemaVersion = "1.4"> = V extends "1.2" ? generated.v1_2.ClockifySettingsTab : V extends "1.3" ? generated.v1_3.ClockifySettingsTab : V extends "1.4" ? generated.v1_4.ClockifySettingsTab : generated.v1_5.ClockifySettingsTab;
+export type ClockifySettingsTab<V extends ClockifySchemaVersion = "1.4"> = V extends "1.2" ? generated.v1_2.ClockifySettingsTab : V extends "1.3" ? generated.v1_3.ClockifySettingsTab : V extends "1.4" ? generated.v1_4.ClockifySettingsTab : V extends "1.5" ? generated.v1_5.ClockifySettingsTab : generated.v1_6.ClockifySettingsTab;
 export declare const ClockifySettingsTab: {
     v1_2Builder: typeof generated.v1_2.ClockifySettingsTab.builder;
     v1_3Builder: typeof generated.v1_3.ClockifySettingsTab.builder;
     v1_4Builder: typeof generated.v1_4.ClockifySettingsTab.builder;
     v1_5Builder: typeof generated.v1_5.ClockifySettingsTab.builder;
+    v1_6Builder: typeof generated.v1_6.ClockifySettingsTab.builder;
 };
-export type ClockifySettings<V extends ClockifySchemaVersion = "1.4"> = V extends "1.2" ? generated.v1_2.ClockifySettings : V extends "1.3" ? generated.v1_3.ClockifySettings : V extends "1.4" ? generated.v1_4.ClockifySettings : generated.v1_5.ClockifySettings;
+export type ClockifySettings<V extends ClockifySchemaVersion = "1.4"> = V extends "1.2" ? generated.v1_2.ClockifySettings : V extends "1.3" ? generated.v1_3.ClockifySettings : V extends "1.4" ? generated.v1_4.ClockifySettings : V extends "1.5" ? generated.v1_5.ClockifySettings : generated.v1_6.ClockifySettings;
 export declare const ClockifySettings: {
     v1_2Builder: typeof generated.v1_2.ClockifySettings.builder;
     v1_3Builder: typeof generated.v1_3.ClockifySettings.builder;
     v1_4Builder: typeof generated.v1_4.ClockifySettings.builder;
     v1_5Builder: typeof generated.v1_5.ClockifySettings.builder;
+    v1_6Builder: typeof generated.v1_6.ClockifySettings.builder;
 };
 export declare const ClockifyScope: {
     readonly CLIENT_READ: "CLIENT_READ";
@@ -3453,12 +4242,24 @@ export declare function assertClockifyManifest(value: unknown): asserts value is
 import type { AddonResponse } from "../shared/response.js";
 /** Options for the SDK's browser-facing response security baseline. */
 export interface ClockifySecurityHeaderOptions {
+    /**
+     * CSP `frame-ancestors` values. Omitting this defaults to `["'none'"]` —
+     * deny all embedding, including Clockify's own iframe. Pass the exact
+     * verified Clockify parent origin (e.g. `[parentOrigin]`) to allow the
+     * component to actually load inside Clockify.
+     */
     readonly frameAncestors?: readonly string[];
     readonly contentSecurityPolicy?: Readonly<Record<string, readonly string[]>>;
 }
 /** Builds the secure default headers for Clockify iframe HTML and browser-facing JSON. */
 export declare function buildClockifySecurityHeaders(options?: ClockifySecurityHeaderOptions): Record<string, string>;
-/** Creates a no-store HTML response with the SDK security baseline. */
+/**
+ * Creates a no-store HTML response with the SDK security baseline.
+ *
+ * @param options.frameAncestors Omit this and the response denies all embedding — the iframe
+ * will NOT load in Clockify. Pass `[parentOrigin]` (the exact verified Clockify parent origin)
+ * for a component response that Clockify actually embeds.
+ */
 export declare function createClockifyHtmlResponse(body: string, options?: ClockifySecurityHeaderOptions & {
     readonly status?: number;
 }): AddonResponse;
@@ -3533,8 +4334,24 @@ export interface ClockifyTokenCodec {
 }
 /** Creates an AES-256-GCM token codec backed exclusively by Web Crypto. */
 export declare function createClockifyAesGcmTokenCodec(key: ClockifyAesGcmKey): ClockifyTokenCodec;
-/** Wraps a store so installation and nested webhook credentials are encrypted at rest. */
-export declare function wrapClockifyInstallationStoreWithEncryption(store: ClockifyInstallationStore, codec: ClockifyTokenCodec): ClockifyInstallationStore;
+/**
+ * Composes two codecs to support key rotation without a storage migration.
+ * Encodes only with `newCodec`; decodes by trying `newCodec` first, falling
+ * back to `oldCodec` for a row encrypted before the rotation. Once every
+ * stored row has been re-saved (and so re-encrypted with the new key), drop
+ * `oldCodec` and use `newCodec` alone. See the public-key-rotation
+ * deployment guide for the equivalent recipe applied to signature keys.
+ */
+export declare function createRotatingClockifyTokenCodec(newCodec: ClockifyTokenCodec, oldCodec: ClockifyTokenCodec): ClockifyTokenCodec;
+/**
+ * Wraps a store so installation and nested webhook credentials are encrypted at rest.
+ *
+ * A `load()` whose stored row fails to decode (wrong key, tampering, corruption) returns `null`,
+ * the same result as "no installation" — the caller must fail closed either way. Pass
+ * `onDecodeError` to observe the difference for operational alerting; it does not change what
+ * `load()` returns.
+ */
+export declare function wrapClockifyInstallationStoreWithEncryption(store: ClockifyInstallationStore, codec: ClockifyTokenCodec, onDecodeError?: (error: unknown, workspaceId: string, addonId: string) => void): ClockifyInstallationStore;
 ```
 
 ### clockify/clockify-webhook-idempotency.d.ts
@@ -3546,7 +4363,13 @@ export interface ClockifyIdempotencyLeaseStore {
     complete(key: string, owner: string): Promise<boolean>;
     release(key: string, owner: string): Promise<boolean>;
 }
-/** In-memory lease store for tests and single-process deployments. */
+/**
+ * In-memory lease store for tests and single-process deployments. Completed
+ * entries are retained forever (no TTL) so a replayed webhook is always
+ * recognized as a duplicate; a long-lived process therefore grows this map
+ * without bound. Use a durable store with a TTL on completed entries for
+ * production.
+ */
 export declare class InMemoryClockifyIdempotencyLeaseStore implements ClockifyIdempotencyLeaseStore {
     private readonly leases;
     private readonly now;
@@ -3579,6 +4402,7 @@ export * as v1_2 from "./v1_2.js";
 export * as v1_3 from "./v1_3.js";
 export * as v1_4 from "./v1_4.js";
 export * as v1_5 from "./v1_5.js";
+export * as v1_6 from "./v1_6.js";
 export { clockifyManifestSchemas } from "./manifest-schemas.js";
 ```
 
@@ -3645,7 +4469,7 @@ export interface ClockifyComponent extends ClockifyResource {
     /** Specifies which kind of component will be rendered. If component is 'tab', it also comes with the name of Clockify page where 'tab' component will be rendered. */
     readonly type: "sidebar" | "widget" | "timeoff.tab" | "schedule.tab" | "approvals.tab" | "reports.tab" | "activity.tab" | "team.tab" | "projects.tab";
     /** If you want to define some component-specific options for component that holds your addon app, this is the place to define them. */
-    readonly options?: Record<string, any>;
+    readonly options?: Record<string, unknown>;
     /** Label of the component e.g. if component is 'tab', value of 'label' property will be shown in UI. Label is not required for WIDGET component type. */
     readonly label?: string;
     /** Specifies who can access addon component. You can either choose to give access only to Clockify workspace admins, or everyone. */
@@ -3903,7 +4727,7 @@ export interface ClockifyComponentBuilder_path {
 }
 export interface ClockifyComponentBuilder_Optional {
     /** If you want to define some component-specific options for component that holds your addon app, this is the place to define them. */
-    options(value: Record<string, any>): ClockifyComponentBuilder_Optional;
+    options(value: Record<string, unknown>): ClockifyComponentBuilder_Optional;
     /** Label of the component e.g. if component is 'tab', value of 'label' property will be shown in UI. Label is not required for WIDGET component type. */
     label(value: string): ClockifyComponentBuilder_Optional;
     /** Path to addon hosted image which will serve as an icon for Clockify component. Path is part of the url from which the image will be served. Full url is constructed by concatenating addon 'baseUrl' and path. */
@@ -4157,7 +4981,7 @@ export interface ClockifyComponent extends ClockifyResource {
     /** Specifies which kind of component will be rendered. If component is 'tab', it also comes with the name of Clockify page where 'tab' component will be rendered. */
     readonly type: "sidebar" | "widget" | "timeoff.tab" | "schedule.tab" | "approvals.tab" | "reports.tab" | "activity.tab" | "team.tab" | "projects.tab";
     /** If you want to define some component-specific options for component that holds your addon app, this is the place to define them. */
-    readonly options?: Record<string, any>;
+    readonly options?: Record<string, unknown>;
     /** Label of the component e.g. if component is 'tab', value of 'label' property will be shown in UI. Label is not required for WIDGET component type. */
     readonly label: string;
     /** Specifies who can access addon component. You can either choose to give access only to Clockify workspace admins, or everyone. */
@@ -4379,7 +5203,7 @@ export interface ClockifyComponentBuilder_label {
 }
 export interface ClockifyComponentBuilder_Optional {
     /** If you want to define some component-specific options for component that holds your addon app, this is the place to define them. */
-    options(value: Record<string, any>): ClockifyComponentBuilder_Optional;
+    options(value: Record<string, unknown>): ClockifyComponentBuilder_Optional;
     /** Path to addon hosted image which will serve as an icon for Clockify component. Path is part of the url from which the image will be served. Full url is constructed by concatenating addon 'baseUrl' and path. */
     iconPath(value: string): ClockifyComponentBuilder_Optional;
     /** Defines rendered component width expressed in 'vw'. Applicable only to WIDGET components. */
@@ -4629,7 +5453,7 @@ export interface ClockifyComponent extends ClockifyResource {
     /** Specifies which kind of component will be rendered. If component is 'tab', it also comes with the name of Clockify page where 'tab' component will be rendered. */
     readonly type: "sidebar" | "widget" | "timeoff.tab" | "schedule.tab" | "approvals.tab" | "reports.tab" | "activity.tab" | "team.tab" | "projects.tab" | "invoices.action";
     /** If you want to define some component-specific options for component that holds your addon app, this is the place to define them. */
-    readonly options?: Record<string, any>;
+    readonly options?: Record<string, unknown>;
     /** Label of the component e.g. if component is 'tab', value of 'label' property will be shown in UI. Label is not required for WIDGET component type. */
     readonly label: string;
     /** Specifies who can access addon component. You can either choose to give access only to Clockify workspace admins, or everyone. */
@@ -4853,7 +5677,7 @@ export interface ClockifyComponentBuilder_label {
 }
 export interface ClockifyComponentBuilder_Optional {
     /** If you want to define some component-specific options for component that holds your addon app, this is the place to define them. */
-    options(value: Record<string, any>): ClockifyComponentBuilder_Optional;
+    options(value: Record<string, unknown>): ClockifyComponentBuilder_Optional;
     /** Path to addon hosted image which will serve as an icon for Clockify component. Path is part of the url from which the image will be served. Full url is constructed by concatenating addon 'baseUrl' and path. */
     iconPath(value: string): ClockifyComponentBuilder_Optional;
     /** Defines rendered component width expressed in 'vw'. Applicable only to WIDGET components. */
@@ -5103,7 +5927,7 @@ export interface ClockifyComponent extends ClockifyResource {
     /** Specifies which kind of component will be rendered. If component is 'tab', it also comes with the name of Clockify page where 'tab' component will be rendered. */
     readonly type: "sidebar" | "widget" | "timeoff.tab" | "schedule.tab" | "approvals.tab" | "reports.tab" | "activity.tab" | "team.tab" | "projects.tab" | "invoices.action";
     /** If you want to define some component-specific options for component that holds your addon app, this is the place to define them. */
-    readonly options?: Record<string, any>;
+    readonly options?: Record<string, unknown>;
     /** Label of the component e.g. if component is 'tab', value of 'label' property will be shown in UI. Label is not required for WIDGET component type. */
     readonly label: string;
     /** Specifies who can access addon component. You can either choose to give access only to Clockify workspace admins, or everyone. */
@@ -5383,7 +6207,541 @@ export interface ClockifyComponentBuilder_label {
 }
 export interface ClockifyComponentBuilder_Optional {
     /** If you want to define some component-specific options for component that holds your addon app, this is the place to define them. */
-    options(value: Record<string, any>): ClockifyComponentBuilder_Optional;
+    options(value: Record<string, unknown>): ClockifyComponentBuilder_Optional;
+    /** Path to addon hosted image which will serve as an icon for Clockify component. Path is part of the url from which the image will be served. Full url is constructed by concatenating addon 'baseUrl' and path. */
+    iconPath(value: string): ClockifyComponentBuilder_Optional;
+    /** Defines rendered component width expressed in 'vw'. Applicable only to WIDGET components. */
+    width(value: number): ClockifyComponentBuilder_Optional;
+    /** Defines rendered component height expressed in 'vw'. Applicable only to WIDGET components. */
+    height(value: number): ClockifyComponentBuilder_Optional;
+    build(): ClockifyComponent;
+}
+export declare namespace ClockifyComponent {
+    function builder(): ClockifyComponentBuilder_type;
+}
+export declare function ClockifyComponentBuilder(): ClockifyComponentBuilder_type;
+export interface ClockifySettingBuilder_id {
+    /** Setting unique identifier. */
+    id(value: string): ClockifySettingBuilder_name;
+}
+export interface ClockifySettingBuilder_name {
+    /** Setting name. */
+    name(value: string): ClockifySettingBuilder_accessLevel;
+}
+export interface ClockifySettingBuilder_accessLevel {
+    /** Specifies who can access addon settings. You can either choose to give access only to Clockify workspace admins, or everyone. */
+    accessLevel(value: "ADMINS" | "EVERYONE"): ClockifySettingBuilder_type;
+    /** Specifies who can access addon settings. You can either choose to give access only to Clockify workspace admins, or everyone. */
+    allowAdmins(): ClockifySettingBuilder_type;
+    /** Specifies who can access addon settings. You can either choose to give access only to Clockify workspace admins, or everyone. */
+    allowEveryone(): ClockifySettingBuilder_type;
+}
+export interface ClockifySettingBuilder_type {
+    /** Specifies setting value type. Each type is shown differently in UI and value must be compatible with a specified type e.g. if 'type' is TXT, 'value' must be 'string', if 'type' is DROPDOWN, 'value' must be 'array'. */
+    type(value: "TXT" | "NUMBER" | "DROPDOWN_SINGLE" | "DROPDOWN_MULTIPLE" | "CHECKBOX" | "LINK" | "USER_DROPDOWN_SINGLE" | "USER_DROPDOWN_MULTIPLE"): ClockifySettingBuilder_value;
+    /** Specifies setting value type. Each type is shown differently in UI and value must be compatible with a specified type e.g. if 'type' is TXT, 'value' must be 'string', if 'type' is DROPDOWN, 'value' must be 'array'. */
+    asTxt(): ClockifySettingBuilder_value;
+    /** Specifies setting value type. Each type is shown differently in UI and value must be compatible with a specified type e.g. if 'type' is TXT, 'value' must be 'string', if 'type' is DROPDOWN, 'value' must be 'array'. */
+    asNumber(): ClockifySettingBuilder_value;
+    /** Specifies setting value type. Each type is shown differently in UI and value must be compatible with a specified type e.g. if 'type' is TXT, 'value' must be 'string', if 'type' is DROPDOWN, 'value' must be 'array'. */
+    asDropdownSingle(): ClockifySettingBuilder_value;
+    /** Specifies setting value type. Each type is shown differently in UI and value must be compatible with a specified type e.g. if 'type' is TXT, 'value' must be 'string', if 'type' is DROPDOWN, 'value' must be 'array'. */
+    asDropdownMultiple(): ClockifySettingBuilder_value;
+    /** Specifies setting value type. Each type is shown differently in UI and value must be compatible with a specified type e.g. if 'type' is TXT, 'value' must be 'string', if 'type' is DROPDOWN, 'value' must be 'array'. */
+    asCheckbox(): ClockifySettingBuilder_value;
+    /** Specifies setting value type. Each type is shown differently in UI and value must be compatible with a specified type e.g. if 'type' is TXT, 'value' must be 'string', if 'type' is DROPDOWN, 'value' must be 'array'. */
+    asLink(): ClockifySettingBuilder_value;
+    /** Specifies setting value type. Each type is shown differently in UI and value must be compatible with a specified type e.g. if 'type' is TXT, 'value' must be 'string', if 'type' is DROPDOWN, 'value' must be 'array'. */
+    asUserDropdownSingle(): ClockifySettingBuilder_value;
+    /** Specifies setting value type. Each type is shown differently in UI and value must be compatible with a specified type e.g. if 'type' is TXT, 'value' must be 'string', if 'type' is DROPDOWN, 'value' must be 'array'. */
+    asUserDropdownMultiple(): ClockifySettingBuilder_value;
+}
+export interface ClockifySettingBuilder_value {
+    /** Value of the setting. Value must be of type 'setting.type' e.g. For USER_DROPDOWN, value will be the user ID of the installer upon installation. */
+    value(value: string | number | any[] | boolean): ClockifySettingBuilder_Optional;
+}
+export interface ClockifySettingBuilder_Optional {
+    /** Brief description of setting. What is it used for, what does it affect, etc. */
+    description(value: string): ClockifySettingBuilder_Optional;
+    /** Text that is shown in UI form field if setting has no value. */
+    placeholder(value: string): ClockifySettingBuilder_Optional;
+    /** Serves as key for setting that represents key-value pair e.g. if you have documentation addon which shows document corresponding to the Clockify page i.e. you need to match the Clockify page to the url of the document describing how to use that page. In that case, key would be 'Clockify page', and 'value' would be 'url of the document'. */
+    key(value: string): ClockifySettingBuilder_Optional;
+    /** Required if 'setting.type' is DROPDOWN_SINGLE or DROPDOWN_MULTIPLE. Specifies which options will be shown in dropdown. */
+    allowedValues(value: string[]): ClockifySettingBuilder_Optional;
+    /** Toggles whether setting value is required or not. */
+    required(value: boolean): ClockifySettingBuilder_Optional;
+    /** Toggles whether setting value will be shown with 'Copy' button for easier copying. */
+    copyable(value: boolean): ClockifySettingBuilder_Optional;
+    /** Toggles whether setting value is read-only i.e. setting value cannot be updated. */
+    readOnly(value: boolean): ClockifySettingBuilder_Optional;
+    build(): ClockifySetting;
+}
+export declare namespace ClockifySetting {
+    function builder(): ClockifySettingBuilder_id;
+}
+export declare function ClockifySettingBuilder(): ClockifySettingBuilder_id;
+export interface ClockifySettingsHeaderBuilder_title {
+    /** Text shown in banner. */
+    title(value: string): ClockifySettingsHeaderBuilder_Build;
+}
+export interface ClockifySettingsHeaderBuilder_Build {
+    build(): ClockifySettingsHeader;
+}
+export declare namespace ClockifySettingsHeader {
+    function builder(): ClockifySettingsHeaderBuilder_title;
+}
+export declare function ClockifySettingsHeaderBuilder(): ClockifySettingsHeaderBuilder_title;
+export interface ClockifySettingsGroupBuilder_id {
+    /** Group identifier. */
+    id(value: string): ClockifySettingsGroupBuilder_title;
+}
+export interface ClockifySettingsGroupBuilder_title {
+    /** Group title. Shown in UI. */
+    title(value: string): ClockifySettingsGroupBuilder_settings;
+}
+export interface ClockifySettingsGroupBuilder_settings {
+    /** List of settings the group contains */
+    settings(value: ClockifySetting[]): ClockifySettingsGroupBuilder_Optional;
+}
+export interface ClockifySettingsGroupBuilder_Optional {
+    /** Brief description of the settings that given group contains. */
+    description(value: string): ClockifySettingsGroupBuilder_Optional;
+    /** Banner with info text shown before all settings that given group contains. */
+    header(value: ClockifySettingsHeader): ClockifySettingsGroupBuilder_Optional;
+    build(): ClockifySettingsGroup;
+}
+export declare namespace ClockifySettingsGroup {
+    function builder(): ClockifySettingsGroupBuilder_id;
+}
+export declare function ClockifySettingsGroupBuilder(): ClockifySettingsGroupBuilder_id;
+export interface ClockifySettingsTabBuilder_id {
+    /** Tab identifier. */
+    id(value: string): ClockifySettingsTabBuilder_name;
+}
+export interface ClockifySettingsTabBuilder_name {
+    /** Tab name shown in UI. */
+    name(value: string): ClockifySettingsTabBuilder_Optional;
+}
+export interface ClockifySettingsTabBuilder_Optional {
+    /** Banner with info text shown before all settings and groups contained in tab. */
+    header(value: ClockifySettingsHeader): ClockifySettingsTabBuilder_Optional;
+    /** List of setting groups contained in tab. */
+    groups(value: ClockifySettingsGroup[]): ClockifySettingsTabBuilder_Optional;
+    /** List of settings contained in tab */
+    settings(value: ClockifySetting[]): ClockifySettingsTabBuilder_Optional;
+    build(): ClockifySettingsTab;
+}
+export declare namespace ClockifySettingsTab {
+    function builder(): ClockifySettingsTabBuilder_id;
+}
+export declare function ClockifySettingsTabBuilder(): ClockifySettingsTabBuilder_id;
+export interface ClockifySettingsBuilder_tabs {
+    tabs(value: ClockifySettingsTab[]): ClockifySettingsBuilder_Build;
+}
+export interface ClockifySettingsBuilder_Build {
+    build(): ClockifySettings;
+}
+export declare namespace ClockifySettings {
+    function builder(): ClockifySettingsBuilder_tabs;
+}
+export declare function ClockifySettingsBuilder(): ClockifySettingsBuilder_tabs;
+export interface ClockifyManifestBuilder_key {
+    /** Serves as addon identifier. All addons must have unique key. */
+    key(value: string): ClockifyManifestBuilder_name;
+}
+export interface ClockifyManifestBuilder_name {
+    /** Addon name */
+    name(value: string): ClockifyManifestBuilder_baseUrl;
+}
+export interface ClockifyManifestBuilder_baseUrl {
+    /** Base url on which addon app is hosted. This url with 'path' from the following entities is used when constructing urls for webhooks, components, lifecycle hooks, etc. */
+    baseUrl(value: string): ClockifyManifestBuilder_minimalSubscriptionPlan;
+}
+export interface ClockifyManifestBuilder_minimalSubscriptionPlan {
+    /** Minimal Clockify's subscription plan that is required for addon. This plan is used when checking if user's current plan is at least equal to the plan required by addon. */
+    minimalSubscriptionPlan(value: ClockifyMinimalSubscriptionPlan): ClockifyManifestBuilder_Optional;
+    /** Minimal Clockify's subscription plan that is required for addon. This plan is used when checking if user's current plan is at least equal to the plan required by addon. */
+    requireFreePlan(): ClockifyManifestBuilder_Optional;
+    /** Minimal Clockify's subscription plan that is required for addon. This plan is used when checking if user's current plan is at least equal to the plan required by addon. */
+    requireBasicPlan(): ClockifyManifestBuilder_Optional;
+    /** Minimal Clockify's subscription plan that is required for addon. This plan is used when checking if user's current plan is at least equal to the plan required by addon. */
+    requireStandardPlan(): ClockifyManifestBuilder_Optional;
+    /** Minimal Clockify's subscription plan that is required for addon. This plan is used when checking if user's current plan is at least equal to the plan required by addon. */
+    requireProPlan(): ClockifyManifestBuilder_Optional;
+    /** Minimal Clockify's subscription plan that is required for addon. This plan is used when checking if user's current plan is at least equal to the plan required by addon. */
+    requireEnterprisePlan(): ClockifyManifestBuilder_Optional;
+}
+export interface ClockifyManifestBuilder_Optional {
+    /** API scopes that addon is using. */
+    scopes(value: ClockifyScope[]): ClockifyManifestBuilder_Optional;
+    /** Brief description of given addon functionalities and purpose. */
+    description(value: string): ClockifyManifestBuilder_Optional;
+    /** Path to addon icon. Path is part of the url where image icon is being hosted. Full url is constructed by concatenating addon 'baseUrl' and path. */
+    iconPath(value: string): ClockifyManifestBuilder_Optional;
+    /** List of defined lifecycle hooks for given addon. */
+    lifecycle(value: ClockifyLifecycleEvent[]): ClockifyManifestBuilder_Optional;
+    /** List of defined webhooks for given addon. */
+    webhooks(value: ClockifyWebhook[]): ClockifyManifestBuilder_Optional;
+    /** List of defined components for given addon. */
+    components(value: ClockifyComponent[]): ClockifyManifestBuilder_Optional;
+    settings(value: string | ClockifySettings): ClockifyManifestBuilder_Optional;
+    build(): ClockifyManifest;
+}
+export declare namespace ClockifyManifest {
+    function builder(): ClockifyManifestBuilder_key;
+}
+export declare function ClockifyManifestBuilder(): ClockifyManifestBuilder_key;
+```
+
+### clockify/generated/v1_6.d.ts
+
+```ts
+import { ClockifyResource } from "../clockify-resource.js";
+export declare const ClockifyScope: {
+    readonly CLIENT_READ: "CLIENT_READ";
+    readonly CLIENT_WRITE: "CLIENT_WRITE";
+    readonly PROJECT_READ: "PROJECT_READ";
+    readonly PROJECT_WRITE: "PROJECT_WRITE";
+    readonly TAG_READ: "TAG_READ";
+    readonly TAG_WRITE: "TAG_WRITE";
+    readonly TASK_READ: "TASK_READ";
+    readonly TASK_WRITE: "TASK_WRITE";
+    readonly TIME_ENTRY_READ: "TIME_ENTRY_READ";
+    readonly TIME_ENTRY_WRITE: "TIME_ENTRY_WRITE";
+    readonly EXPENSE_READ: "EXPENSE_READ";
+    readonly EXPENSE_WRITE: "EXPENSE_WRITE";
+    readonly INVOICE_READ: "INVOICE_READ";
+    readonly INVOICE_WRITE: "INVOICE_WRITE";
+    readonly USER_READ: "USER_READ";
+    readonly USER_WRITE: "USER_WRITE";
+    readonly GROUP_READ: "GROUP_READ";
+    readonly GROUP_WRITE: "GROUP_WRITE";
+    readonly WORKSPACE_READ: "WORKSPACE_READ";
+    readonly WORKSPACE_WRITE: "WORKSPACE_WRITE";
+    readonly CUSTOM_FIELDS_READ: "CUSTOM_FIELDS_READ";
+    readonly CUSTOM_FIELDS_WRITE: "CUSTOM_FIELDS_WRITE";
+    readonly APPROVAL_READ: "APPROVAL_READ";
+    readonly APPROVAL_WRITE: "APPROVAL_WRITE";
+    readonly SCHEDULING_READ: "SCHEDULING_READ";
+    readonly SCHEDULING_WRITE: "SCHEDULING_WRITE";
+    readonly REPORTS_READ: "REPORTS_READ";
+    readonly REPORTS_WRITE: "REPORTS_WRITE";
+    readonly TIME_OFF_READ: "TIME_OFF_READ";
+    readonly TIME_OFF_WRITE: "TIME_OFF_WRITE";
+};
+export type ClockifyScope = typeof ClockifyScope[keyof typeof ClockifyScope];
+export declare const ClockifyMinimalSubscriptionPlan: {
+    readonly FREE: "FREE";
+    readonly BASIC: "BASIC";
+    readonly STANDARD: "STANDARD";
+    readonly PRO: "PRO";
+    readonly ENTERPRISE: "ENTERPRISE";
+};
+export type ClockifyMinimalSubscriptionPlan = typeof ClockifyMinimalSubscriptionPlan[keyof typeof ClockifyMinimalSubscriptionPlan];
+export interface ClockifyWebhook extends ClockifyResource {
+    /** Clockify event that triggers webhook is sending to specified url. Url is constructed by concatenating addon 'baseUrl' and 'webhook.path'. */
+    readonly event: "APPROVAL_REQUEST_STATUS_UPDATED" | "ASSIGNMENT_CREATED" | "ASSIGNMENT_DELETED" | "ASSIGNMENT_PUBLISHED" | "ASSIGNMENT_UPDATED" | "BALANCE_UPDATED" | "BILLABLE_RATE_UPDATED" | "CLIENT_DELETED" | "CLIENT_UPDATED" | "COST_RATE_UPDATED" | "EXPENSE_CREATED" | "EXPENSE_DELETED" | "EXPENSE_RESTORED" | "EXPENSE_UPDATED" | "INVOICE_UPDATED" | "LIMITED_USERS_ADDED_TO_WORKSPACE" | "NEW_APPROVAL_REQUEST" | "NEW_CLIENT" | "NEW_INVOICE" | "NEW_PROJECT" | "NEW_TAG" | "NEW_TASK" | "NEW_TIME_ENTRY" | "NEW_TIMER_STARTED" | "PROJECT_DELETED" | "PROJECT_UPDATED" | "TAG_DELETED" | "TAG_UPDATED" | "TASK_DELETED" | "TASK_UPDATED" | "TIME_ENTRY_DELETED" | "TIME_ENTRY_RESTORED" | "TIME_ENTRY_SPLIT" | "TIME_ENTRY_UPDATED" | "TIME_OFF_REQUEST_APPROVED" | "TIME_OFF_REQUEST_REJECTED" | "TIME_OFF_REQUEST_STARTED" | "TIME_OFF_REQUEST_UPDATED" | "TIME_OFF_REQUEST_WITHDRAWN" | "TIME_OFF_REQUESTED" | "TIMER_STOPPED" | "USER_ACTIVATED_ON_WORKSPACE" | "USER_DEACTIVATED_ON_WORKSPACE" | "USER_DELETED_FROM_WORKSPACE" | "USER_EMAIL_CHANGED" | "USER_GROUP_CREATED" | "USER_GROUP_DELETED" | "USER_GROUP_UPDATED" | "USER_JOINED_WORKSPACE" | "USER_UPDATED" | "USERS_INVITED_TO_WORKSPACE";
+    /** Path to addon endpoint designated for receiving webhooks from Clockify side. Path is just part of url to which webhook will be sent. Full url is constructed by concatenating addon 'baseUrl' and path. */
+    readonly path: string;
+}
+/** Specialized webhook triggered on addon lifecycle event. */
+export interface ClockifyLifecycleEvent extends ClockifyResource {
+    /** Path to addon endpoint designated for receiving lifecycle hooks from Clockify side. Path is just part of url to which a lifecycle hook will be sent. Full url is constructed by concatenating addon 'baseUrl' and path. */
+    readonly path: string;
+    /** Specifies addon lifecycle event you want to be notified by Clockify. */
+    readonly type: "INSTALLED" | "DELETED" | "SETTINGS_UPDATED" | "STATUS_CHANGED";
+}
+/** UI element shown in Clockify web app. It serves as a placeholder for addon app i.e. addon app will be rendered inside Clockify component. */
+export interface ClockifyComponent extends ClockifyResource {
+    /** Specifies which kind of component will be rendered. If component is 'tab', it also comes with the name of Clockify page where 'tab' component will be rendered. */
+    readonly type: "sidebar" | "widget" | "timeoff.tab" | "schedule.tab" | "approvals.tab" | "reports.tab" | "activity.tab" | "team.tab" | "projects.tab" | "invoices.action" | "timeentries.action.uiblocks";
+    /** If you want to define some component-specific options for component that holds your addon app, this is the place to define them. */
+    readonly options?: Record<string, unknown>;
+    /** Label of the component e.g. if component is 'tab', value of 'label' property will be shown in UI. Label is not required for WIDGET component type. */
+    readonly label: string;
+    /** Specifies who can access addon component. You can either choose to give access only to Clockify workspace admins, or everyone. */
+    readonly accessLevel: "ADMINS" | "EVERYONE";
+    /** Path to addon web app that will be rendered inside Clockify component. Path is part of the url from which component content will be served. Full url is constructed by concatenating addon 'baseUrl' and path. */
+    readonly path: string;
+    /** Path to addon hosted image which will serve as an icon for Clockify component. Path is part of the url from which the image will be served. Full url is constructed by concatenating addon 'baseUrl' and path. */
+    readonly iconPath?: string;
+    /** Defines rendered component width expressed in 'vw'. Applicable only to WIDGET components. */
+    readonly width?: number;
+    /** Defines rendered component height expressed in 'vw'. Applicable only to WIDGET components. */
+    readonly height?: number;
+}
+/** This is definition of Clockify addon setting. Each setting must have id, name, type and value. Value and type of setting must be compatible. */
+export interface ClockifySetting {
+    /** Setting unique identifier. */
+    readonly id: string;
+    /** Setting name. */
+    readonly name: string;
+    /** Brief description of setting. What is it used for, what does it affect, etc. */
+    readonly description?: string;
+    /** Text that is shown in UI form field if setting has no value. */
+    readonly placeholder?: string;
+    /** Specifies who can access addon settings. You can either choose to give access only to Clockify workspace admins, or everyone. */
+    readonly accessLevel: "ADMINS" | "EVERYONE";
+    /** Specifies setting value type. Each type is shown differently in UI and value must be compatible with a specified type e.g. if 'type' is TXT, 'value' must be 'string', if 'type' is DROPDOWN, 'value' must be 'array'. */
+    readonly type: "TXT" | "NUMBER" | "DROPDOWN_SINGLE" | "DROPDOWN_MULTIPLE" | "CHECKBOX" | "LINK" | "USER_DROPDOWN_SINGLE" | "USER_DROPDOWN_MULTIPLE";
+    /** Serves as key for setting that represents key-value pair e.g. if you have documentation addon which shows document corresponding to the Clockify page i.e. you need to match the Clockify page to the url of the document describing how to use that page. In that case, key would be 'Clockify page', and 'value' would be 'url of the document'. */
+    readonly key?: string;
+    /** Value of the setting. Value must be of type 'setting.type' e.g. For USER_DROPDOWN, value will be the user ID of the installer upon installation. */
+    readonly value: string | number | any[] | boolean;
+    /** Required if 'setting.type' is DROPDOWN_SINGLE or DROPDOWN_MULTIPLE. Specifies which options will be shown in dropdown. */
+    readonly allowedValues?: string[];
+    /** Toggles whether setting value is required or not. */
+    readonly required?: boolean;
+    /** Toggles whether setting value will be shown with 'Copy' button for easier copying. */
+    readonly copyable?: boolean;
+    /** Toggles whether setting value is read-only i.e. setting value cannot be updated. */
+    readonly readOnly?: boolean;
+}
+/** Setting banner that shows info about setting group or tab. It is shown as a blue banner before all settings contained in a given group. */
+export interface ClockifySettingsHeader {
+    /** Text shown in banner. */
+    readonly title: string;
+}
+/** Serves as another level of hierarchy when defining settings. Group can be part of tabs, and one tab can contain multiple groups. */
+export interface ClockifySettingsGroup {
+    /** Group identifier. */
+    readonly id: string;
+    /** Group title. Shown in UI. */
+    readonly title: string;
+    /** Brief description of the settings that given group contains. */
+    readonly description?: string;
+    /** Banner with info text shown before all settings that given group contains. */
+    readonly header?: ClockifySettingsHeader;
+    /** List of settings the group contains */
+    readonly settings: ClockifySetting[];
+}
+/** Serves as top level of hierarchy when defining settings. Tabs cannot be nested in other tabs or groups. */
+export interface ClockifySettingsTab {
+    /** Tab identifier. */
+    readonly id: string;
+    /** Tab name shown in UI. */
+    readonly name: string;
+    /** Banner with info text shown before all settings and groups contained in tab. */
+    readonly header?: ClockifySettingsHeader;
+    /** List of setting groups contained in tab. */
+    readonly groups?: ClockifySettingsGroup[];
+    /** List of settings contained in tab */
+    readonly settings?: ClockifySetting[];
+}
+/** Top level settings property. All settings grouped in tabs are defined here. */
+export interface ClockifySettings {
+    readonly tabs: ClockifySettingsTab[];
+}
+export interface ClockifyManifest {
+    readonly schemaVersion: "1.6";
+    /** Serves as addon identifier. All addons must have unique key. */
+    readonly key: string;
+    /** Addon name */
+    readonly name: string;
+    /** Base url on which addon app is hosted. This url with 'path' from the following entities is used when constructing urls for webhooks, components, lifecycle hooks, etc. */
+    readonly baseUrl: string;
+    /** Minimal Clockify's subscription plan that is required for addon. This plan is used when checking if user's current plan is at least equal to the plan required by addon. */
+    readonly minimalSubscriptionPlan: ClockifyMinimalSubscriptionPlan;
+    /** API scopes that addon is using. */
+    readonly scopes?: ClockifyScope[];
+    /** Brief description of given addon functionalities and purpose. */
+    readonly description?: string;
+    /** Path to addon icon. Path is part of the url where image icon is being hosted. Full url is constructed by concatenating addon 'baseUrl' and path. */
+    readonly iconPath?: string;
+    /** List of defined lifecycle hooks for given addon. */
+    readonly lifecycle?: ClockifyLifecycleEvent[];
+    /** List of defined webhooks for given addon. */
+    readonly webhooks?: ClockifyWebhook[];
+    /** List of defined components for given addon. */
+    readonly components?: ClockifyComponent[];
+    readonly settings?: string | ClockifySettings;
+}
+export interface ClockifyWebhookBuilder_event {
+    /** Clockify event that triggers webhook is sending to specified url. Url is constructed by concatenating addon 'baseUrl' and 'webhook.path'. */
+    event(value: "APPROVAL_REQUEST_STATUS_UPDATED" | "ASSIGNMENT_CREATED" | "ASSIGNMENT_DELETED" | "ASSIGNMENT_PUBLISHED" | "ASSIGNMENT_UPDATED" | "BALANCE_UPDATED" | "BILLABLE_RATE_UPDATED" | "CLIENT_DELETED" | "CLIENT_UPDATED" | "COST_RATE_UPDATED" | "EXPENSE_CREATED" | "EXPENSE_DELETED" | "EXPENSE_RESTORED" | "EXPENSE_UPDATED" | "INVOICE_UPDATED" | "LIMITED_USERS_ADDED_TO_WORKSPACE" | "NEW_APPROVAL_REQUEST" | "NEW_CLIENT" | "NEW_INVOICE" | "NEW_PROJECT" | "NEW_TAG" | "NEW_TASK" | "NEW_TIME_ENTRY" | "NEW_TIMER_STARTED" | "PROJECT_DELETED" | "PROJECT_UPDATED" | "TAG_DELETED" | "TAG_UPDATED" | "TASK_DELETED" | "TASK_UPDATED" | "TIME_ENTRY_DELETED" | "TIME_ENTRY_RESTORED" | "TIME_ENTRY_SPLIT" | "TIME_ENTRY_UPDATED" | "TIME_OFF_REQUEST_APPROVED" | "TIME_OFF_REQUEST_REJECTED" | "TIME_OFF_REQUEST_STARTED" | "TIME_OFF_REQUEST_UPDATED" | "TIME_OFF_REQUEST_WITHDRAWN" | "TIME_OFF_REQUESTED" | "TIMER_STOPPED" | "USER_ACTIVATED_ON_WORKSPACE" | "USER_DEACTIVATED_ON_WORKSPACE" | "USER_DELETED_FROM_WORKSPACE" | "USER_EMAIL_CHANGED" | "USER_GROUP_CREATED" | "USER_GROUP_DELETED" | "USER_GROUP_UPDATED" | "USER_JOINED_WORKSPACE" | "USER_UPDATED" | "USERS_INVITED_TO_WORKSPACE"): ClockifyWebhookBuilder_path;
+    /** Clockify event that triggers webhook is sending to specified url. Url is constructed by concatenating addon 'baseUrl' and 'webhook.path'. */
+    onApprovalRequestStatusUpdated(): ClockifyWebhookBuilder_path;
+    /** Clockify event that triggers webhook is sending to specified url. Url is constructed by concatenating addon 'baseUrl' and 'webhook.path'. */
+    onAssignmentCreated(): ClockifyWebhookBuilder_path;
+    /** Clockify event that triggers webhook is sending to specified url. Url is constructed by concatenating addon 'baseUrl' and 'webhook.path'. */
+    onAssignmentDeleted(): ClockifyWebhookBuilder_path;
+    /** Clockify event that triggers webhook is sending to specified url. Url is constructed by concatenating addon 'baseUrl' and 'webhook.path'. */
+    onAssignmentPublished(): ClockifyWebhookBuilder_path;
+    /** Clockify event that triggers webhook is sending to specified url. Url is constructed by concatenating addon 'baseUrl' and 'webhook.path'. */
+    onAssignmentUpdated(): ClockifyWebhookBuilder_path;
+    /** Clockify event that triggers webhook is sending to specified url. Url is constructed by concatenating addon 'baseUrl' and 'webhook.path'. */
+    onBalanceUpdated(): ClockifyWebhookBuilder_path;
+    /** Clockify event that triggers webhook is sending to specified url. Url is constructed by concatenating addon 'baseUrl' and 'webhook.path'. */
+    onBillableRateUpdated(): ClockifyWebhookBuilder_path;
+    /** Clockify event that triggers webhook is sending to specified url. Url is constructed by concatenating addon 'baseUrl' and 'webhook.path'. */
+    onClientDeleted(): ClockifyWebhookBuilder_path;
+    /** Clockify event that triggers webhook is sending to specified url. Url is constructed by concatenating addon 'baseUrl' and 'webhook.path'. */
+    onClientUpdated(): ClockifyWebhookBuilder_path;
+    /** Clockify event that triggers webhook is sending to specified url. Url is constructed by concatenating addon 'baseUrl' and 'webhook.path'. */
+    onCostRateUpdated(): ClockifyWebhookBuilder_path;
+    /** Clockify event that triggers webhook is sending to specified url. Url is constructed by concatenating addon 'baseUrl' and 'webhook.path'. */
+    onExpenseCreated(): ClockifyWebhookBuilder_path;
+    /** Clockify event that triggers webhook is sending to specified url. Url is constructed by concatenating addon 'baseUrl' and 'webhook.path'. */
+    onExpenseDeleted(): ClockifyWebhookBuilder_path;
+    /** Clockify event that triggers webhook is sending to specified url. Url is constructed by concatenating addon 'baseUrl' and 'webhook.path'. */
+    onExpenseRestored(): ClockifyWebhookBuilder_path;
+    /** Clockify event that triggers webhook is sending to specified url. Url is constructed by concatenating addon 'baseUrl' and 'webhook.path'. */
+    onExpenseUpdated(): ClockifyWebhookBuilder_path;
+    /** Clockify event that triggers webhook is sending to specified url. Url is constructed by concatenating addon 'baseUrl' and 'webhook.path'. */
+    onInvoiceUpdated(): ClockifyWebhookBuilder_path;
+    /** Clockify event that triggers webhook is sending to specified url. Url is constructed by concatenating addon 'baseUrl' and 'webhook.path'. */
+    onLimitedUsersAddedToWorkspace(): ClockifyWebhookBuilder_path;
+    /** Clockify event that triggers webhook is sending to specified url. Url is constructed by concatenating addon 'baseUrl' and 'webhook.path'. */
+    onNewApprovalRequest(): ClockifyWebhookBuilder_path;
+    /** Clockify event that triggers webhook is sending to specified url. Url is constructed by concatenating addon 'baseUrl' and 'webhook.path'. */
+    onNewClient(): ClockifyWebhookBuilder_path;
+    /** Clockify event that triggers webhook is sending to specified url. Url is constructed by concatenating addon 'baseUrl' and 'webhook.path'. */
+    onNewInvoice(): ClockifyWebhookBuilder_path;
+    /** Clockify event that triggers webhook is sending to specified url. Url is constructed by concatenating addon 'baseUrl' and 'webhook.path'. */
+    onNewProject(): ClockifyWebhookBuilder_path;
+    /** Clockify event that triggers webhook is sending to specified url. Url is constructed by concatenating addon 'baseUrl' and 'webhook.path'. */
+    onNewTag(): ClockifyWebhookBuilder_path;
+    /** Clockify event that triggers webhook is sending to specified url. Url is constructed by concatenating addon 'baseUrl' and 'webhook.path'. */
+    onNewTask(): ClockifyWebhookBuilder_path;
+    /** Clockify event that triggers webhook is sending to specified url. Url is constructed by concatenating addon 'baseUrl' and 'webhook.path'. */
+    onNewTimeEntry(): ClockifyWebhookBuilder_path;
+    /** Clockify event that triggers webhook is sending to specified url. Url is constructed by concatenating addon 'baseUrl' and 'webhook.path'. */
+    onNewTimerStarted(): ClockifyWebhookBuilder_path;
+    /** Clockify event that triggers webhook is sending to specified url. Url is constructed by concatenating addon 'baseUrl' and 'webhook.path'. */
+    onProjectDeleted(): ClockifyWebhookBuilder_path;
+    /** Clockify event that triggers webhook is sending to specified url. Url is constructed by concatenating addon 'baseUrl' and 'webhook.path'. */
+    onProjectUpdated(): ClockifyWebhookBuilder_path;
+    /** Clockify event that triggers webhook is sending to specified url. Url is constructed by concatenating addon 'baseUrl' and 'webhook.path'. */
+    onTagDeleted(): ClockifyWebhookBuilder_path;
+    /** Clockify event that triggers webhook is sending to specified url. Url is constructed by concatenating addon 'baseUrl' and 'webhook.path'. */
+    onTagUpdated(): ClockifyWebhookBuilder_path;
+    /** Clockify event that triggers webhook is sending to specified url. Url is constructed by concatenating addon 'baseUrl' and 'webhook.path'. */
+    onTaskDeleted(): ClockifyWebhookBuilder_path;
+    /** Clockify event that triggers webhook is sending to specified url. Url is constructed by concatenating addon 'baseUrl' and 'webhook.path'. */
+    onTaskUpdated(): ClockifyWebhookBuilder_path;
+    /** Clockify event that triggers webhook is sending to specified url. Url is constructed by concatenating addon 'baseUrl' and 'webhook.path'. */
+    onTimeEntryDeleted(): ClockifyWebhookBuilder_path;
+    /** Clockify event that triggers webhook is sending to specified url. Url is constructed by concatenating addon 'baseUrl' and 'webhook.path'. */
+    onTimeEntryRestored(): ClockifyWebhookBuilder_path;
+    /** Clockify event that triggers webhook is sending to specified url. Url is constructed by concatenating addon 'baseUrl' and 'webhook.path'. */
+    onTimeEntrySplit(): ClockifyWebhookBuilder_path;
+    /** Clockify event that triggers webhook is sending to specified url. Url is constructed by concatenating addon 'baseUrl' and 'webhook.path'. */
+    onTimeEntryUpdated(): ClockifyWebhookBuilder_path;
+    /** Clockify event that triggers webhook is sending to specified url. Url is constructed by concatenating addon 'baseUrl' and 'webhook.path'. */
+    onTimeOffRequestApproved(): ClockifyWebhookBuilder_path;
+    /** Clockify event that triggers webhook is sending to specified url. Url is constructed by concatenating addon 'baseUrl' and 'webhook.path'. */
+    onTimeOffRequestRejected(): ClockifyWebhookBuilder_path;
+    /** Clockify event that triggers webhook is sending to specified url. Url is constructed by concatenating addon 'baseUrl' and 'webhook.path'. */
+    onTimeOffRequestStarted(): ClockifyWebhookBuilder_path;
+    /** Clockify event that triggers webhook is sending to specified url. Url is constructed by concatenating addon 'baseUrl' and 'webhook.path'. */
+    onTimeOffRequestUpdated(): ClockifyWebhookBuilder_path;
+    /** Clockify event that triggers webhook is sending to specified url. Url is constructed by concatenating addon 'baseUrl' and 'webhook.path'. */
+    onTimeOffRequestWithdrawn(): ClockifyWebhookBuilder_path;
+    /** Clockify event that triggers webhook is sending to specified url. Url is constructed by concatenating addon 'baseUrl' and 'webhook.path'. */
+    onTimeOffRequested(): ClockifyWebhookBuilder_path;
+    /** Clockify event that triggers webhook is sending to specified url. Url is constructed by concatenating addon 'baseUrl' and 'webhook.path'. */
+    onTimerStopped(): ClockifyWebhookBuilder_path;
+    /** Clockify event that triggers webhook is sending to specified url. Url is constructed by concatenating addon 'baseUrl' and 'webhook.path'. */
+    onUserActivatedOnWorkspace(): ClockifyWebhookBuilder_path;
+    /** Clockify event that triggers webhook is sending to specified url. Url is constructed by concatenating addon 'baseUrl' and 'webhook.path'. */
+    onUserDeactivatedOnWorkspace(): ClockifyWebhookBuilder_path;
+    /** Clockify event that triggers webhook is sending to specified url. Url is constructed by concatenating addon 'baseUrl' and 'webhook.path'. */
+    onUserDeletedFromWorkspace(): ClockifyWebhookBuilder_path;
+    /** Clockify event that triggers webhook is sending to specified url. Url is constructed by concatenating addon 'baseUrl' and 'webhook.path'. */
+    onUserEmailChanged(): ClockifyWebhookBuilder_path;
+    /** Clockify event that triggers webhook is sending to specified url. Url is constructed by concatenating addon 'baseUrl' and 'webhook.path'. */
+    onUserGroupCreated(): ClockifyWebhookBuilder_path;
+    /** Clockify event that triggers webhook is sending to specified url. Url is constructed by concatenating addon 'baseUrl' and 'webhook.path'. */
+    onUserGroupDeleted(): ClockifyWebhookBuilder_path;
+    /** Clockify event that triggers webhook is sending to specified url. Url is constructed by concatenating addon 'baseUrl' and 'webhook.path'. */
+    onUserGroupUpdated(): ClockifyWebhookBuilder_path;
+    /** Clockify event that triggers webhook is sending to specified url. Url is constructed by concatenating addon 'baseUrl' and 'webhook.path'. */
+    onUserJoinedWorkspace(): ClockifyWebhookBuilder_path;
+    /** Clockify event that triggers webhook is sending to specified url. Url is constructed by concatenating addon 'baseUrl' and 'webhook.path'. */
+    onUserUpdated(): ClockifyWebhookBuilder_path;
+    /** Clockify event that triggers webhook is sending to specified url. Url is constructed by concatenating addon 'baseUrl' and 'webhook.path'. */
+    onUsersInvitedToWorkspace(): ClockifyWebhookBuilder_path;
+}
+export interface ClockifyWebhookBuilder_path {
+    /** Path to addon endpoint designated for receiving webhooks from Clockify side. Path is just part of url to which webhook will be sent. Full url is constructed by concatenating addon 'baseUrl' and path. */
+    path(value: string): ClockifyWebhookBuilder_Build;
+}
+export interface ClockifyWebhookBuilder_Build {
+    build(): ClockifyWebhook;
+}
+export declare namespace ClockifyWebhook {
+    function builder(): ClockifyWebhookBuilder_event;
+}
+export declare function ClockifyWebhookBuilder(): ClockifyWebhookBuilder_event;
+export interface ClockifyLifecycleEventBuilder_path {
+    /** Path to addon endpoint designated for receiving lifecycle hooks from Clockify side. Path is just part of url to which a lifecycle hook will be sent. Full url is constructed by concatenating addon 'baseUrl' and path. */
+    path(value: string): ClockifyLifecycleEventBuilder_type;
+}
+export interface ClockifyLifecycleEventBuilder_type {
+    /** Specifies addon lifecycle event you want to be notified by Clockify. */
+    type(value: "INSTALLED" | "DELETED" | "SETTINGS_UPDATED" | "STATUS_CHANGED"): ClockifyLifecycleEventBuilder_Build;
+    /** Specifies addon lifecycle event you want to be notified by Clockify. */
+    onInstalled(): ClockifyLifecycleEventBuilder_Build;
+    /** Specifies addon lifecycle event you want to be notified by Clockify. */
+    onDeleted(): ClockifyLifecycleEventBuilder_Build;
+    /** Specifies addon lifecycle event you want to be notified by Clockify. */
+    onSettingsUpdated(): ClockifyLifecycleEventBuilder_Build;
+    /** Specifies addon lifecycle event you want to be notified by Clockify. */
+    onStatusChanged(): ClockifyLifecycleEventBuilder_Build;
+}
+export interface ClockifyLifecycleEventBuilder_Build {
+    build(): ClockifyLifecycleEvent;
+}
+export declare namespace ClockifyLifecycleEvent {
+    function builder(): ClockifyLifecycleEventBuilder_path;
+}
+export declare function ClockifyLifecycleEventBuilder(): ClockifyLifecycleEventBuilder_path;
+export interface ClockifyComponentBuilder_type {
+    /** Specifies which kind of component will be rendered. If component is 'tab', it also comes with the name of Clockify page where 'tab' component will be rendered. */
+    type(value: "sidebar" | "widget" | "timeoff.tab" | "schedule.tab" | "approvals.tab" | "reports.tab" | "activity.tab" | "team.tab" | "projects.tab" | "invoices.action" | "timeentries.action.uiblocks"): ClockifyComponentBuilder_accessLevel;
+    /** Specifies which kind of component will be rendered. If component is 'tab', it also comes with the name of Clockify page where 'tab' component will be rendered. */
+    sidebar(): ClockifyComponentBuilder_accessLevel;
+    /** Specifies which kind of component will be rendered. If component is 'tab', it also comes with the name of Clockify page where 'tab' component will be rendered. */
+    widget(): ClockifyComponentBuilder_accessLevel;
+    /** Specifies which kind of component will be rendered. If component is 'tab', it also comes with the name of Clockify page where 'tab' component will be rendered. */
+    timeoffTab(): ClockifyComponentBuilder_accessLevel;
+    /** Specifies which kind of component will be rendered. If component is 'tab', it also comes with the name of Clockify page where 'tab' component will be rendered. */
+    scheduleTab(): ClockifyComponentBuilder_accessLevel;
+    /** Specifies which kind of component will be rendered. If component is 'tab', it also comes with the name of Clockify page where 'tab' component will be rendered. */
+    approvalsTab(): ClockifyComponentBuilder_accessLevel;
+    /** Specifies which kind of component will be rendered. If component is 'tab', it also comes with the name of Clockify page where 'tab' component will be rendered. */
+    reportsTab(): ClockifyComponentBuilder_accessLevel;
+    /** Specifies which kind of component will be rendered. If component is 'tab', it also comes with the name of Clockify page where 'tab' component will be rendered. */
+    activityTab(): ClockifyComponentBuilder_accessLevel;
+    /** Specifies which kind of component will be rendered. If component is 'tab', it also comes with the name of Clockify page where 'tab' component will be rendered. */
+    teamTab(): ClockifyComponentBuilder_accessLevel;
+    /** Specifies which kind of component will be rendered. If component is 'tab', it also comes with the name of Clockify page where 'tab' component will be rendered. */
+    projectsTab(): ClockifyComponentBuilder_accessLevel;
+    /** Specifies which kind of component will be rendered. If component is 'tab', it also comes with the name of Clockify page where 'tab' component will be rendered. */
+    invoicesAction(): ClockifyComponentBuilder_accessLevel;
+    /** Specifies which kind of component will be rendered. If component is 'tab', it also comes with the name of Clockify page where 'tab' component will be rendered. */
+    timeentriesActionUiblocks(): ClockifyComponentBuilder_accessLevel;
+}
+export interface ClockifyComponentBuilder_accessLevel {
+    /** Specifies who can access addon component. You can either choose to give access only to Clockify workspace admins, or everyone. */
+    accessLevel(value: "ADMINS" | "EVERYONE"): ClockifyComponentBuilder_path;
+    /** Specifies who can access addon component. You can either choose to give access only to Clockify workspace admins, or everyone. */
+    allowAdmins(): ClockifyComponentBuilder_path;
+    /** Specifies who can access addon component. You can either choose to give access only to Clockify workspace admins, or everyone. */
+    allowEveryone(): ClockifyComponentBuilder_path;
+}
+export interface ClockifyComponentBuilder_path {
+    /** Path to addon web app that will be rendered inside Clockify component. Path is part of the url from which component content will be served. Full url is constructed by concatenating addon 'baseUrl' and path. */
+    path(value: string): ClockifyComponentBuilder_label;
+}
+export interface ClockifyComponentBuilder_label {
+    /** Label of the component e.g. if component is 'tab', value of 'label' property will be shown in UI. Label is not required for WIDGET component type. */
+    label(value: string): ClockifyComponentBuilder_Optional;
+}
+export interface ClockifyComponentBuilder_Optional {
+    /** If you want to define some component-specific options for component that holds your addon app, this is the place to define them. */
+    options(value: Record<string, unknown>): ClockifyComponentBuilder_Optional;
     /** Path to addon hosted image which will serve as an icon for Clockify component. Path is part of the url from which the image will be served. Full url is constructed by concatenating addon 'baseUrl' and path. */
     iconPath(value: string): ClockifyComponentBuilder_Optional;
     /** Defines rendered component width expressed in 'vw'. Applicable only to WIDGET components. */
@@ -5574,7 +6932,7 @@ export declare function ClockifyManifestBuilder(): ClockifyManifestBuilder_key;
 
 ```ts
 /** Draft-04 Clockify manifest schemas embedded for runtime-neutral validation. */
-export type ClockifyEmbeddedManifestSchemas = Readonly<Record<"1.2" | "1.3" | "1.4" | "1.5", object>>;
+export type ClockifyEmbeddedManifestSchemas = Readonly<Record<"1.2" | "1.3" | "1.4" | "1.5" | "1.6", object>>;
 /** Supported schemas keyed by the manifest's declared schema version. */
 export declare const clockifyManifestSchemas: ClockifyEmbeddedManifestSchemas;
 ```
@@ -5584,10 +6942,20 @@ export declare const clockifyManifestSchemas: ClockifyEmbeddedManifestSchemas;
 ### adapters/index.d.ts
 
 ```ts
+/**
+ * @deprecated Import a specific runtime subpath instead of this aggregate:
+ * `@apet97/clockify-addon-sdk/adapters/node-http`,
+ * `@apet97/clockify-addon-sdk/adapters/express`, or
+ * `@apet97/clockify-addon-sdk/adapters/fetch`. A Worker or browser bundle
+ * that imports this aggregate pulls in `node:http` transitively even when it
+ * only needs the Fetch adapter. Kept for backward compatibility; scheduled
+ * for removal in a future major version.
+ */
 export * from "./node-http.js";
 export * from "./express.js";
 export * from "./fetch.js";
 export * from "./body-limit.js";
+export * from "./request-target.js";
 ```
 
 ### adapters/node-http.d.ts
@@ -5608,7 +6976,7 @@ export declare function createNodeHttpAddonServer(addon: Addon<unknown>, options
 ### adapters/express.d.ts
 
 ```ts
-import { Addon } from "../shared/addon.js";
+import { Addon, AddonErrorReporter } from "../shared/addon.js";
 export interface ExpressLikeRequest {
     method?: string;
     path?: string;
@@ -5626,7 +6994,9 @@ export interface ExpressLikeResponse {
     end(): unknown;
 }
 export type ExpressLikeNextFunction = (error?: unknown) => void;
-export declare function createExpressAddonHandler(addon: Addon<unknown>): (req: ExpressLikeRequest, res: ExpressLikeResponse, next?: ExpressLikeNextFunction) => Promise<void>;
+export declare function createExpressAddonHandler(addon: Addon<unknown>, options?: {
+    readonly onError?: AddonErrorReporter;
+}): (req: ExpressLikeRequest, res: ExpressLikeResponse, next?: ExpressLikeNextFunction) => Promise<void>;
 ```
 
 ### adapters/fetch.d.ts
@@ -5659,6 +7029,21 @@ export declare class InvalidContentLengthError extends Error {
 export declare function parseContentLength(value: string | undefined | null): number | undefined;
 export declare function resolveMaxBodyBytes(options?: BodyLimitOptions): number;
 export declare function isPayloadTooLargeError(error: unknown): error is PayloadTooLargeError;
+```
+
+### adapters/request-target.d.ts
+
+```ts
+/**
+ * Raised when a Node request-target is not origin-form (`/path`). An origin
+ * server only ever receives origin-form; absolute-form and authority-form
+ * are proxy-only per RFC 7230 and have no business reaching this adapter.
+ */
+export declare class InvalidRequestTargetError extends Error {
+    readonly requestTarget: string;
+    constructor(requestTarget: string);
+}
+export declare function parseHttpRequestTarget(requestTarget: string | undefined): URL;
 ```
 
 ## fetch-adapter
@@ -5695,7 +7080,7 @@ export declare function createNodeHttpAddonServer(addon: Addon<unknown>, options
 ### adapters/express.d.ts
 
 ```ts
-import { Addon } from "../shared/addon.js";
+import { Addon, AddonErrorReporter } from "../shared/addon.js";
 export interface ExpressLikeRequest {
     method?: string;
     path?: string;
@@ -5713,7 +7098,9 @@ export interface ExpressLikeResponse {
     end(): unknown;
 }
 export type ExpressLikeNextFunction = (error?: unknown) => void;
-export declare function createExpressAddonHandler(addon: Addon<unknown>): (req: ExpressLikeRequest, res: ExpressLikeResponse, next?: ExpressLikeNextFunction) => Promise<void>;
+export declare function createExpressAddonHandler(addon: Addon<unknown>, options?: {
+    readonly onError?: AddonErrorReporter;
+}): (req: ExpressLikeRequest, res: ExpressLikeResponse, next?: ExpressLikeNextFunction) => Promise<void>;
 ```
 
 ## client
@@ -5726,6 +7113,17 @@ export interface ClockifySettingUpdate {
     readonly id: string;
     readonly value: unknown;
 }
+/** Observed just before {@link ClockifyAddonClient} retries a request. */
+export interface ClockifyAddonClientRetryInfo {
+    /** The attempt that just finished (1-indexed); the retry will be `attempt + 1`. */
+    readonly attempt: number;
+    /** The response status that triggered the retry, absent for a network-error retry. */
+    readonly status?: number;
+    /** The response error that triggered the retry, absent for a status-based retry. */
+    readonly error?: unknown;
+    /** Delay before the retry, in milliseconds. */
+    readonly delayMs: number;
+}
 /** Construction options for {@link ClockifyAddonClient}. */
 export interface ClockifyAddonClientOptions {
     readonly token: string;
@@ -5735,6 +7133,8 @@ export interface ClockifyAddonClientOptions {
     readonly timeoutMs?: number;
     readonly maxAttempts?: number;
     readonly sleep?: (milliseconds: number) => Promise<void>;
+    /** Observe retries for metrics/logging. Never affects retry behavior, even if it throws. */
+    readonly onRetry?: (info: ClockifyAddonClientRetryInfo) => void;
 }
 /** HTTP failure returned by a Clockify add-on API call. */
 export declare class ClockifyAddonHttpError extends Error {
@@ -5751,7 +7151,9 @@ export declare class ClockifyAddonClient {
     private readonly timeoutMs;
     private readonly maxAttempts;
     private readonly sleep;
+    private readonly onRetry?;
     constructor(options: ClockifyAddonClientOptions);
+    private notifyRetry;
     private send;
     private expectOk;
     /** Exchanges an installation token for a user-scoped add-on token. */
@@ -5796,10 +7198,16 @@ export interface CreateClockifyBridgeOptions {
     readonly window: ClockifyBrowserWindow;
     readonly parentOrigin: string;
 }
+/**
+ * The add-on-dispatchable event names Clockify's window-messaging bridge documents. See
+ * `MARKETPLACE_DOCS/10-window-events.md`'s "Event dispatch" section — Clockify states this list is
+ * not final and is subject to change.
+ */
+export type ClockifyBridgeAction = "refreshAddonToken" | "preview" | "navigate" | "toastrPop";
 /** Typed Clockify iframe messaging surface. */
 export interface ClockifyBridge {
     subscribe(title: string, handler: (body: unknown) => void): () => void;
-    dispatch(action: string, payload?: unknown): void;
+    dispatch(action: ClockifyBridgeAction, payload?: unknown): void;
     refreshAddonToken(): void;
     preview(): void;
     navigate(type: "tracker"): void;
@@ -5817,7 +7225,10 @@ export interface ClockifyDocumentRoot {
 export declare function applyClockifyTheme(theme: string | undefined, root: Pick<ClockifyDocumentRoot, "dataset">): void;
 /** Applies the verified Clockify user language to a document root. */
 export declare function applyClockifyLanguage(language: string | undefined, root: Pick<ClockifyDocumentRoot, "lang">): void;
-/** Formats a date using the user's locale while permitting explicit timezone policy. */
+/**
+ * Formats a date using the user's locale while permitting explicit timezone policy. Falls back to
+ * `"en"` if `locale` is not a well-formed BCP 47 tag `Intl.DateTimeFormat` accepts.
+ */
 export declare function formatClockifyDate(value: Date | number, locale: string, options?: Intl.DateTimeFormatOptions): string;
 ```
 
@@ -5827,11 +7238,21 @@ export declare function formatClockifyDate(value: Date | number, locale: string,
 
 ```ts
 import type { ClockifyCryptoKey, ClockifyPrivateKeyInput } from "../clockify/clockify-crypto-key.js";
+import type { ClockifyInstalledLifecyclePayload } from "../clockify/clockify-lifecycle.js";
+import type { AddonRequest } from "../shared/request.js";
 export interface ClockifyTestKeys {
     publicKey: ClockifyCryptoKey;
     privateKey: ClockifyPrivateKeyInput;
     pem: string;
 }
 export declare function generateTestKeys(): Promise<ClockifyTestKeys>;
+/** Builds an `AddonRequest` for a signed component GET request, e.g. `?auth_token=<jwt>`. */
+export declare function createTestComponentRequest(token: string, overrides?: Partial<AddonRequest>): AddonRequest;
+/** Builds an `AddonRequest` for a signed lifecycle POST request carrying `payload`. */
+export declare function createTestLifecycleRequest(token: string, payload: unknown, overrides?: Partial<AddonRequest>): AddonRequest;
+/** Builds an `AddonRequest` for a signed webhook POST delivery carrying `payload`. */
+export declare function createTestWebhookRequest(token: string, eventType: string, payload: unknown, overrides?: Partial<AddonRequest>): AddonRequest;
+/** Builds a documented `INSTALLED` lifecycle payload with sensible test defaults. */
+export declare function buildInstalledPayload(overrides?: Partial<ClockifyInstalledLifecyclePayload>): ClockifyInstalledLifecyclePayload;
 export declare function signTestToken(privateKey: ClockifyPrivateKeyInput, addonKey: string, claims?: Record<string, unknown>, expiresIn?: string): Promise<string>;
 ```

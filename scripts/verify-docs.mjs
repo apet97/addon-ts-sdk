@@ -41,7 +41,6 @@ function excluded(relative) {
     relative === "NEW_SESSION_PROMPT.md" ||
     relative === "verification_report.md" ||
     relative === "addon-sdk/public-api.snapshot.md" ||
-    relative.startsWith("docs/superpowers/") ||
     relative.startsWith("docs/archive/") ||
     /^MARKETPLACE_DOCS\/\d{2}-.*\.md$/.test(relative)
   );

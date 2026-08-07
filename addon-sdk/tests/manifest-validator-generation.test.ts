@@ -37,7 +37,7 @@ describe("generated manifest validators", () => {
     if (!existsSync(committedValidatorsPath)) return;
 
     const source = readFileSync(committedValidatorsPath, "utf8");
-    for (const version of ["1_2", "1_3", "1_4", "1_5"]) {
+    for (const version of ["1_2", "1_3", "1_4", "1_5", "1_6"]) {
       expect(source).toContain(`export const validateManifest${version}`);
     }
     expect(source).toContain("clockifyUnicodeLength");

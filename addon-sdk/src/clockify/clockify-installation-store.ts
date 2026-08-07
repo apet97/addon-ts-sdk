@@ -84,13 +84,24 @@ export interface ClockifyTokenCodec {
   decode(encoded: string): Promise<string>;
 }
 
+// Node and workerd (with nodejs_compat) expose Buffer; plain browsers and a
+// bare workerd runtime do not, so both codecs fall back to the Web Crypto
+// btoa/atob path. Neither loop nor conversion is skipped based on environment
+// detection at module load time — only at the point of use — so a single
+// bundle works unmodified across all three runtimes.
 function bytesToBase64(bytes: Uint8Array): string {
+  if (typeof globalThis.Buffer !== "undefined") {
+    return globalThis.Buffer.from(bytes).toString("base64");
+  }
   let binary = "";
   for (const byte of bytes) binary += String.fromCharCode(byte);
   return btoa(binary);
 }
 
 function base64ToBytes(value: string): Uint8Array<ArrayBuffer> {
+  if (typeof globalThis.Buffer !== "undefined") {
+    return new Uint8Array(globalThis.Buffer.from(value, "base64"));
+  }
   const binary = atob(value);
   const bytes = new Uint8Array(binary.length);
   for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index);
@@ -102,8 +113,11 @@ export function createClockifyAesGcmTokenCodec(key: ClockifyAesGcmKey): Clockify
   return {
     async encode(token) {
       if (token.trim() === "") throw new Error("Clockify auth token must not be empty.");
-      const iv = crypto.getRandomValues(new Uint8Array(12));
-      const ciphertext = await crypto.subtle.encrypt(
+      if (!globalThis.crypto?.getRandomValues) {
+        throw new Error("Web Crypto is required for token encryption.");
+      }
+      const iv = globalThis.crypto.getRandomValues(new Uint8Array(12));
+      const ciphertext = await globalThis.crypto.subtle.encrypt(
         { name: "AES-GCM", iv },
         key,
         new TextEncoder().encode(token),
@@ -115,12 +129,36 @@ export function createClockifyAesGcmTokenCodec(key: ClockifyAesGcmKey): Clockify
       if (parts.length !== 4 || parts[0] !== "enc" || parts[1] !== "v1") {
         throw new Error("Invalid encrypted Clockify token encoding.");
       }
-      const plaintext = await crypto.subtle.decrypt(
+      const plaintext = await globalThis.crypto.subtle.decrypt(
         { name: "AES-GCM", iv: base64ToBytes(parts[2]) },
         key,
         base64ToBytes(parts[3]),
       );
       return new TextDecoder().decode(plaintext);
+    },
+  };
+}
+
+/**
+ * Composes two codecs to support key rotation without a storage migration.
+ * Encodes only with `newCodec`; decodes by trying `newCodec` first, falling
+ * back to `oldCodec` for a row encrypted before the rotation. Once every
+ * stored row has been re-saved (and so re-encrypted with the new key), drop
+ * `oldCodec` and use `newCodec` alone. See the public-key-rotation
+ * deployment guide for the equivalent recipe applied to signature keys.
+ */
+export function createRotatingClockifyTokenCodec(
+  newCodec: ClockifyTokenCodec,
+  oldCodec: ClockifyTokenCodec,
+): ClockifyTokenCodec {
+  return {
+    encode: (token) => newCodec.encode(token),
+    async decode(encoded) {
+      try {
+        return await newCodec.decode(encoded);
+      } catch {
+        return oldCodec.decode(encoded);
+      }
     },
   };
 }
@@ -139,10 +177,18 @@ function assertInstallationContext(context: ClockifyInstallationContext): void {
     assertNonEmpty(webhook.authToken, "webhook auth token");
 }
 
-/** Wraps a store so installation and nested webhook credentials are encrypted at rest. */
+/**
+ * Wraps a store so installation and nested webhook credentials are encrypted at rest.
+ *
+ * A `load()` whose stored row fails to decode (wrong key, tampering, corruption) returns `null`,
+ * the same result as "no installation" — the caller must fail closed either way. Pass
+ * `onDecodeError` to observe the difference for operational alerting; it does not change what
+ * `load()` returns.
+ */
 export function wrapClockifyInstallationStoreWithEncryption(
   store: ClockifyInstallationStore,
   codec: ClockifyTokenCodec,
+  onDecodeError?: (error: unknown, workspaceId: string, addonId: string) => void,
 ): ClockifyInstallationStore {
   return {
     async load(workspaceId, addonId) {
@@ -163,7 +209,8 @@ export function wrapClockifyInstallationStoreWithEncryption(
               }
             : {}),
         };
-      } catch {
+      } catch (error) {
+        onDecodeError?.(error, workspaceId, addonId);
         return null;
       }
     },

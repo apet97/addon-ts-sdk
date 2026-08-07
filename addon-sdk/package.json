@@ -1,6 +1,6 @@
 {
   "name": "@apet97/clockify-addon-sdk",
-  "version": "1.0.5",
+  "version": "1.1.0",
   "description": "TypeScript SDK for building Clockify add-on servers: manifest builders, request router, runtime adapters, and RS256 webhook-signature verification.",
   "keywords": [
     "clockify",
@@ -24,7 +24,7 @@
   "homepage": "https://github.com/apet97/addon-ts-sdk#readme",
   "bugs": "https://github.com/apet97/addon-ts-sdk/issues",
   "engines": {
-    "node": ">=22"
+    "node": ">=22.13.0"
   },
   "files": [
     "dist",
@@ -154,8 +154,6 @@
     "prepack": "npm run type-check && npm run verify:generated && npm run test && npm run lint && npm run format:check && npm run build && npm run verify:public-api && npm run verify:dist"
   },
   "dependencies": {
-    "ajv": "^8.20.0",
-    "ajv-draft-04": "^1.0.0",
     "jose": "^6.2.3"
   },
   "peerDependencies": {
@@ -172,6 +170,8 @@
     "@types/express": "^5.0.6",
     "@types/node": "^22.20.1",
     "@vitest/coverage-v8": "^4.1.10",
+    "ajv": "^8.20.0",
+    "ajv-draft-04": "^1.0.0",
     "eslint": "^10.7.0",
     "eslint-config-prettier": "^10.1.8",
     "express": "^5.2.1",

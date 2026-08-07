@@ -29,6 +29,54 @@ check must reject immutable versions that are already published. Documentation v
 not create a new release candidate, registry receipt, authenticated Clockify receipt, or Marketplace
 submission evidence.
 
+## 1.1.0 release candidate
+
+Workspace versions `@apet97/clockify-addon-sdk@1.1.0` and `create-clockify-addon@1.1.0` are prepared
+on branch `perfect-state-2026-08-06`. Publication requires explicit npm-owner approval for the exact
+packages and versions; until that approval and the publish itself complete, the "Published versions"
+section above remains the accurate record of what the registry currently serves.
+
+`npm run release:preflight` confirmed both exact versions are absent from the registry.
+`npm run release:verify` (`ci:verify && verify:schema-live && release:dry-run`) now **passes end to
+end**:
+
+- `ci:verify` passes with 480 tests, thresholded coverage, lint, format, build, the public API
+  snapshot, `verify:dist`, `pack:dry-run`, package-lint, package-consumer, all four packed
+  Node/Worker scaffolds (including real `workerd` routes), and both `npm audit --omit=dev` and the
+  full-tree `npm audit` (0 vulnerabilities each; the production dependency tree remains `jose`
+  alone). The three pre-existing transitive dev-tooling advisories (`brace-expansion`, `fast-uri`,
+  `postcss`) were resolved by `npm audit fix`: each moved by a patch version within its existing
+  major (confirmed against `package-lock.json`), touching neither `typescript` nor `@types/node`.
+- `verify:schema-live` passes: Clockify's live schema endpoint serves a genuine, distinct schema
+  `1.6` (own `$schema`/`definitions`, not an echo of `1.5`). Structural diff against vendored `1.5`
+  showed it is additive-only — one new webhook event (`TIME_OFF_REQUEST_STARTED`) and one new
+  component type (`timeentries.action.uiblocks`), no required/removed/changed fields. `1.6` is now
+  vendored with provenance, and the generated builders/validators cover it; the unsupported-version
+  probe moved to `1.7` (confirmed HTTP 400 against the live endpoint).
+- `npm run release:dry-run` passed for both packages; both tarball contents matched the "Expected
+  package shape" section below.
+
+Any future `src/**` change (as opposed to a documentation-only pass) requires a fresh live receipt
+— an authenticated install exercising installation, component authentication, webhook delivery, and
+uninstall cleanup — before that release counts as Marketplace-proven; see the Future release
+checklist below. This candidate does not yet have a 1.1.0 live receipt.
+
+A later pass on the same branch added `withClockifyHandler()` (a unified additive alternative to
+the `withClockify*` wrappers, P2.6), narrowed generated `Record<string, any>` `options` fields to
+`Record<string, unknown>` across schema versions 1.2–1.6 (P2.11), added `@deprecated`
+`verifyComponentToken`/`verifyLifecycleToken`/`verifyWebhookToken` naming aliases (P2.12), and
+renamed `addon-sdk/examples/` to `addon-sdk/snippets/` with README documentation as copy-in
+reference code rather than runnable projects (P4.1). All four are additive or documentation-only;
+none change a canonical export's name or signature. `npm run release:verify` was re-run and passed
+end to end after this pass, confirmed twice in a row to rule out a flake.
+
+A further documentation-only pass refreshed all 13 `MARKETPLACE_DOCS/` snapshots from a 2026-08-07
+re-scrape of Clockify's developer docs, added the previously-uncaptured `14-manifest.md`, fixed a
+wire-header naming defect in `addon-sdk/docs/api-reference.md`'s P2.6 mapping table introduced by
+the prior pass, and removed `docs/superpowers/**` and an orphaned stale `docs/product-surface.json`
+that were not customer-facing. No `src/**` change; `npm run ci:verify` passed end to end
+afterward.
+
 ## 1.0.5 release evidence
 
 Release source commit `d46723956b9b5ff7fb5587bdc03fc8858c90113f` reorganizes the active
@@ -112,6 +160,12 @@ npm run release:verify
 `npm run release:preflight` reads both workspace package versions and fails unless those exact
 versions are absent from the configured npm registry. It is intentionally a one-shot, fail-fast
 check and must run immediately before publishing.
+
+Any release whose source changed under `src/**` since the last live receipt requires a fresh one —
+an authenticated install exercising installation, component authentication, webhook delivery, and
+uninstall cleanup — before that release counts as Marketplace-proven; see the Publish boundary
+below. A documentation-only release (no `src/**` change) may stay registry-only and reuse the prior
+live receipt as evidence for the underlying runtime.
 
 Run `release:verify` only for unpublished workspace versions. After publication,
 `release:dry-run` correctly fails when npm reaches its immutable-version registry check; use

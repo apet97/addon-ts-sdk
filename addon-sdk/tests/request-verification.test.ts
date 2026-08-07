@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll } from "vitest";
+import { describe, it, expect, beforeAll, vi } from "vitest";
 import { generateKeyPair, SignJWT } from "jose";
 import {
   AddonRequest,
@@ -28,6 +28,10 @@ import {
   withClockifyVerifiedLifecycleRequest,
   withClockifyVerifiedRequest,
   withClockifyVerifiedWebhookRequest,
+  withClockifyHandler,
+  verifyComponentToken,
+  verifyLifecycleToken,
+  verifyWebhookToken,
 } from "../src";
 import { generateTestKeys, signTestToken } from "../src/testing";
 
@@ -66,7 +70,7 @@ describe("Marketplace request verification helpers", () => {
     expect(() => new ClockifySignatureParser(" ", keys.publicKey)).toThrow(/add-on key/i);
   });
 
-  it("requires expiration on component and lifecycle tokens", async () => {
+  it("requires expiration on component tokens by default", async () => {
     const token = await new SignJWT({
       type: "addon",
       workspaceId: WORKSPACE_ID,
@@ -83,11 +87,31 @@ describe("Marketplace request verification helpers", () => {
         componentRequest(new URLSearchParams({ [ClockifyQueryParams.AUTH_TOKEN]: token })),
       ),
     ).resolves.toEqual({ ok: false, reason: "missing-expiration" });
+  });
+
+  it("does not require expiration on lifecycle tokens by default (INSTALLED payload has none)", async () => {
+    const token = await new SignJWT({
+      type: "addon",
+      workspaceId: WORKSPACE_ID,
+      addonId: ADDON_ID,
+    })
+      .setProtectedHeader({ alg: "RS256" })
+      .setIssuer("clockify")
+      .setSubject(ADDON_KEY)
+      .sign(keys.privateKey);
 
     await expect(
       verifyClockifyLifecycleRequest(
         parser(),
         request({ [ClockifyHeaders.LIFECYCLE_TOKEN]: token }),
+      ),
+    ).resolves.toMatchObject({ ok: true });
+
+    await expect(
+      verifyClockifyLifecycleRequest(
+        parser(),
+        request({ [ClockifyHeaders.LIFECYCLE_TOKEN]: token }),
+        { requireExpiration: true },
       ),
     ).resolves.toEqual({ ok: false, reason: "missing-expiration" });
   });
@@ -239,6 +263,23 @@ describe("Marketplace request verification helpers", () => {
     ).resolves.toEqual({ ok: false, reason: "ambiguous-event-type" });
   });
 
+  it("rejects a duplicate signature comma-joined into one header value", async () => {
+    // Node and the Fetch Headers object both fold a client-repeated header into
+    // one "value1, value2" string rather than an array; a real signature must
+    // still be caught as ambiguous in that shape.
+    const token = await validToken();
+
+    await expect(
+      verifyClockifyRequest(
+        parser(),
+        request({
+          [ClockifyHeaders.SIGNATURE]: `${token}, ${token}`,
+          [ClockifyHeaders.WEBHOOK_EVENT_TYPE]: "EXPENSE_CREATED",
+        }),
+      ),
+    ).resolves.toEqual({ ok: false, reason: "ambiguous-signature" });
+  });
+
   it("verifies webhook requests with event, workspace, add-on, and stored webhook token checks", async () => {
     const token = await validToken();
 
@@ -284,6 +325,23 @@ describe("Marketplace request verification helpers", () => {
         },
       ),
     ).resolves.toEqual({ ok: false, reason: "webhook-token-mismatch" });
+
+    // An unsigned string that happens to equal the stored expected token must
+    // still fail as an invalid signature, not a token mismatch — the JWT is
+    // verified before the token is ever compared, closing the probing oracle.
+    await expect(
+      verifyClockifyWebhookRequest(
+        parser(),
+        request({
+          [ClockifyHeaders.SIGNATURE]: "not-a-jwt-but-matches-stored-token",
+          [ClockifyHeaders.WEBHOOK_EVENT_TYPE]: "EXPENSE_CREATED",
+        }),
+        {
+          expectedEventType: "EXPENSE_CREATED",
+          expectedWebhookAuthToken: "not-a-jwt-but-matches-stored-token",
+        },
+      ),
+    ).resolves.toEqual({ ok: false, reason: "invalid-signature" });
 
     await expect(
       verifyClockifyWebhookRequest(
@@ -879,8 +937,10 @@ describe("Marketplace request verification helpers", () => {
     const token = await validToken();
     const lookups: Array<{ workspaceId: string; addonId: string; eventType: string }> = [];
     let handled = false;
+    const clockifyParser = parser();
+    const parseClaimsSpy = vi.spyOn(clockifyParser, "parseClaims");
     const handler = withClockifyVerifiedWebhookRequest(
-      parser(),
+      clockifyParser,
       {
         expectedEventType: "EXPENSE_CREATED",
         getExpectedWebhookAuthToken(input) {
@@ -911,6 +971,10 @@ describe("Marketplace request verification helpers", () => {
       { workspaceId: WORKSPACE_ID, addonId: ADDON_ID, eventType: "EXPENSE_CREATED" },
     ]);
     expect(handled).toBe(true);
+    // The lookup path must verify the JWT exactly once: the stored-token
+    // comparison reuses firstPass's already-verified claims and raw header
+    // value instead of re-running verifyClockifyWebhookRequest.
+    expect(parseClaimsSpy).toHaveBeenCalledTimes(1);
 
     handled = false;
     const missingStoredToken = withClockifyVerifiedWebhookRequest(
@@ -975,16 +1039,84 @@ describe("Marketplace request verification helpers", () => {
     expect(contextlessLookups).toBe(0);
   });
 
-  it("rejects webhook wrappers with ambiguous fixed and lookup token configuration", async () => {
+  it("throws at wiring time for ambiguous fixed and lookup token configuration", async () => {
     const token = await validToken();
+    let handled = false;
+    // These are configuration mistakes, not verification failures: they must
+    // surface immediately as a thrown error during setup, not as a silent
+    // per-request 401 that hides a broken webhook registration.
+    expect(() =>
+      withClockifyVerifiedWebhookRequest(
+        parser(),
+        {
+          expectedEventType: "EXPENSE_CREATED",
+          expectedWebhookAuthToken: token,
+          getExpectedWebhookAuthToken: () => token,
+        } as any,
+        async () => {
+          handled = true;
+          return { status: 204 };
+        },
+      ),
+    ).toThrow(/requires exactly one of/);
+    expect(handled).toBe(false);
+  });
+
+  it("throws at wiring time without a fixed or lookup token source", async () => {
+    let handled = false;
+    expect(() =>
+      withClockifyVerifiedWebhookRequest(
+        parser(),
+        { expectedEventType: "EXPENSE_CREATED" } as any,
+        async () => {
+          handled = true;
+          return { status: 204 };
+        },
+      ),
+    ).toThrow(/requires exactly one of/);
+    expect(handled).toBe(false);
+  });
+
+  it("throws at wiring time for a non-callable webhook token lookup", async () => {
+    let handled = false;
+    expect(() =>
+      withClockifyVerifiedWebhookRequest(
+        parser(),
+        {
+          expectedEventType: "EXPENSE_CREATED",
+          getExpectedWebhookAuthToken: null,
+        } as any,
+        async () => {
+          handled = true;
+          return { status: 204 };
+        },
+      ),
+    ).toThrow(/must be a function/);
+    expect(handled).toBe(false);
+  });
+
+  it("throws at wiring time for a missing expected event type", async () => {
+    let handled = false;
+    expect(() =>
+      withClockifyVerifiedWebhookRequest(parser(), {} as any, async () => {
+        handled = true;
+        return { status: 204 };
+      }),
+    ).toThrow(/requires a nonblank expectedEventType/);
+    expect(handled).toBe(false);
+  });
+
+  it("reports a misconfigured token lookup via onError before returning 401", async () => {
+    const token = await validToken();
+    const onError = vi.fn();
     let handled = false;
     const handler = withClockifyVerifiedWebhookRequest(
       parser(),
       {
         expectedEventType: "EXPENSE_CREATED",
-        expectedWebhookAuthToken: token,
-        getExpectedWebhookAuthToken: () => token,
-      } as any,
+        getExpectedWebhookAuthToken: () => undefined,
+        onError,
+      },
       async () => {
         handled = true;
         return { status: 204 };
@@ -1000,74 +1132,11 @@ describe("Marketplace request verification helpers", () => {
       ),
     ).resolves.toEqual({ status: 401, body: "Unauthorized" });
     expect(handled).toBe(false);
-  });
-
-  it("rejects webhook wrappers without a fixed or lookup token source", async () => {
-    const token = await validToken();
-    let handled = false;
-    const handler = withClockifyVerifiedWebhookRequest(
-      parser(),
-      { expectedEventType: "EXPENSE_CREATED" } as any,
-      async () => {
-        handled = true;
-        return { status: 204 };
-      },
+    expect(onError).toHaveBeenCalledExactlyOnceWith(
+      expect.any(Error),
+      expect.objectContaining({ source: "router" }),
     );
-
-    await expect(
-      handler(
-        request({
-          [ClockifyHeaders.SIGNATURE]: token,
-          [ClockifyHeaders.WEBHOOK_EVENT_TYPE]: "EXPENSE_CREATED",
-        }),
-      ),
-    ).resolves.toEqual({ status: 401, body: "Unauthorized" });
-    expect(handled).toBe(false);
-  });
-
-  it("rejects non-callable webhook token lookups from runtime-unsafe callers", async () => {
-    const token = await validToken();
-    let handled = false;
-    const handler = withClockifyVerifiedWebhookRequest(
-      parser(),
-      {
-        expectedEventType: "EXPENSE_CREATED",
-        getExpectedWebhookAuthToken: null,
-      } as any,
-      async () => {
-        handled = true;
-        return { status: 204 };
-      },
-    );
-
-    await expect(
-      handler(
-        request({
-          [ClockifyHeaders.SIGNATURE]: token,
-          [ClockifyHeaders.WEBHOOK_EVENT_TYPE]: "EXPENSE_CREATED",
-        }),
-      ),
-    ).resolves.toEqual({ status: 401, body: "Unauthorized" });
-    expect(handled).toBe(false);
-  });
-
-  it("rejects webhook wrappers with missing expected event type", async () => {
-    const token = await validToken();
-    let handled = false;
-    const handler = withClockifyVerifiedWebhookRequest(parser(), {} as any, async () => {
-      handled = true;
-      return { status: 204 };
-    });
-
-    await expect(
-      handler(
-        request({
-          [ClockifyHeaders.SIGNATURE]: token,
-          [ClockifyHeaders.WEBHOOK_EVENT_TYPE]: "EXPENSE_CREATED",
-        }),
-      ),
-    ).resolves.toEqual({ status: 401, body: "Unauthorized" });
-    expect(handled).toBe(false);
+    expect(onError.mock.calls[0]![0].message).toMatch(/no stored token/);
   });
 
   it("extracts environment and user context claims without hardcoded URL fallbacks", () => {
@@ -1108,5 +1177,205 @@ describe("Marketplace request verification helpers", () => {
         sub: ADDON_KEY,
       }).backendUrl,
     ).toBeUndefined();
+  });
+});
+
+describe("withClockifyHandler (unified arity)", () => {
+  it("normalizes the verified kind to (request, context)", async () => {
+    const token = await validToken();
+    let handled = false;
+    const handler = withClockifyHandler(
+      parser(),
+      { kind: "verified", expectedEventType: "EXPENSE_CREATED" },
+      async (_request, context) => {
+        handled = true;
+        expect(context.eventType).toBe("EXPENSE_CREATED");
+        return { status: 200, body: { workspaceId: context.claims.workspaceId } };
+      },
+    );
+
+    const valid = await handler(
+      request({
+        [ClockifyHeaders.SIGNATURE]: token,
+        [ClockifyHeaders.WEBHOOK_EVENT_TYPE]: "EXPENSE_CREATED",
+      }),
+    );
+    expect(valid).toEqual({ status: 200, body: { workspaceId: WORKSPACE_ID } });
+    expect(handled).toBe(true);
+  });
+
+  it("normalizes the lifecycle kind to (request, context)", async () => {
+    const token = await validToken();
+    let handled = false;
+    const handler = withClockifyHandler(
+      parser(),
+      { kind: "lifecycle" },
+      async (_request, context) => {
+        handled = true;
+        expect(context.payload).toBeUndefined();
+        return { status: 200, body: { addonId: context.claims.addonId } };
+      },
+    );
+
+    const valid = await handler(request({ [ClockifyHeaders.LIFECYCLE_TOKEN]: token }));
+    expect(valid).toEqual({ status: 200, body: { addonId: ADDON_ID } });
+    expect(handled).toBe(true);
+  });
+
+  it("normalizes the statusChanged, settingsUpdated, and deleted kinds, exposing payload on context", async () => {
+    const token = await validToken();
+    const headers = { [ClockifyHeaders.LIFECYCLE_TOKEN]: token };
+
+    const statusPayload: ClockifyStatusChangedLifecyclePayload = {
+      addonId: ADDON_ID,
+      workspaceId: WORKSPACE_ID,
+      status: "ACTIVE",
+    };
+    const statusHandler = withClockifyHandler(
+      parser(),
+      { kind: "statusChanged" },
+      async (_request, context) => {
+        expect(context.payload).toBe(statusPayload);
+        return { status: 200 };
+      },
+    );
+    await expect(statusHandler({ ...request(headers), body: statusPayload })).resolves.toEqual({
+      status: 200,
+    });
+
+    const settingsPayload: ClockifySettingsUpdatedLifecyclePayload = {
+      addonId: ADDON_ID,
+      workspaceId: WORKSPACE_ID,
+      settings: [{ id: "setting-1", name: "Setting", value: true }],
+    };
+    const settingsHandler = withClockifyHandler(
+      parser(),
+      { kind: "settingsUpdated" },
+      async (_request, context) => {
+        expect(context.payload).toBe(settingsPayload);
+        return { status: 200 };
+      },
+    );
+    await expect(settingsHandler({ ...request(headers), body: settingsPayload })).resolves.toEqual({
+      status: 200,
+    });
+
+    const deletedPayload: ClockifyDeletedLifecyclePayload = {
+      addonId: ADDON_ID,
+      workspaceId: WORKSPACE_ID,
+      asUser: "admin-user",
+    };
+    const deletedHandler = withClockifyHandler(
+      parser(),
+      { kind: "deleted" },
+      async (_request, context) => {
+        expect(context.payload).toBe(deletedPayload);
+        return { status: 200 };
+      },
+    );
+    await expect(deletedHandler({ ...request(headers), body: deletedPayload })).resolves.toEqual({
+      status: 200,
+    });
+  });
+
+  it("normalizes the component kind to (request, context)", async () => {
+    const token = await validToken({ user: "component-user", workspaceRole: "ADMIN" });
+    let handled = false;
+    const handler = withClockifyHandler(
+      parser(),
+      { kind: "component", expectedWorkspaceId: WORKSPACE_ID, expectedAddonId: ADDON_ID },
+      async (_request, context) => {
+        handled = true;
+        expect(context.payload).toBeUndefined();
+        expect(context.eventType).toBeUndefined();
+        return { status: 200, body: { user: context.claims.user } };
+      },
+    );
+
+    const valid = await handler(
+      componentRequest(new URLSearchParams({ [ClockifyQueryParams.AUTH_TOKEN]: token })),
+    );
+    expect(valid).toEqual({ status: 200, body: { user: "component-user" } });
+    expect(handled).toBe(true);
+
+    handled = false;
+    const invalid = await handler(componentRequest(new URLSearchParams()));
+    expect(invalid).toEqual({ status: 401, body: "Unauthorized" });
+    expect(handled).toBe(false);
+  });
+
+  it("normalizes the installed lifecycle kind, exposing payload on context", async () => {
+    const token = await validToken();
+    const payload: ClockifyInstalledLifecyclePayload = {
+      addonId: ADDON_ID,
+      authToken: "installation-token",
+      workspaceId: WORKSPACE_ID,
+      asUser: "admin-user",
+      apiUrl: "https://developer.clockify.me/api",
+      addonUserId: "addon-user",
+      webhooks: [],
+    };
+    let handled = false;
+    const handler = withClockifyHandler(
+      parser(),
+      { kind: "installed", expectedWorkspaceId: WORKSPACE_ID, expectedAddonId: ADDON_ID },
+      async (_request, context) => {
+        handled = true;
+        expect(context.payload).toBe(payload);
+        return { status: 201, body: { workspaceId: context.claims.workspaceId } };
+      },
+    );
+
+    const valid = await handler({
+      ...request({ [ClockifyHeaders.LIFECYCLE_TOKEN]: token }),
+      body: payload,
+    });
+    expect(valid).toEqual({ status: 201, body: { workspaceId: WORKSPACE_ID } });
+    expect(handled).toBe(true);
+  });
+
+  it("normalizes the webhook kind, exposing eventType on context", async () => {
+    const token = await signTestToken(keys.privateKey, ADDON_KEY, {
+      workspaceId: WORKSPACE_ID,
+      addonId: ADDON_ID,
+    });
+    let handled = false;
+    const handler = withClockifyHandler(
+      parser(),
+      { kind: "webhook", expectedEventType: "EXPENSE_CREATED", expectedWebhookAuthToken: token },
+      async (_request, context) => {
+        handled = true;
+        expect(context.eventType).toBe("EXPENSE_CREATED");
+        return { status: 204 };
+      },
+    );
+
+    const valid = await handler(
+      request({
+        [ClockifyHeaders.SIGNATURE]: token,
+        [ClockifyHeaders.WEBHOOK_EVENT_TYPE]: "EXPENSE_CREATED",
+      }),
+    );
+    expect(valid).toEqual({ status: 204 });
+    expect(handled).toBe(true);
+
+    handled = false;
+    const invalid = await handler(request({}));
+    expect(invalid).toEqual({ status: 401, body: "Unauthorized" });
+    expect(handled).toBe(false);
+  });
+});
+
+describe("verifier naming aliases (deprecated, additive)", () => {
+  it("verifyComponentToken is verifyClockifyComponentRequest", () => {
+    expect(verifyComponentToken).toBe(verifyClockifyComponentRequest);
+  });
+
+  it("verifyLifecycleToken is verifyClockifyLifecycleRequest", () => {
+    expect(verifyLifecycleToken).toBe(verifyClockifyLifecycleRequest);
+  });
+
+  it("verifyWebhookToken is verifyClockifyWebhookRequest", () => {
+    expect(verifyWebhookToken).toBe(verifyClockifyWebhookRequest);
   });
 });

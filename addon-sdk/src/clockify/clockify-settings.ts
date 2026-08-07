@@ -1,4 +1,5 @@
 import type { ClockifySetting } from "./clockify-models";
+import { ValidationException } from "../shared/errors";
 
 export type ClockifySettingAccessLevel = ClockifySetting["accessLevel"];
 
@@ -86,6 +87,13 @@ function dropdownSetting<Type extends ClockifySetting["type"], Value>(
 export function createClockifyTextSetting(
   input: ClockifyTextSettingOptions,
 ): ClockifyTypedSetting<"TXT", string> {
+  // The type signature already enforces `value: string`; this guard exists for
+  // JavaScript (non-TS-checked) callers who can pass anything at runtime.
+  if (typeof input.value !== "string") {
+    throw new ValidationException(
+      `createClockifyTextSetting requires a string value — got ${typeof input.value}.`,
+    );
+  }
   return valueSetting("TXT", input);
 }
 

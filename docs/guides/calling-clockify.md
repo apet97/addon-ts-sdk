@@ -73,8 +73,25 @@ Do not serialize the client, token, or response request metadata into component 
   are ambiguous and are not retried for mutation methods.
 - A caller abort is terminal. Discarded retry response bodies are cancelled before backoff, and
   cancellation cleanup failures do not replace the intended retry.
+- Pass `onRetry` to observe a retry for metrics or logging: it receives `{attempt, delayMs}` plus
+  either `status` (a status-based retry) or `error` (a network-error retry). It never affects retry
+  behavior, even if it throws.
 - An invalid generic path segment fails before fetch; accepted dynamic segments remain within one
   encoded path segment.
+
+## Pagination and rate limits
+
+`request(pathSegments, init)` reaches any Clockify REST resource behind the verified
+`backendUrl`, including paginated ones. This SDK does not model pagination — it stays at the
+transport boundary. When calling a paginated resource:
+
+- Follow Clockify's own `page`/`page-size` query parameters for that resource; check the entity's
+  API reference, since page-size limits and defaults are resource-specific and subject to change.
+- Keep fetching pages until a page returns fewer than `page-size` results.
+- `ClockifyAddonClient` already retries a confirmed `429` per [Failure behavior](#failure-behavior)
+  above; a pagination loop does not need its own retry logic on top of that.
+- Prefer the separate `clockify-ts-sdk` for typed, paginated entity operations (time entries,
+  projects, reports) — it is the entity model this client intentionally is not.
 
 ## Prove it
 

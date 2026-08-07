@@ -15,9 +15,9 @@ import {
   ClockifySignatureParser,
   ClockifyAddonClaims,
   ClockifyHeaders,
+  ClockifyWebhook,
   ClockifyWebhookAuthTokenLookup,
   withClockifyVerifiedWebhookRequest,
-  generated,
 } from "../../src";
 
 /** The Clockify expense webhook body. Full payloads carry `id`; reference payloads carry `expenseId`. */
@@ -68,7 +68,7 @@ export interface ExpenseWebhookAddonOptions {
  */
 export function createExpenseWebhookAddon(
   opts: ExpenseWebhookAddonOptions,
-): ClockifyAddon<generated.v1_5.ClockifyManifest> {
+): ClockifyAddon<ClockifyManifest<"1.5">> {
   const parser = new ClockifySignatureParser(opts.key, opts.publicKey);
 
   const manifest = ClockifyManifest.v1_5Builder()
@@ -81,8 +81,7 @@ export function createExpenseWebhookAddon(
 
   const addon = new ClockifyAddon(manifest);
 
-  const webhook = generated.v1_5
-    .ClockifyWebhookBuilder()
+  const webhook = ClockifyWebhook.v1_5Builder()
     .event("EXPENSE_CREATED")
     .path("/webhook/expense-created")
     .build();

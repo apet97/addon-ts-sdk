@@ -6,6 +6,18 @@ export interface ClockifySettingUpdate {
   readonly value: unknown;
 }
 
+/** Observed just before {@link ClockifyAddonClient} retries a request. */
+export interface ClockifyAddonClientRetryInfo {
+  /** The attempt that just finished (1-indexed); the retry will be `attempt + 1`. */
+  readonly attempt: number;
+  /** The response status that triggered the retry, absent for a network-error retry. */
+  readonly status?: number;
+  /** The response error that triggered the retry, absent for a status-based retry. */
+  readonly error?: unknown;
+  /** Delay before the retry, in milliseconds. */
+  readonly delayMs: number;
+}
+
 /** Construction options for {@link ClockifyAddonClient}. */
 export interface ClockifyAddonClientOptions {
   readonly token: string;
@@ -15,6 +27,8 @@ export interface ClockifyAddonClientOptions {
   readonly timeoutMs?: number;
   readonly maxAttempts?: number;
   readonly sleep?: (milliseconds: number) => Promise<void>;
+  /** Observe retries for metrics/logging. Never affects retry behavior, even if it throws. */
+  readonly onRetry?: (info: ClockifyAddonClientRetryInfo) => void;
 }
 
 /** HTTP failure returned by a Clockify add-on API call. */
@@ -39,6 +53,10 @@ function normalizeBackendUrl(value: string): URL {
     /^[a-z][a-z\d+.-]*:\/\/(\[[^?/#\\]+\]|[^:/?#\\]+)(?::[^/?#\\]*)?(?:[/?#\\]|$)/i.exec(
       value.trim(),
     )?.[1];
+  // Not using the shared isHttpsOrLoopbackHttp predicate here: this call site
+  // additionally requires the raw input string's hostname to match the
+  // parsed URL's hostname, guarding against a parsing quirk letting a
+  // non-loopback input resolve to a loopback URL.hostname.
   const loopback = rawHostname === url.hostname && isCanonicalLoopbackHostname(url.hostname);
   if (url.protocol !== "https:" && !(url.protocol === "http:" && loopback)) {
     throw new Error("Clockify backendUrl must use HTTPS outside canonical loopback hosts.");
@@ -49,8 +67,27 @@ function normalizeBackendUrl(value: string): URL {
   return url;
 }
 
+/**
+ * Rejects an empty, `.`, or `..` segment — including one only reachable by
+ * decoding a caller-supplied percent-encoding once (e.g. `%2e%2e`). Every
+ * segment is still passed through encodeURIComponent below, which already
+ * keeps embedded `/`, `?`, and `#` characters confined to their own opaque
+ * segment; only a segment that resolves to a bare dot or dot-dot is an
+ * actual traversal risk. Malformed percent-encoding is rejected outright.
+ */
+function isBadClockifyPathSegment(segment: string): boolean {
+  if (segment === "" || segment === "." || segment === "..") return true;
+  let decoded: string;
+  try {
+    decoded = decodeURIComponent(segment);
+  } catch {
+    return true;
+  }
+  return decoded === "" || decoded === "." || decoded === "..";
+}
+
 function requestUrl(base: URL, segments: readonly string[]): URL {
-  if (segments.some((segment) => segment === "" || segment === "." || segment === "..")) {
+  if (segments.some(isBadClockifyPathSegment)) {
     throw new Error("Clockify API path segments must be non-empty and must not be '.' or '..'.");
   }
   const url = new URL(base);
@@ -75,6 +112,7 @@ export class ClockifyAddonClient {
   private readonly timeoutMs: number;
   private readonly maxAttempts: number;
   private readonly sleep: (milliseconds: number) => Promise<void>;
+  private readonly onRetry?: (info: ClockifyAddonClientRetryInfo) => void;
 
   constructor(options: ClockifyAddonClientOptions) {
     if (options.token.trim() === "") throw new Error("Clockify add-on token must not be empty.");
@@ -93,6 +131,15 @@ export class ClockifyAddonClient {
       ((milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds)));
     if (!Number.isInteger(this.maxAttempts) || this.maxAttempts < 1)
       throw new Error("maxAttempts must be a positive integer.");
+    this.onRetry = options.onRetry;
+  }
+
+  private notifyRetry(info: ClockifyAddonClientRetryInfo): void {
+    try {
+      this.onRetry?.(info);
+    } catch {
+      // An observer must never affect retry behavior.
+    }
   }
 
   private async send(segments: readonly string[], init: RequestInit): Promise<Response> {
@@ -123,13 +170,17 @@ export class ClockifyAddonClient {
           } catch {
             // Discarded-response cleanup must not replace the intended retry.
           }
-          await this.sleep(retryDelay(response, attempt));
+          const delayMs = retryDelay(response, attempt);
+          this.notifyRetry({ attempt, status: response.status, delayMs });
+          await this.sleep(delayMs);
           continue;
         }
         return response;
       } catch (error) {
         if (!safeRead || attempt >= this.maxAttempts || this.signal?.aborted) throw error;
-        await this.sleep(Math.min(100 * 2 ** (attempt - 1), 2_000));
+        const delayMs = Math.min(100 * 2 ** (attempt - 1), 2_000);
+        this.notifyRetry({ attempt, error, delayMs });
+        await this.sleep(delayMs);
       } finally {
         clearTimeout(timeout);
         this.signal?.removeEventListener("abort", abort);

@@ -47,7 +47,7 @@ Clockify request
 
 | Capability             | SDK support                                                                                    |
 | ---------------------- | ---------------------------------------------------------------------------------------------- |
-| Typed manifests        | Schema 1.5 builders and runtime validation                                                     |
+| Typed manifests        | Schema 1.2–1.6 builders and runtime validation                                                 |
 | Verified requests      | RS256 component, lifecycle, and stored-token webhook verification with context checks          |
 | Runtime adapters       | Node.js `http`, optional Express integration, and the standard Fetch API                       |
 | Add-on services        | Claim-driven token exchange, structured settings transport, and generic authenticated requests |

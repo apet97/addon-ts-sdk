@@ -4,8 +4,112 @@ All notable changes to this SDK are recorded here.
 
 ## Unreleased
 
+## 1.1.0
+
 - Kept documentation verification deterministic by excluding Git-ignored local memory, worktree,
   prompt, and upstream-reference Markdown from the active repository document set.
+- Closed a webhook timing oracle by verifying the signed JWT before comparing the fixed expected
+  token, and removed a redundant second verification on the lookup-token path.
+- Split comma-joined duplicate header values before verification and rejected Node requests with a
+  duplicate `Content-Length` header, closing a request-smuggling class of ambiguity.
+- Rejected client path segments that decode to `.`/`..`, and rejected absolute-form
+  (`scheme://...`) Node request targets.
+- Redacted headers, query strings, and bodies before `onError` reporters see a request; added
+  `onError` support to the Express adapter.
+- Hardened installation-store base64 encode/decode with a `Buffer` fast path and an explicit guard
+  when `globalThis.crypto.getRandomValues` is unavailable; added `createRotatingClockifyTokenCodec`
+  for encryption-key rotation without a forced re-encrypt migration.
+- Made manifest/webhook/lifecycle registration atomic: a route only appears in the manifest after
+  it binds, and an identical re-registration is a no-op instead of a conflict.
+- Moved `ajv`/`ajv-draft-04` to devDependencies; the packed SDK's production dependency tree is now
+  `jose` alone.
+- Memoized per-path allowed methods instead of rescanning every request; dropped an unnecessary
+  Fetch body stream clone.
+- Added `isJsonBody` narrowing that excludes `Map`/`Set`/`Date`/`RegExp` and other class instances
+  from the JSON-body fast path.
+- Added an `onRetry` observer hook to `ClockifyAddonClient` and an `AllowedMethodsByPath` cache
+  cleared on registration.
+- Deprecated the legacy `/adapters` aggregate export in favor of the runtime-specific subpaths.
+- Added `ClockifyManifest.builder()` as a canonical alias for `v1_5Builder()`; the webhook wrapper
+  now fails fast on misconfiguration at construction and reports lookup-token misses through
+  `onError` before returning 401.
+- Expanded `testing/index.ts` with request/payload builder helpers
+  (`createTestComponentRequest`, `createTestLifecycleRequest`, `createTestWebhookRequest`,
+  `buildInstalledPayload`).
+- Added `isAddonInputError` and clarified the absolute-path validation error message.
+- Fixed `applyClockifyLanguage`'s multi-underscore locale conversion and `formatClockifyDate`'s
+  crash on a malformed locale; documented `createClockifyHtmlResponse`'s default
+  `frame-ancestors 'none'` deny-all.
+- Generated a Worker-runtime `wrangler.toml` (`main`, `compatibility_date`, project name) in the
+  creator scaffold so `wrangler dev`/`wrangler deploy` work without extra flags.
+- Aligned the engine floor to Node `>=22.13.0` across both packages and documentation.
+- Documented deferred/out-of-scope findings instead of rushing unjustified changes: bundle-size
+  debt, pagination/rate-limit guidance for `ClockifyAddonClient.request()`, and public-key rotation.
+- Recorded documented Java/TypeScript SDK behavioral divergences in the parity checklist.
+- `verify:dist` now walks the portable ESM entry's relative-import closure to catch a `node:*`
+  leak into the runtime-neutral graph.
+- Made `verifyClockifyLifecycleRequest` default `requireExpiration` to `false`: the `INSTALLED`
+  payload's `authToken` does not expire per the Marketplace auth docs, and requiring `exp` by
+  default rejected legitimate lifecycle requests. `verifyClockifyComponentRequest` keeps the
+  strict default for interactive, short-lived tokens.
+- Added an optional `onDecodeError` callback to `wrapClockifyInstallationStoreWithEncryption` so a
+  corrupt-decode event (wrong key, tampering) is observable instead of looking identical to "no
+  installation" — `load()` still fails closed to `null` either way.
+- Documented why manifest validation stays opt-in via `createValidatedClockifyAddon` rather than
+  running inside the `ClockifyAddon` constructor: forcing it broke two official Clockify example
+  manifests that fail this SDK's own schema validator for reasons unrelated to routing.
+- Added tunnel guidance (`ngrok`/`cloudflared`) to the getting-started guide and SDK README
+  quick-start — Clockify cannot reach `localhost`, and neither doc previously said so.
+- Warned on the three insecure examples (`express-basic`, `fetch-basic`, `custom-settings`) that
+  skip verifying Clockify's signed `auth_token`, and switched `expense-webhook` from the internal
+  `generated.v1_5.*` accessors to the canonical `ClockifyWebhook.v1_5Builder()` export.
+- Added `jose`'s MIT notice to `THIRD_PARTY_NOTICES.md` — the SDK's one runtime dependency was
+  undocumented there — and extended the packed-consumer check to assert it ships.
+- Added a commented `runClockifyIdempotentWebhook` recipe to the generated all-features webhook
+  handler, and a liveness/readiness/`SIGTERM`-drain recipe to the deployment guide.
+- Recorded the remaining Java-parity rows (lifecycle-token expiration, `scopes` and
+  `component.label` requiredness drift across schema versions) and expanded the previously thin
+  "TS Extensions" list.
+- Vendored Clockify manifest schema 1.6 (additive over 1.5: the `TIME_OFF_REQUEST_STARTED` webhook
+  event and the `timeentries.action.uiblocks` component type). Added `ClockifyManifest.v1_6Builder()`
+  and the matching per-model `v1_6Builder()` factories alongside the existing 1.2–1.5 versions; the
+  canonical `.builder()` alias stays on 1.5. `npm run verify:schema-live` now passes against the
+  live Clockify endpoint.
+- Applied `npm audit fix` for three pre-existing transitive dev-only advisories (`brace-expansion`,
+  `fast-uri`, `postcss`): all three moved by a patch version within their existing majors. The
+  packed production dependency tree (`jose` alone) already had 0 vulnerabilities.
+- Added `withClockifyHandler()` as an additive unified alternative to the `withClockify*` wrappers:
+  it normalizes every verification kind (`verified`, `component`, `lifecycle`, `installed`,
+  `statusChanged`, `settingsUpdated`, `deleted`, `webhook`) to one `(request, context)` handler
+  signature. No existing wrapper's signature changed. `ClockifyHandlerContext<Kind>` is
+  parameterized on the discriminant, so the four lifecycle-payload kinds keep required
+  `claims.workspaceId`/`claims.addonId` and their exact matched `payload` type instead of widening
+  to the union a naive unification would produce. Documented the wire → header → wrapper → handler
+  mapping in `addon-sdk/docs/api-reference.md`.
+- Narrowed generated `Record<string, any>` component `options` fields to `Record<string, unknown>`
+  across schema versions 1.2–1.6 by fixing the emitter in `generate-clockify-manifest.ts`. Added a
+  runtime `typeof` guard to `createClockifyTextSetting` so a JavaScript (non-TS-checked) caller
+  passing a non-string `value` gets a `ValidationException` instead of a silently malformed
+  manifest.
+- Added `@deprecated` naming aliases `verifyComponentToken`, `verifyLifecycleToken`, and
+  `verifyWebhookToken` for `verifyClockifyComponentRequest`, `verifyClockifyLifecycleRequest`, and
+  `verifyClockifyWebhookRequest`. Additive only — each alias is a direct reference to its canonical
+  function, and no call site in this package switched to an alias. Documented the wire → header →
+  helper table in `addon-sdk/docs/token-validation.md`.
+- Renamed `addon-sdk/examples/` to `addon-sdk/snippets/` and documented the directory as copy-in
+  reference code rather than standalone runnable projects — each file imports `../../src` directly
+  and has no `package.json` of its own. The packed tarball's `files` array never listed this
+  directory, so publication is unaffected.
+- Refreshed all 13 captured `MARKETPLACE_DOCS/` snapshots from a 2026-08-07 re-scrape of Clockify's
+  developer docs and added `MARKETPLACE_DOCS/14-manifest.md` for a previously-uncaptured upstream
+  page. Documented that Clockify's live schema endpoint now also serves an intermediate `1.5.1`
+  schema this SDK does not vendor a dedicated builder for.
+- Fixed `addon-sdk/docs/api-reference.md`'s wire → header → wrapper → handler table, which named
+  headers that do not exist on the wire (`X-Clockify-Signature`, `X-Clockify-Lifecycle-Token`,
+  `X-Clockify-Webhook-Event-Token`); the real names are `clockify-signature`,
+  `clockify-webhook-event-type`, and `x-addon-lifecycle-token`.
+- Removed `docs/superpowers/**` (past-session planning records, not customer-facing) and the
+  orphaned, stale `docs/product-surface.json`.
 
 ## 1.0.5 - 2026-07-14
 

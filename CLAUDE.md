@@ -56,9 +56,8 @@ diff. Intentional schema/model changes start from the vendored schema or generat
   authored builder documentation.
 - `addon-sdk/src/clockify/generated/**` and `addon-sdk/public-api.snapshot.md` are generated evidence.
   Change their owning inputs or explicit update command, never their contents by hand.
-- `docs/superpowers/**` and `docs/archive/**` are historical evidence. Ignored local files such as
-  `.superpowers/**`, `GOAL.md`, and `verification_report.md` are execution notes, not repository
-  documentation.
+- `docs/archive/**` is historical evidence. Ignored local files such as `.superpowers/**`,
+  `GOAL.md`, and `verification_report.md` are execution notes, not repository documentation.
 
 Run `npm run verify:docs` after authored Markdown changes. Its active-document gate checks local
 links and anchors, the builder index, the shared agent body, and configured stale claims while
@@ -99,8 +98,8 @@ respecting the upstream, generated, historical, and ignored-local boundaries abo
 
 - `addon-sdk/src/` — portable SDK source, runtime adapters, Clockify modules, client, UI, and testing
   exports; generated manifest code lives under `src/clockify/generated/`.
-- `addon-sdk/docs/`, `addon-sdk/examples/`, `addon-sdk/schemas/`, `addon-sdk/tests/`, and
-  `addon-sdk/scripts/` — package reference, runnable examples, vendored schemas/provenance, tests,
+- `addon-sdk/docs/`, `addon-sdk/snippets/`, `addon-sdk/schemas/`, `addon-sdk/tests/`, and
+  `addon-sdk/scripts/` — package reference, copy-in snippets, vendored schemas/provenance, tests,
   and package build/verification tools.
 - `create-clockify-addon/src/` — creator API and generated project templates, including the project
   README; `bin/` is the CLI and `scripts/verify-scaffolds.mjs` owns packed scaffold proof.

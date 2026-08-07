@@ -1,8 +1,14 @@
-import { isCanonicalLoopbackHostname } from "../shared/loopback";
+import { isHttpsOrLoopbackHttp } from "../shared/loopback";
 import type { AddonResponse } from "../shared/response";
 
 /** Options for the SDK's browser-facing response security baseline. */
 export interface ClockifySecurityHeaderOptions {
+  /**
+   * CSP `frame-ancestors` values. Omitting this defaults to `["'none'"]` —
+   * deny all embedding, including Clockify's own iframe. Pass the exact
+   * verified Clockify parent origin (e.g. `[parentOrigin]`) to allow the
+   * component to actually load inside Clockify.
+   */
   readonly frameAncestors?: readonly string[];
   readonly contentSecurityPolicy?: Readonly<Record<string, readonly string[]>>;
 }
@@ -41,9 +47,8 @@ function assertFrameAncestor(value: string): void {
   assertDirectiveValue(value);
   if (value === "'none'" || value === "'self'") return;
   const url = new URL(value);
-  const local = isCanonicalLoopbackHostname(url.hostname);
   if (url.origin !== value) throw new Error("CSP frame ancestors must be origins without paths.");
-  if (url.protocol !== "https:" && !(local && url.protocol === "http:")) {
+  if (!isHttpsOrLoopbackHttp(url)) {
     throw new Error("CSP frame ancestors must use HTTPS outside localhost.");
   }
 }
@@ -75,7 +80,13 @@ export function buildClockifySecurityHeaders(
   };
 }
 
-/** Creates a no-store HTML response with the SDK security baseline. */
+/**
+ * Creates a no-store HTML response with the SDK security baseline.
+ *
+ * @param options.frameAncestors Omit this and the response denies all embedding — the iframe
+ * will NOT load in Clockify. Pass `[parentOrigin]` (the exact verified Clockify parent origin)
+ * for a component response that Clockify actually embeds.
+ */
 export function createClockifyHtmlResponse(
   body: string,
   options: ClockifySecurityHeaderOptions & { readonly status?: number } = {},

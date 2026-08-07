@@ -19,7 +19,7 @@ Install the public package from npm:
 npm install @apet97/clockify-addon-sdk
 ```
 
-Node 22+. Ships ESM and CommonJS builds with type declarations.
+Node 22.13.0+. Ships ESM and CommonJS builds with type declarations.
 
 ## Imports
 
@@ -128,9 +128,13 @@ server.listen(8080, () => {
 });
 ```
 
+Clockify fetches `${baseUrl}/manifest` over public HTTPS — it cannot reach `localhost`. During
+development, expose your server with a tunnel (`npx ngrok http 8080` or
+`npx cloudflared tunnel --url http://localhost:8080`) and use the printed tunnel URL as `baseUrl`.
+
 ## Product surface
 
-- **Manifest builders** for schema versions 1.2–1.5. Required fields are enforced at the type
+- **Manifest builders** for schema versions 1.2–1.6. Required fields are enforced at the type
   level: the chain will not expose `.build()` until every required step is set.
 - **Router** that serves `/manifest`, trims one trailing slash before matching, returns 404 when no
   route owns a path, returns 405 with `Allow` when the path exists for another method, and contains
@@ -221,6 +225,14 @@ const claims = await new ClockifySignatureParser("my-addon-key", publicKey).pars
 - `create-clockify-addon` scaffolds Node or Worker projects that fail closed until production origin,
   parent-origin, persistence and webhook processing are configured.
 
+## Snippets
+
+`snippets/*` are copy-in reference code, not standalone runnable projects — each imports `../../src`
+directly and has no `package.json` of its own. Copy the file you need into a project that depends on
+`@apet97/clockify-addon-sdk` and adjust the import path. This package's own test suite and
+`npm run dev:clockify-local` run them in place, inside this repository, as regression coverage; that
+in-repo execution is not a claim that the files work unmodified outside it.
+
 ## Local Clockify replay
 
 Run the secure example as a local Clockify emulator/playground:
@@ -229,7 +241,7 @@ Run the secure example as a local Clockify emulator/playground:
 npm run dev:clockify-local
 ```
 
-The command boots `examples/secure-server`, generates fake signed test tokens with the SDK testing
+The command boots `snippets/secure-server`, generates fake signed test tokens with the SDK testing
 helpers, replays manifest/component/lifecycle/webhook requests, prints the status transcript, and
 then keeps the server running for manual inspection. For automation, use:
 
@@ -243,11 +255,13 @@ Clockify credentials.
 
 ## Schema versions
 
-1.2–1.4 are ported from the Clockify add-on Java SDK; 1.5 is taken from the live schema endpoint
-(`GET https://api.clockify.me/api/addons/manifest-schema?version=1.5`). The copies vendored under
-`schemas/clockify-manifests/` are structurally identical to those sources, and the generated builders
-are reproducible from them. Run `npm run verify:schema-live` manually when you want to compare the
-vendored schemas against Clockify's live endpoint.
+1.2–1.4 are ported from the Clockify add-on Java SDK; 1.5 and 1.6 are taken from the live schema
+endpoint (`GET https://developer.clockify.me/api/addons/manifest-schema?version=1.6`, also served
+identically from `api.clockify.me`). Schema 1.6 is additive over 1.5 — one new webhook event and one
+new component type, no changed or removed fields. The copies vendored under
+`schemas/clockify-manifests/` are structurally identical to those sources, and the generated
+builders are reproducible from them. Run `npm run verify:schema-live` manually when you want to
+compare the vendored schemas against Clockify's live endpoint.
 
 The packaged tarball intentionally exposes the vendored schema JSON files. ESM consumers can
 import a schema or the provenance file directly:

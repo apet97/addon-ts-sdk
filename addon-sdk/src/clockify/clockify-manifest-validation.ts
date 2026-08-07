@@ -4,6 +4,7 @@ import {
   validateManifest1_3,
   validateManifest1_4,
   validateManifest1_5,
+  validateManifest1_6,
 } from "./generated/manifest-validators";
 
 /** A normalized manifest-validation issue suitable for logs and developer tooling. */
@@ -47,10 +48,13 @@ const validatorsByVersion: Readonly<Record<ClockifySchemaVersion, GeneratedManif
   "1.3": validateManifest1_3 as GeneratedManifestValidator,
   "1.4": validateManifest1_4 as GeneratedManifestValidator,
   "1.5": validateManifest1_5 as GeneratedManifestValidator,
+  "1.6": validateManifest1_6 as GeneratedManifestValidator,
 };
 
 function isSchemaVersion(value: unknown): value is ClockifySchemaVersion {
-  return value === "1.2" || value === "1.3" || value === "1.4" || value === "1.5";
+  return (
+    value === "1.2" || value === "1.3" || value === "1.4" || value === "1.5" || value === "1.6"
+  );
 }
 
 function normalizeIssue(error: GeneratedManifestValidationError): ClockifyManifestValidationIssue {
@@ -87,7 +91,7 @@ export function validateClockifyManifest(value: unknown): ClockifyManifestValida
           instancePath: "/schemaVersion",
           schemaPath: "#/schemaVersion",
           keyword: "enum",
-          message: "schemaVersion must be one of 1.2, 1.3, 1.4, or 1.5",
+          message: "schemaVersion must be one of 1.2, 1.3, 1.4, 1.5, or 1.6",
         },
       ],
     };

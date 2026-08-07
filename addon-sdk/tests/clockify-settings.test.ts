@@ -8,6 +8,7 @@ import {
   createClockifyTextSetting,
   createClockifyUserDropdownMultipleSetting,
   createClockifyUserDropdownSingleSetting,
+  ValidationException,
 } from "../src";
 
 describe("Clockify settings helpers", () => {
@@ -149,5 +150,17 @@ describe("Clockify settings helpers", () => {
       type: "USER_DROPDOWN_MULTIPLE",
       value: ["user-1", "user-2"],
     });
+  });
+
+  it("createClockifyTextSetting rejects a non-string value at runtime for JS callers", () => {
+    expect(() =>
+      createClockifyTextSetting({
+        id: "description",
+        name: "Description",
+        accessLevel: "ADMINS",
+        // @ts-expect-error — exercising the runtime guard for non-TS-checked callers
+        value: 42,
+      }),
+    ).toThrow(ValidationException);
   });
 });

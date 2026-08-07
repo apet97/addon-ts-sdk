@@ -31,6 +31,11 @@ highlights the stable boundaries and commonly used symbols; the generated
 - `ValidationException` and `IllegalArgumentException` mirror the Java SDK's registration errors.
 - `AddonErrorReporter` and `AddonOptions` let host apps observe handled router/adapter errors without
   changing the SDK's quiet default response policy.
+- Return a plain object or array from a handler's `body` to get an `application/json` response.
+  `isJsonBody` recognizes only `{}`-prototype objects and arrays; a class instance — `Map`, `Set`,
+  `Date`, `RegExp`, or your own class — is not JSON-serialized, since `JSON.stringify` silently
+  discards a `Map`'s or `Set`'s entries instead of erroring. Convert to a plain object first, e.g.
+  `Object.fromEntries(myMap)`.
 
 ## Manifest Builders and Models
 
@@ -59,10 +64,50 @@ highlights the stable boundaries and commonly used symbols; the generated
   handlers and return `401 Unauthorized` before application code runs when verification fails. The
   webhook wrapper requires exactly one token source: fixed `expectedWebhookAuthToken` or
   `getExpectedWebhookAuthToken`, never neither or both.
+- `withClockifyHandler()` is an additive unified wrapper that normalizes every `withClockify*` kind
+  above to one `(request, context)` handler signature — see the mapping table below.
 - `ClockifyHeaders`, `ClockifyQueryParams`, `getClockifyHeader()`, and `getClockifyQueryParam()`
   centralize Marketplace wire names.
 - `getClockifyEnvironmentContext()`, `resolveClockifyApiBaseUrl()`, and
   `resolveClockifyReportsBaseUrl()` keep region/environment URL handling claim-driven.
+
+### Wire → header → wrapper → handler
+
+Each `withClockify*` wrapper reads a different Marketplace credential and calls its handler with a
+different arity. The table below is the exact mapping; `withClockifyHandler()` is an additive
+alternative that normalizes every one of these to `(request, context)` via its `kind` option (see
+row-per-kind below) without changing or removing any wrapper.
+
+| Wire credential                                      | Header/query                                                                                                                    | Wrapper                                       | `withClockifyHandler` `kind` | Handler signature                                 |
+| ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------- | ---------------------------- | ------------------------------------------------- |
+| Signed request (any event)                           | `clockify-signature` + `clockify-webhook-event-type` header                                                                     | `withClockifyVerifiedRequest`                 | `"verified"`                 | `(request, claims, { claims, eventType })`        |
+| Component auth token                                 | `auth_token` query param                                                                                                        | `withClockifyVerifiedComponentRequest`        | `"component"`                | `(request, claims, { claims })`                   |
+| Lifecycle token (no `exp` required by default)       | `x-addon-lifecycle-token` header                                                                                                | `withClockifyVerifiedLifecycleRequest`        | `"lifecycle"`                | `(request, claims, { claims })`                   |
+| Lifecycle token + matched `INSTALLED` payload        | `x-addon-lifecycle-token` header + JSON body                                                                                    | `withClockifyInstalledLifecycleRequest`       | `"installed"`                | `(request, payload, claims, { claims, payload })` |
+| Lifecycle token + matched `STATUS_CHANGED` payload   | `x-addon-lifecycle-token` header + JSON body                                                                                    | `withClockifyStatusChangedLifecycleRequest`   | `"statusChanged"`            | `(request, payload, claims, { claims, payload })` |
+| Lifecycle token + matched `SETTINGS_UPDATED` payload | `x-addon-lifecycle-token` header + JSON body                                                                                    | `withClockifySettingsUpdatedLifecycleRequest` | `"settingsUpdated"`          | `(request, payload, claims, { claims, payload })` |
+| Lifecycle token + matched `DELETED` payload          | `x-addon-lifecycle-token` header + JSON body                                                                                    | `withClockifyDeletedLifecycleRequest`         | `"deleted"`                  | `(request, payload, claims, { claims, payload })` |
+| Signed request + stored webhook auth token           | `clockify-signature` + `clockify-webhook-event-type` header, compared against the stored webhook auth token (not a wire header) | `withClockifyVerifiedWebhookRequest`          | `"webhook"`                  | `(request, claims, { claims, eventType })`        |
+
+`withClockifyHandler(parser, { kind, ...options }, handler)` always calls
+`handler(request, context)`, where `context: ClockifyHandlerContext<typeof kind>` carries `claims`
+(and `payload`/`eventType` when the underlying wrapper supplies them). `ClockifyHandlerContext` is
+parameterized on `kind`, so TypeScript keeps the same narrowing the wrapped `withClockify*` call
+already gives: the four lifecycle-payload kinds (`installed`, `statusChanged`, `settingsUpdated`,
+`deleted`) get `claims.workspaceId`/`claims.addonId` as required `string` (via
+`ClockifyLifecycleMatchedClaims`) and `payload` typed to the exact matched payload — not the wider
+`ClockifyAddonClaims | ClockifyLifecycleMatchedClaims` union a naive unification would produce.
+Reach for `withClockifyHandler` when a single normalized handler shape is more convenient than
+matching each wrapper's own arity; reach for the specific `withClockify*` wrapper when its extra
+positional arguments (payload, claims) read more naturally at the call site.
+
+```ts
+const handleComponent = withClockifyHandler(
+  parser,
+  { kind: "component" },
+  (request, { claims }) => ({ status: 200, body: { user: claims.user } }),
+);
+```
 
 ## Lifecycle Helpers
 
@@ -103,11 +148,17 @@ highlights the stable boundaries and commonly used symbols; the generated
 - `generateTestKeys()` creates an RS256 key pair for tests.
 - `signTestToken(privateKey, addonKey, claims?, expiresIn?)` signs add-on JWTs that exercise the same
   verification path as Clockify-signed requests.
+- `createTestComponentRequest(token, overrides?)`, `createTestLifecycleRequest(token, payload, overrides?)`,
+  and `createTestWebhookRequest(token, eventType, payload, overrides?)` build ready-to-verify
+  `AddonRequest` values around a signed token, so a handler test does not hand-assemble headers and
+  query params.
+- `buildInstalledPayload(overrides?)` returns a documented `INSTALLED` lifecycle payload with every
+  required field defaulted.
 
 ## Validation, Security, Storage, and Client
 
 - `validateClockifyManifest()` and `assertClockifyManifest()` use the embedded draft-04 schema named
-  by `schemaVersion`. Validation dispatches to generated static validators for 1.2-1.5; it does
+  by `schemaVersion`. Validation dispatches to generated static validators for 1.2-1.6; it does
   not compile AJV schemas or generate code at request time, so the same path runs under Workers.
 - `buildClockifySecurityHeaders()`, `createClockifyHtmlResponse()`, and
   `createClockifyJsonResponse()` supply no-store browser response defaults.

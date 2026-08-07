@@ -7,13 +7,16 @@ export type ClockifyWebhook<V extends ClockifySchemaVersion = "1.4"> = V extends
     ? generated.v1_3.ClockifyWebhook
     : V extends "1.4"
       ? generated.v1_4.ClockifyWebhook
-      : generated.v1_5.ClockifyWebhook;
+      : V extends "1.5"
+        ? generated.v1_5.ClockifyWebhook
+        : generated.v1_6.ClockifyWebhook;
 
 export const ClockifyWebhook = {
   v1_2Builder: generated.v1_2.ClockifyWebhook.builder,
   v1_3Builder: generated.v1_3.ClockifyWebhook.builder,
   v1_4Builder: generated.v1_4.ClockifyWebhook.builder,
   v1_5Builder: generated.v1_5.ClockifyWebhook.builder,
+  v1_6Builder: generated.v1_6.ClockifyWebhook.builder,
 };
 
 export type ClockifyLifecycleEvent<V extends ClockifySchemaVersion = "1.4"> = V extends "1.2"
@@ -22,13 +25,16 @@ export type ClockifyLifecycleEvent<V extends ClockifySchemaVersion = "1.4"> = V 
     ? generated.v1_3.ClockifyLifecycleEvent
     : V extends "1.4"
       ? generated.v1_4.ClockifyLifecycleEvent
-      : generated.v1_5.ClockifyLifecycleEvent;
+      : V extends "1.5"
+        ? generated.v1_5.ClockifyLifecycleEvent
+        : generated.v1_6.ClockifyLifecycleEvent;
 
 export const ClockifyLifecycleEvent = {
   v1_2Builder: generated.v1_2.ClockifyLifecycleEvent.builder,
   v1_3Builder: generated.v1_3.ClockifyLifecycleEvent.builder,
   v1_4Builder: generated.v1_4.ClockifyLifecycleEvent.builder,
   v1_5Builder: generated.v1_5.ClockifyLifecycleEvent.builder,
+  v1_6Builder: generated.v1_6.ClockifyLifecycleEvent.builder,
 };
 
 export type ClockifyComponent<V extends ClockifySchemaVersion = "1.4"> = V extends "1.2"
@@ -37,13 +43,16 @@ export type ClockifyComponent<V extends ClockifySchemaVersion = "1.4"> = V exten
     ? generated.v1_3.ClockifyComponent
     : V extends "1.4"
       ? generated.v1_4.ClockifyComponent
-      : generated.v1_5.ClockifyComponent;
+      : V extends "1.5"
+        ? generated.v1_5.ClockifyComponent
+        : generated.v1_6.ClockifyComponent;
 
 export const ClockifyComponent = {
   v1_2Builder: generated.v1_2.ClockifyComponent.builder,
   v1_3Builder: generated.v1_3.ClockifyComponent.builder,
   v1_4Builder: generated.v1_4.ClockifyComponent.builder,
   v1_5Builder: generated.v1_5.ClockifyComponent.builder,
+  v1_6Builder: generated.v1_6.ClockifyComponent.builder,
 };
 
 export type ClockifySetting<V extends ClockifySchemaVersion = "1.4"> = V extends "1.2"
@@ -52,13 +61,16 @@ export type ClockifySetting<V extends ClockifySchemaVersion = "1.4"> = V extends
     ? generated.v1_3.ClockifySetting
     : V extends "1.4"
       ? generated.v1_4.ClockifySetting
-      : generated.v1_5.ClockifySetting;
+      : V extends "1.5"
+        ? generated.v1_5.ClockifySetting
+        : generated.v1_6.ClockifySetting;
 
 export const ClockifySetting = {
   v1_2Builder: generated.v1_2.ClockifySetting.builder,
   v1_3Builder: generated.v1_3.ClockifySetting.builder,
   v1_4Builder: generated.v1_4.ClockifySetting.builder,
   v1_5Builder: generated.v1_5.ClockifySetting.builder,
+  v1_6Builder: generated.v1_6.ClockifySetting.builder,
 };
 
 export type ClockifySettingsHeader<V extends ClockifySchemaVersion = "1.4"> = V extends "1.2"
@@ -67,13 +79,16 @@ export type ClockifySettingsHeader<V extends ClockifySchemaVersion = "1.4"> = V 
     ? generated.v1_3.ClockifySettingsHeader
     : V extends "1.4"
       ? generated.v1_4.ClockifySettingsHeader
-      : generated.v1_5.ClockifySettingsHeader;
+      : V extends "1.5"
+        ? generated.v1_5.ClockifySettingsHeader
+        : generated.v1_6.ClockifySettingsHeader;
 
 export const ClockifySettingsHeader = {
   v1_2Builder: generated.v1_2.ClockifySettingsHeader.builder,
   v1_3Builder: generated.v1_3.ClockifySettingsHeader.builder,
   v1_4Builder: generated.v1_4.ClockifySettingsHeader.builder,
   v1_5Builder: generated.v1_5.ClockifySettingsHeader.builder,
+  v1_6Builder: generated.v1_6.ClockifySettingsHeader.builder,
 };
 
 export type ClockifySettingsGroup<V extends ClockifySchemaVersion = "1.4"> = V extends "1.2"
@@ -82,13 +97,16 @@ export type ClockifySettingsGroup<V extends ClockifySchemaVersion = "1.4"> = V e
     ? generated.v1_3.ClockifySettingsGroup
     : V extends "1.4"
       ? generated.v1_4.ClockifySettingsGroup
-      : generated.v1_5.ClockifySettingsGroup;
+      : V extends "1.5"
+        ? generated.v1_5.ClockifySettingsGroup
+        : generated.v1_6.ClockifySettingsGroup;
 
 export const ClockifySettingsGroup = {
   v1_2Builder: generated.v1_2.ClockifySettingsGroup.builder,
   v1_3Builder: generated.v1_3.ClockifySettingsGroup.builder,
   v1_4Builder: generated.v1_4.ClockifySettingsGroup.builder,
   v1_5Builder: generated.v1_5.ClockifySettingsGroup.builder,
+  v1_6Builder: generated.v1_6.ClockifySettingsGroup.builder,
 };
 
 export type ClockifySettingsTab<V extends ClockifySchemaVersion = "1.4"> = V extends "1.2"
@@ -97,13 +115,16 @@ export type ClockifySettingsTab<V extends ClockifySchemaVersion = "1.4"> = V ext
     ? generated.v1_3.ClockifySettingsTab
     : V extends "1.4"
       ? generated.v1_4.ClockifySettingsTab
-      : generated.v1_5.ClockifySettingsTab;
+      : V extends "1.5"
+        ? generated.v1_5.ClockifySettingsTab
+        : generated.v1_6.ClockifySettingsTab;
 
 export const ClockifySettingsTab = {
   v1_2Builder: generated.v1_2.ClockifySettingsTab.builder,
   v1_3Builder: generated.v1_3.ClockifySettingsTab.builder,
   v1_4Builder: generated.v1_4.ClockifySettingsTab.builder,
   v1_5Builder: generated.v1_5.ClockifySettingsTab.builder,
+  v1_6Builder: generated.v1_6.ClockifySettingsTab.builder,
 };
 
 export type ClockifySettings<V extends ClockifySchemaVersion = "1.4"> = V extends "1.2"
@@ -112,13 +133,16 @@ export type ClockifySettings<V extends ClockifySchemaVersion = "1.4"> = V extend
     ? generated.v1_3.ClockifySettings
     : V extends "1.4"
       ? generated.v1_4.ClockifySettings
-      : generated.v1_5.ClockifySettings;
+      : V extends "1.5"
+        ? generated.v1_5.ClockifySettings
+        : generated.v1_6.ClockifySettings;
 
 export const ClockifySettings = {
   v1_2Builder: generated.v1_2.ClockifySettings.builder,
   v1_3Builder: generated.v1_3.ClockifySettings.builder,
   v1_4Builder: generated.v1_4.ClockifySettings.builder,
   v1_5Builder: generated.v1_5.ClockifySettings.builder,
+  v1_6Builder: generated.v1_6.ClockifySettings.builder,
 };
 
 // Top-level convenience exports for the manifest-level enums. These mirror the default

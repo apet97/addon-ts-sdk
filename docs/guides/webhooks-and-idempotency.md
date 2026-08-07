@@ -27,6 +27,12 @@ first verifies the signature JWT, event, and nonblank installation context, then
 with verified `workspaceId`, `addonId`, and `eventType`, compares the resolved stored token, and only
 then invokes the handler.
 
+A missing event type, a missing or ambiguous token source, or a non-function lookup are
+configuration mistakes, not verification failures — `withClockifyVerifiedWebhookRequest()` throws
+immediately when called with one, instead of registering a handler that silently 401s every real
+delivery. Pass `onError` to observe a lookup that resolves to no stored token at request time
+(e.g. an unrecognized installation) before the 401 is returned.
+
 The Node and Fetch adapters bound and buffer the request body before route verification. Their
 default maximum is 1 MiB, and an oversized body returns `413` before the webhook handler. Express
 body parsing and limits belong to the host application.
@@ -49,6 +55,11 @@ Use a durable lease store in production. Distributed `claim`, `complete`, and `r
 must be atomic and conditional on the current owner; an unguarded read-then-write implementation is
 not sufficient. Keep the business write idempotent or transactional as well—the lease coordinates
 attempts but is not a substitute for a business-data transaction.
+
+`InMemoryClockifyIdempotencyLeaseStore` never expires a completed entry, so a long-lived process
+grows its lease map without bound. It is for tests and short-lived single-process deployments only.
+A production store must put a time-to-live on completed entries — long enough to cover Clockify's
+retry window for a delivery, then evict.
 
 ## Smallest correct path
 

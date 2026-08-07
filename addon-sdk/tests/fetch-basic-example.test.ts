@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createFetchBasicAddon, handleFetchBasicRequest } from "../examples/fetch-basic";
+import { createFetchBasicAddon, handleFetchBasicRequest } from "../snippets/fetch-basic";
 
 describe("fetch-basic example", () => {
   it("serves the manifest through the framework-free Fetch adapter", async () => {

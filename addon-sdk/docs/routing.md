@@ -93,8 +93,13 @@ For Express, configure the host app's body parser directly:
 
 ```typescript
 app.use(express.json({ limit: "1mb" }));
-app.use(createExpressAddonHandler(addon));
+app.use(createExpressAddonHandler(addon, { onError }));
 ```
+
+`createExpressAddonHandler`'s optional `onError` observes an error from outside the handler
+chain — a malformed request target, or a failure while writing the response — the one case the
+`ClockifyAddon`-level `onError` (set on the `Addon`/`ClockifyAddon` instance) cannot see, since
+that only covers errors thrown from inside `addon.handle()`.
 
 Prefer the granular `/adapters/node`, `/adapters/express`, and `/adapters/fetch` imports for host
 code. The legacy `/adapters` aggregate remains Node-oriented, while the package root stays

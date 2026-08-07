@@ -9,10 +9,11 @@ import {
 } from "./body-limit";
 
 async function readFetchBody(request: Request, maxBodyBytes: number): Promise<Uint8Array> {
-  const clone = request.clone();
-  if (!clone.body) return new Uint8Array();
+  // request.body is read exactly once here and never read again from the
+  // original request, so cloning it first would only duplicate the stream.
+  if (!request.body) return new Uint8Array();
 
-  const reader = clone.body.getReader();
+  const reader = request.body.getReader();
   const chunks: Uint8Array[] = [];
   let total = 0;
 

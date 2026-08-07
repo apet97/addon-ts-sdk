@@ -4,6 +4,10 @@ on:
   workflow_dispatch:
   schedule:
     - cron: "17 6 * * 1"
+  pull_request:
+    paths:
+      - "addon-sdk/schemas/**"
+      - "addon-sdk/src/clockify/generated/**"
 
 permissions:
   contents: read
@@ -11,6 +15,10 @@ permissions:
 jobs:
   verify-live-schema:
     runs-on: ubuntu-latest
+    # Non-blocking on the pull_request trigger: Clockify's live endpoint is an external dependency,
+    # so a PR that touches vendored schemas gets early signal without gating on network flakiness.
+    # The scheduled and manual triggers still report their real pass/fail status.
+    continue-on-error: ${{ github.event_name == 'pull_request' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v7

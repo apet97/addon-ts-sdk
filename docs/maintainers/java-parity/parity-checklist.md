@@ -44,6 +44,30 @@ This document tracks implementation status of Java parity requirements and moder
 - [x] Express middleware adapter
 - [x] Fetch API request/response adapter (Hono/Cloudflare compatibility)
 - [x] Node HTTP createServer adapter
+- [x] `wrapClockifyInstallationStoreWithEncryption()` — encrypted-at-rest installation/webhook
+      credential persistence with key-rotation support, not present in the Java SDK
+- [x] `runClockifyIdempotentWebhook()` / `ClockifyIdempotencyLeaseStore` — webhook redelivery
+      dedup with an ownership-checked lease, not present in the Java SDK
+- [x] `ClockifyAddonClient` — a typed Marketplace `/addon/...` HTTP client with retry/backoff
+- [x] Public-key fingerprint pinning (`CLOCKIFY_PLATFORM_PUBLIC_KEY_SHA256`) for rotation seams
+
+## Documented Behavioral Divergences From Java
+
+Each row: what Java does, what TS does, and why the TS behavior is deliberate rather than drift.
+
+| Area | Java | TS | Why TS is deliberate |
+|---|---|---|---|
+| Unknown path | `Addon.java` returns 405 for any unregistered path | `shared/addon.ts` returns 404 when no method is registered for the path at all, 405 only when the path exists for a different method | 404 is the RFC 9110-correct response for a genuinely unknown resource; a port from Java must check for 404, not assume 405, on an unknown path |
+| Empty request path | Java's trailing-slash trim throws on an empty string (`StringIndexOutOfBoundsException`) | `trimTrailingSlash("")` guards `path.length > 0` first and returns `""` without throwing | Fixes a latent Java crash on an empty URI; TS is strictly safer, not merely different |
+| Webhook token check order | Not specified by the platform; left to the application | `verifyClockifyWebhookRequest` verifies the JWT before comparing the stored token (see the P0 security fixes above) | Closes a token-probing oracle a naive Java-parity port would reproduce |
+| Middleware `next()` called twice | Silently allowed | Throws `"Middleware next() called multiple times."` | Hardens over a Java gap: a double-next in Java corrupts response state without an error to point at |
+| `component.settings` field setter | `DefinitionProcessor.java`'s generic model setter hardcodes its parameter name as `settings` while its generated body statement references the field's own name — reading the annotation processor source, this shape would not compile for a field literally named anything other than `settings` | `clockify-addon.ts`'s `registerCustomSettings` assigns `m.settings = path` directly, unconditionally correct for any field | Not independently reproduced by compiling the Java generator; documented from reading the generator source, not asserted as a confirmed runtime failure |
+| `DELETED` lifecycle guard | Not specified; left to the application | `InMemoryClockifyInstallationStore.delete()` is unconditional unless the caller supplies `installedAt` | The `DELETED` payload carries no installation generation; an application that wants to guard against a stale delete must retain its own `installedAt` and pass it explicitly (see the installation-and-storage guide) |
+| `AddonResponse` JSON boundary | N/A (Java's typed model has no equivalent ambiguity) | `isJsonBody()` treats only plain objects and arrays as JSON; a class instance (`Map`, `Set`, `Date`, `RegExp`, or a custom class) falls to the non-JSON path instead of silently serializing to `{}` | See the `isJsonBody` fix above; documented here so a Java-to-TS port doesn't assume every object-shaped body round-trips through JSON |
+| `UNINSTALLED` event | Not a Marketplace lifecycle term | Not implemented; `DELETED` is the documented deletion event | No migration needed — `UNINSTALLED` was never part of either SDK's supported surface |
+| Lifecycle token expiration | Not specified by the platform | `verifyClockifyLifecycleRequest` defaults `requireExpiration` to `false`; `verifyClockifyComponentRequest` keeps it `true` | The `INSTALLED` lifecycle `authToken` does not expire per the Marketplace auth docs; requiring `exp` by default rejected legitimate lifecycle requests. Interactive component tokens stay strict |
+| `scopes` requiredness | Schema 1.2's manifest requires `scopes` | Schema 1.3+ makes `scopes` optional | Vendored schema fact, not a TS behavior choice — verified directly against `schemas/clockify-manifests/1.2.json` (`required` includes `scopes`) vs 1.5 (it does not). A manifest ported from 1.2 to a later version may drop `scopes` without a validation error |
+| `component.label` requiredness | Schema 1.2's component does not require `label` | Schema 1.4+ requires `label` | Vendored schema fact — verified directly against `schemas/clockify-manifests/1.2.json` vs `1.4.json`'s component `required` array. A 1.2 manifest that omits `label` fails validation once ported to 1.4+ |
 
 ## Latest Manifest 1.5 Proof
 

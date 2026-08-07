@@ -52,6 +52,7 @@ my-addon/
 ├── README.md
 ├── package.json
 ├── tsconfig.json
+├── wrangler.toml   (worker runtime only)
 └── src/
     ├── addon.ts
     └── index.ts
@@ -59,7 +60,9 @@ my-addon/
 
 - `src/addon.ts` builds the schema 1.5 manifest and registers the routes shared by both runtimes.
 - `src/index.ts` starts the Node HTTP server or exports the Fetch/Worker handler.
-- `package.json` installs the published `^1.0.0` SDK and provides `typecheck` and `start` scripts.
+- `wrangler.toml` (worker runtime only) sets `main`, `compatibility_date`, and the project name so
+  `npm start` (`wrangler dev`) and `wrangler deploy` work without extra flags.
+- `package.json` installs the published SDK and provides `typecheck` and `start` scripts.
 - The generated README explains the selected runtime, request flow, and production checklist.
 
 ## Configuration
@@ -105,7 +108,7 @@ await scaffoldClockifyAddon({
 
 Importing `create-clockify-addon` does not run the CLI or touch the file system. Files are created
 only when `scaffoldClockifyAddon()` is called. The optional `sdkSpec` field lets repository tooling
-substitute a packed SDK; normal generated projects use `^1.0.0`.
+substitute a packed SDK; normal generated projects use `^1.1.0`.
 
 ## Before production
 

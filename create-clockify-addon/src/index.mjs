@@ -84,12 +84,24 @@ function commonSource(features) {
           )?.authToken;
         },
       },
-      async () => ({
-        status: environment.ALLOW_EPHEMERAL_STORAGE === "true" ? 204 : 503,
-        ...(environment.ALLOW_EPHEMERAL_STORAGE === "true"
-          ? {}
-          : { body: "Configure stored-token verification and background processing." }),
-      }),
+      async () => {
+        // TODO(prod): make webhook processing idempotent — Clockify can redeliver an
+        // event. Claim a lease keyed by a stable identifier from the payload (not the
+        // request) before doing work, with a durable ClockifyIdempotencyLeaseStore:
+        //
+        //   const result = await runClockifyIdempotentWebhook(
+        //     leaseStore,
+        //     { key: stableEventKey, owner: crypto.randomUUID(), leaseMs: 30_000 },
+        //     () => handleBusinessLogic(request.body, claims),
+        //   );
+        //   if (result.status === "duplicate") return { status: 204 };
+        return {
+          status: environment.ALLOW_EPHEMERAL_STORAGE === "true" ? 204 : 503,
+          ...(environment.ALLOW_EPHEMERAL_STORAGE === "true"
+            ? {}
+            : { body: "Configure stored-token verification and background processing." }),
+        };
+      },
     ),
   );`
     : "";
@@ -272,6 +284,13 @@ function tsconfig(runtime) {
 }
 
 /** Creates a Clockify add-on project without overwriting existing files. */
+function wranglerToml(name) {
+  return `name = "${name}"
+main = "src/index.ts"
+compatibility_date = "2026-07-12"
+`;
+}
+
 export async function scaffoldClockifyAddon(options) {
   if (options.runtime !== "node" && options.runtime !== "worker")
     throw new Error("runtime must be node or worker");
@@ -285,7 +304,7 @@ export async function scaffoldClockifyAddon(options) {
     if (error?.code !== "ENOENT") throw error;
   }
   await mkdir(resolve(directory, "src"), { recursive: true });
-  const sdkSpec = options.sdkSpec ?? "^1.0.0";
+  const sdkSpec = options.sdkSpec ?? "^1.1.0";
   const manifest = {
     name: packageName(directory),
     version: "0.1.0",
@@ -328,6 +347,9 @@ export async function scaffoldClockifyAddon(options) {
       resolve(directory, "README.md"),
       projectReadme(options.runtime, options.features),
     ),
+    ...(options.runtime === "worker"
+      ? [writeFile(resolve(directory, "wrangler.toml"), wranglerToml(packageName(directory)))]
+      : []),
   ]);
   return directory;
 }
