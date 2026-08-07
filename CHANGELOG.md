@@ -4,6 +4,52 @@ All notable changes to this SDK are recorded here.
 
 ## Unreleased
 
+- Compared webhook and lookup-token secrets with a constant-time equality check instead of `===`,
+  closing a timing side-channel; captured the signature header once before verification so the
+  compared value cannot change between the check and the comparison.
+- Added an opt-in `requireExpiration` verification option (component/webhook) and reused it during
+  webhook verification instead of layering a second check afterward.
+- Rejected Node/Fetch requests carrying a folded duplicate `Content-Length` header
+  (e.g. `"10, 10"`) instead of accepting the ambiguous value.
+- **Behavior change:** `parseHttpRequestTarget` now throws on a `//`-prefixed request target
+  instead of silently treating it as `http://localhost//...`. Node adapters now return `400`
+  instead of `404` for these requests. The Express adapter now maps this rejection to a plain
+  `400` response *without* invoking `onError`/`next(e)` — this also changes the pre-existing
+  absolute-form (`scheme://...`) case, which previously reached the generic error path.
+- **Behavior change:** `assertInstallationContext` now also validates `asUser`, `addonUserId`
+  (non-empty), and `apiUrl` (must parse as a URL and pass the HTTPS-or-loopback-HTTP check) before
+  an `INSTALLED` payload is stored. A payload that previously stored successfully with a malformed
+  `apiUrl`/`asUser`/`addonUserId` now throws instead.
+- **Behavior change:** the `createClockify*Setting` factories (`Number`, `Checkbox`, `Link`,
+  `DropdownSingle`, `DropdownMultiple`, `UserDropdownSingle`, `UserDropdownMultiple`) now throw
+  `ValidationException` for a wrong-typed default/options value instead of accepting it silently.
+- **Behavior change:** `registerCustomSettings` is now idempotent like other manifest
+  registrations — an identical redeclaration is a no-op instead of throwing, while a conflicting
+  path or an overwrite of prior structured settings now throws instead of silently replacing them.
+- **Behavior change:** `isJsonBody` now classifies a `Date` instance as a JSON body, so a `Date`
+  response/request body now serializes as its ISO string instead of the engine's default
+  `toString()` output.
+- **Behavior change:** `resolveClockifyApiBaseUrl` now falls back to `backendUrl` when `apiUrl` is
+  absent or blank instead of returning `undefined`.
+- **Behavior change:** a `429` response is no longer retried when the request body is a
+  non-replayable stream, since replaying it would send a truncated or empty body.
+- **Note (deliberate, narrower than a behavior change):** trimming and filtering blank values from
+  split header values means a `clockify-signature` value like `"validJWT, "` now yields a single
+  token instead of a two-element array that hit the `ambiguous-signature` rejection. The JWT still
+  has to verify and the token still has to match exactly, so this does not weaken verification; it
+  is documented here because it is a visible narrowing of what previously counted as ambiguous.
+- Extended `ClockifyAddonClient` retry handling: canceled discarded retries' response bodies before
+  replacing the intended result, raced the retry delay against the caller's `AbortSignal`, honored
+  the RFC 7231 HTTP-date form of `Retry-After` (capped at 30s), stripped any incoming
+  `Authorization` header before setting `x-addon-token`, and wrapped a malformed JSON response in a
+  clear error instead of letting `response.json()`'s raw `SyntaxError` propagate.
+- Bounded `InMemoryClockifyIdempotencyLeaseStore`'s completed-entry set with `maxCompletedEntries`
+  (FIFO eviction) and `completedTtlMs`, and added `size()` for test/ops visibility.
+- Added a `constant-time.ts` shared helper (`constantTimeEqual`) and covered canonical/noncanonical
+  IPv6 loopback hostname spellings (bracketed and unbracketed) with a dedicated test file.
+- Documented `ClockifyAddonHttpError` and `ClockifyAddonClient` rejection shapes, the Express
+  adapter's body-limit delegation, and the synthetic `Allow` header behavior in `handle()`.
+
 ## 1.1.0 - 2026-08-07
 
 - Kept documentation verification deterministic by excluding Git-ignored local memory, worktree,
