@@ -1,6 +1,5 @@
 {
   "name": "addon-sdk-workers-compat",
   "main": "worker.js",
-  "compatibility_date": "2026-08-01",
-  "compatibility_flags": ["nodejs_compat"]
+  "compatibility_date": "2026-08-01"
 }

@@ -195,6 +195,14 @@ app.all("*", (c) => handleFetchRequest(addon, c.req.raw));
 
 For a plain Fetch handler, return `handleFetchRequest(addon, request)` from `fetch(request)`.
 
+### Cloudflare Workers support
+
+Cloudflare Workers is a tested runtime: the `workers-compat/` CI gate runs the published package
+shape inside workerd on every push, covering the Fetch adapter, manifest serving, and RS256
+signature verification. The SDK uses only Web APIs on this path (Fetch, WebCrypto through `jose`),
+so **no `nodejs_compat` compatibility flag is required**. The Node and Express adapters live on
+separate subpaths and never enter a Worker bundle.
+
 ## Testing helpers
 
 The `@apet97/clockify-addon-sdk/testing` subpath exports `generateTestKeys()` and `signTestToken()`
