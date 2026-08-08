@@ -1,0 +1,33 @@
+name: Workers compatibility
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  workerd:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22.13.0
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - name: Build SDK
+        run: |
+          npm ci
+          npm run build
+      - name: Run workerd tests
+        working-directory: workers-compat
+        run: |
+          npm ci
+          npm test
+      - name: Verify Worker bundling
+        working-directory: workers-compat
+        run: npm run bundle
