@@ -5,18 +5,10 @@ Historical receipts below prove only the source SHA and environment they name.
 
 ## Published versions
 
-The current unpublished release candidate is:
+The latest registry publication is:
 
 - `@apet97/clockify-addon-sdk@1.3.0`
 - `create-clockify-addon@1.3.0`
-
-Do not treat these candidate versions as registry evidence until this document records the exact
-published artifacts and post-publication verification.
-
-The latest registry publication is:
-
-- `@apet97/clockify-addon-sdk@1.2.0`
-- `create-clockify-addon@1.2.0`
 
 Install the SDK with `npm install @apet97/clockify-addon-sdk` or create a project with
 `npm create clockify-addon@latest`. npm versions are immutable: every future release requires a
@@ -36,6 +28,49 @@ Do not run `npm run release:verify` for that pass. It ends with `release:dry-run
 check must reject immutable versions that are already published. Documentation verification does
 not create a new release candidate, registry receipt, authenticated Clockify receipt, or Marketplace
 submission evidence.
+
+## 1.3.0 release evidence
+
+Release source commit `64e668afd7bf330be4908c58d8671bdd27951608` was pushed directly to `main`
+without force. [SDK CI run
+`31325254062`](https://github.com/apet97/addon-ts-sdk/actions/runs/31325254062) passed on Node
+22.13.0 and Node 24.x. [Workers compatibility run
+`31325254066`](https://github.com/apet97/addon-ts-sdk/actions/runs/31325254066) passed the real
+`workerd` tests and Worker bundle check against the same commit.
+
+The release removes native host requests and raw request bytes from error reports, improves
+idempotency retention and cleanup, normalizes stored webhook paths, fixes UI helper types and date
+formatting, and hardens the add-on client around redirects, aborts, transient retries, response
+cleanup, rate-limit resets, and query parameters. `CHANGELOG.md` owns the complete change list.
+
+`npm run release:preflight` confirmed both exact versions were absent from the registry.
+`npm run release:verify` then passed end to end:
+
+- `ci:verify` passed 50 test files and 572 tests. Coverage was 97.63% statements, 94.73% branches,
+  98.75% functions, and 98.65% lines. Type checks, generated drift, documentation, lint, format,
+  build, the public API snapshot, distribution imports, package shape, package lint, isolated
+  consumers, all four Node/Worker scaffolds, and both audits also passed. Both audits reported zero
+  vulnerabilities.
+- `verify:schema-live` confirmed that live schemas 1.2-1.6 still match the vendored schemas
+  structurally. Schema 1.7 remains unsupported.
+- Both publish dry-runs passed with the expected package contents.
+
+The exact artifacts were published from that source commit in SDK-first order:
+
+- `@apet97/clockify-addon-sdk@1.3.0`: SHA-1
+  `eebed77d7cd6e133c8fb73f85dc205ab2ae05162`; SHA-512
+  `sha512-zgGcpwJmt9BXNEjpywLrqarN0yKBOEewxjlsl/temvvPCJB8RLV5RVN41MVjZH0jQ6/JjWjV3O9ZJ9RjjfEcKw==`
+- `create-clockify-addon@1.3.0`: SHA-1
+  `67cf6cb7f892275938bde6e5fe80835718fdd35f`; SHA-512
+  `sha512-VxztQmpskL0cbN/ggqO2nrRzh8vGW+75ijJsYLpMmqT0BKTNAjgepFrjq8Qfo4YiLXZaQz+/aiAqLp4zYzzWqA==`
+
+Post-publication `npm run verify:registry` passed from an isolated empty npm cache. It installed and
+executed both exact public versions, including a real `npm create` project that type-checked and
+served a schema-valid manifest. Both `latest` tags resolve to 1.3.0.
+
+No authenticated developer-workspace pass was run for 1.3.0. This receipt proves source, CI,
+Worker, package, and registry behavior only. The 1.2.0 receipt remains the latest Marketplace
+lifecycle evidence. No Git tag or Marketplace submission was created.
 
 ## 1.2.0 release evidence
 
