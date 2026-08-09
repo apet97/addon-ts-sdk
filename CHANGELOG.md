@@ -4,6 +4,26 @@ All notable changes to this SDK are recorded here.
 
 ## Unreleased
 
+## 1.3.0 - 2026-08-09
+
+- Omitted raw request bytes and native host request objects from `onError` context, and identified
+  Express adapter failures with `express-adapter` instead of `router`. Unstructured string and
+  binary request bodies are now redacted, and JSON array bodies keep their shape.
+- Validated in-memory idempotency retention bounds, pruned expired leases during TTL-backed
+  operations and size checks, and kept one FIFO position per completed key. Webhook execution now
+  preserves the original work error when lease cleanup also fails and avoids a duplicate release
+  attempt after a release error.
+- Added `normalizeClockifyWebhookPath()` and used it in generated all-features projects so stored
+  lifecycle webhook tokens match normalized route paths.
+- Made `/ui` accept real DOM document roots, export `isClockifyAdminRole()` without exposing the
+  broader request-wire declaration surface, and honor explicit date, time, and style options.
+- Made `ClockifyAddonClient` reject redirects without forwarding `X-Addon-Token`, and honor the
+  `AbortSignal` passed to `request()`. Retry-delay failures now propagate once, non-replayable read
+  bodies do not retry, response cleanup cannot block progress, and safe requests retry only
+  transient HTTP statuses. Retry delays also honor `X-RateLimit-Reset`. Generic requests now accept
+  encoded `URLSearchParams` through `options.query`.
+- Corrected the documented `resolveClockifyApiBaseUrl()` fallback behavior.
+
 ## 1.2.0 - 2026-08-07
 
 - Compared webhook and lookup-token secrets with a constant-time equality check instead of `===`,
@@ -16,7 +36,7 @@ All notable changes to this SDK are recorded here.
 - **Behavior change:** `parseHttpRequestTarget` now throws on a `//`-prefixed request target
   instead of silently treating it as `http://localhost//...`. Node adapters now return `400`
   instead of `404` for these requests. The Express adapter now maps this rejection to a plain
-  `400` response *without* invoking `onError`/`next(e)` — this also changes the pre-existing
+  `400` response _without_ invoking `onError`/`next(e)` — this also changes the pre-existing
   absolute-form (`scheme://...`) case, which previously reached the generic error path.
 - **Behavior change:** `assertInstallationContext` now also validates `asUser`, `addonUserId`
   (non-empty), and `apiUrl` (must parse as a URL and pass the HTTPS-or-loopback-HTTP check) before

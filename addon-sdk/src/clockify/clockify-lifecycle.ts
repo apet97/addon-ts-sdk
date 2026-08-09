@@ -56,6 +56,20 @@ export type ClockifyLifecyclePayload =
   | ClockifySettingsUpdatedLifecyclePayload
   | ClockifyDeletedLifecyclePayload;
 
+/** Converts a lifecycle webhook path or absolute HTTP(S) URL to one stable path key. */
+export function normalizeClockifyWebhookPath(path: string): string {
+  let pathname = path;
+  if (/^https?:\/\//i.test(path)) {
+    try {
+      pathname = new URL(path).pathname;
+    } catch {
+      // Keep the original text when an HTTP(S) URL is malformed.
+    }
+  }
+  const collapsed = `/${pathname.replace(/^\/+/, "")}`.replace(/\/{2,}/g, "/");
+  return collapsed.length > 1 ? collapsed.replace(/\/+$/, "") : collapsed;
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }

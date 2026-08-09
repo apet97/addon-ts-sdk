@@ -27,11 +27,15 @@ request, and exposes:
 
 - `exchangeUserToken(userId)` for Marketplace add-on user-token exchange.
 - `getSettings(workspaceId)` and `updateSettings(workspaceId, updates)` for structured settings.
-- `request(pathSegments, init)` for authenticated generic transport.
+- `request(pathSegments, options)` for authenticated generic transport, including query parameters.
 
 Every caller-supplied segment is encoded separately, so a workspace, user, or entity ID containing
 `/`, `?`, `#`, or dot-like text cannot escape its segment. Empty, `.` and `..` segments are rejected
 before a request is sent.
+
+The client uses manual redirect handling by default. It rejects every HTTP 3xx response and does
+not send `X-Addon-Token` to the redirect target. It also rejects `redirect: "follow"` before it
+sends the request.
 
 ## What your application must do
 
@@ -41,9 +45,10 @@ production Clockify host. `ClockifyInstallationContext` stores the payload `apiU
 application using the raw Marketplace `backendUrl` should retain that verified claim in its own
 installation record alongside the SDK context.
 
-Set an abort policy and a bounded timeout appropriate for the job. Treat outbound credential and
-URL selection as installation-scoped data: do not mix the token from one workspace/add-on record
-with a URL from another.
+Set an abort policy and a bounded timeout appropriate for the job. You can set a signal on the
+client or pass a signal to `request(pathSegments, options)`. Either signal stops the request and
+retry delay. Treat outbound credential and URL selection as installation-scoped data: do not mix
+the token from one workspace/add-on record with a URL from another.
 
 Use the separate `clockify-ts-sdk` for entity-specific Clockify resources, typed project/time-entry
 operations, CLI behavior, or MCP behavior. Keep `ClockifyAddonClient` at the add-on token exchange,
@@ -51,14 +56,23 @@ settings, and generic authenticated transport boundary.
 
 ## Smallest correct path
 
-After loading one application-owned installation record, construct `new ClockifyAddonClient({
-token: storedInstallation.authToken, backendUrl: storedInstallation.backendUrl })` on the server.
+After you load one application-owned installation record, create the client on the server:
+
+```typescript
+const client = new ClockifyAddonClient({
+  token: storedInstallation.authToken,
+  backendUrl: storedInstallation.backendUrl,
+  timeoutMs: 15_000,
+});
+```
+
 Then choose only the operation you need:
 
 1. Call `exchangeUserToken(userId)` when Clockify requires a user-scoped add-on token.
 2. Call `getSettings(workspaceId)` or `updateSettings(workspaceId, updates)` for add-on settings.
-3. Call `request(["workspaces", workspaceId, "resource", resourceId], init)` only when the generic
-   transport is the intended boundary; pass unencoded segments and let the client encode each one.
+3. Call `request(["workspaces", workspaceId, "resource", resourceId], options)` only when the
+   generic transport is the intended boundary. Pass unencoded segments and a `URLSearchParams`
+   value in `options.query`; the client encodes both.
 
 Do not serialize the client, token, or response request metadata into component state.
 
@@ -67,29 +81,33 @@ Do not serialize the client, token, or response request metadata into component 
 - Construction rejects a blank token, credential-bearing `backendUrl`, insecure non-loopback HTTP,
   noncanonical loopback spellings, invalid timeout bounds, and invalid attempt counts.
 - A non-success HTTP response becomes `ClockifyAddonHttpError` with its status and response body.
-- Safe `GET` and `HEAD` reads may retry network errors, timeouts, HTTP 5xx, and confirmed `429`
-  responses up to `maxAttempts`.
+- Safe `GET`, `HEAD`, and `OPTIONS` requests may retry network errors, attempt timeouts, and HTTP
+  `408`, `429`, `500`, `502`, `503`, or `504` responses up to `maxAttempts`. The body must be
+  replayable.
 - A mutation is replayed only after a confirmed `429`. Network errors, timeouts, and 5xx responses
   are ambiguous and are not retried for mutation methods.
-- A caller abort is terminal. Discarded retry response bodies are cancelled before backoff, and
-  cancellation cleanup failures do not replace the intended retry.
+- A client or per-request abort is terminal. Response-body cancellation starts before backoff.
+  A failed or pending cancellation does not delay or replace the intended retry.
+- A 3xx response is terminal and is not retried. The client never follows it with the add-on token.
 - Pass `onRetry` to observe a retry for metrics or logging: it receives `{attempt, delayMs}` plus
-  either `status` (a status-based retry) or `error` (a network-error retry). It never affects retry
-  behavior, even if it throws.
+  either `status` (a status-based retry) or `error` (a transport or timeout retry). It never affects
+  retry behavior, even if it throws.
 - An invalid generic path segment fails before fetch; accepted dynamic segments remain within one
   encoded path segment.
 
 ## Pagination and rate limits
 
-`request(pathSegments, init)` reaches any Clockify REST resource behind the verified
+`request(pathSegments, options)` reaches any Clockify REST resource behind the verified
 `backendUrl`, including paginated ones. This SDK does not model pagination — it stays at the
 transport boundary. When calling a paginated resource:
 
-- Follow Clockify's own `page`/`page-size` query parameters for that resource; check the entity's
-  API reference, since page-size limits and defaults are resource-specific and subject to change.
+- Pass Clockify's `page` and `page-size` query parameters through `options.query`. Check the
+  entity's API reference because page-size limits and defaults are resource-specific and can
+  change.
 - Keep fetching pages until a page returns fewer than `page-size` results.
 - `ClockifyAddonClient` already retries a confirmed `429` per [Failure behavior](#failure-behavior)
-  above; a pagination loop does not need its own retry logic on top of that.
+  above. It honors `Retry-After` and `X-RateLimit-Reset`, so a pagination loop does not need its own
+  retry logic.
 - Prefer the separate `clockify-ts-sdk` for typed, paginated entity operations (time entries,
   projects, reports) — it is the entity model this client intentionally is not.
 

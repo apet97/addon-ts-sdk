@@ -32,7 +32,9 @@ Clockify. The SDK and the `create-clockify-addon` creator are published to the n
   entering application error reporting. Node and the Express structural fallback preserve repeated
   leading slashes as path data; Express remains an optional peer with body limits owned by the host
   app.
-- Optional `onError(error, context)` reporting for handled router, Fetch, and Node adapter errors.
+- Optional `onError(error, context)` reporting for handled router, Express, Fetch, and Node adapter
+  errors. Reporter context omits raw bytes and native host requests, and it redacts known Clockify
+  credentials.
 - Package documentation and vendored manifest schemas.
 - Runtime draft-04 manifest validation through generated static 1.2-1.6 validators. Runtime
   validation does not load an AJV compiler or use string code generation, so the same public API is
@@ -42,8 +44,9 @@ Clockify. The SDK and the `create-clockify-addon` creator are published to the n
 - Encrypted installation-store contracts, caller-qualified generation deletion, and webhook
   idempotency leases. An unqualified delete is unconditional because Clockify's `DELETED` payload
   does not carry an installation generation.
-- `ClockifyAddonClient` for Marketplace-specific add-on token exchange, structured settings, and
-  generic authenticated transport, plus a secure iframe UI bridge.
+- `ClockifyAddonClient` for Marketplace-specific add-on token exchange, structured settings,
+  encoded path and query values, bounded retries, caller aborts, fail-closed redirects, and a
+  secure iframe UI bridge.
 - A separate ESM-only creator workspace with a typed programmatic export. Its packed artifact
   generates Node/Worker minimal/all projects that install the packed SDK, type-check, execute their
   runtime, serve schema-valid manifests with exact route counts, exercise Worker routes in real

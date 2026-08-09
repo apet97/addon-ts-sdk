@@ -149,7 +149,7 @@ const settings = await client.getSettings(installation.workspaceId);
 const userToken = await client.exchangeUserToken(userId);
 ```
 
-The client sends `X-Addon-Token`, encodes each caller-provided path segment, retries safe reads under
+The client sends `X-Addon-Token`, encodes each caller-provided path segment, retries safe requests under
 its bounded policy, and replays mutations only after a confirmed `429`. Do not use the transient
 component `auth_token` as the installation credential.
 

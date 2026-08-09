@@ -140,7 +140,6 @@ export function createNodeHttpAddonServer(
       }
       reportAddonError(options.onError, e, {
         source: "node-http-adapter",
-        nativeRequest: req,
       });
       res.statusCode = 500;
       res.end("Internal Server Error");

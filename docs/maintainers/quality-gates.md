@@ -28,7 +28,7 @@ consumer, audit, or live-schema checks.
    97% statements, 92% branches, 98% functions, and 98% lines.
    - **`npm run test:replay`** — focused local Clockify replay coverage for component auth-token,
      installed lifecycle, stored-token webhook verification, and negative token/workspace cases.
-6. **`npm run test`** — a focused non-coverage unit-test shortcut for local development.
+6. **`npm run test`** — the full non-coverage Vitest suite for local development.
 7. **`npm run lint`** — check-only ESLint over the package plus every root `scripts/*.mjs` release
    tool through the shared flat configuration.
 8. **`npm run format:check`** — check-only Prettier over the package and root release tools. Vendored
@@ -49,7 +49,7 @@ consumer, audit, or live-schema checks.
 13. **`npm run verify:package-lint`** — packs both artifacts with `--ignore-scripts`, then runs
     `publint --strict` and Are The Types Wrong against each tarball. The dual-format SDK uses the
     Node16 profile; the ESM-only creator uses the `esm-only` profile. Node10 findings are not release
-    blockers because both packages support Node 22+.
+    blockers because both packages require Node 22.13.0 or newer.
 14. **`npm run verify:package-consumer`** — packs the already-built package with `--ignore-scripts`,
     installs that tarball into temporary runtime ESM/CJS and TypeScript ESM/CJS consumers, imports
     the root and subpath entry points, checks `generated.v1_5`, type-checks declarations without
@@ -121,9 +121,8 @@ Makefile shortcuts:
   `verify-fast` respectively.
 
 GitHub Actions runs the same root gate on Node 22.13.0 and 24.x for pushes to `main`, pull requests,
-and manual dispatches. Published-package runtime support starts at Node 22; the source-build floor is
-Node 22.13.0 because the accepted ESLint toolchain is narrower. The source-build toolchain remains
-TypeScript 6, Vitest 4, and Vite 8.
+and manual dispatches. Source development and both published packages require Node 22.13.0 or
+newer. The source-build toolchain remains TypeScript 6, Vitest 4, and Vite 8.
 
 The package `prepack` chain includes type-check, generated drift, tests, lint, format check, build,
 `verify:public-api`, and `verify:dist`; `npm pack --dry-run` is therefore both a contents check and

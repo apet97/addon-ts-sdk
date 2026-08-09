@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { InMemoryClockifyIdempotencyLeaseStore, runClockifyIdempotentWebhook } from "../src";
 
 describe("webhook idempotency leases", () => {
@@ -56,6 +56,65 @@ describe("webhook idempotency leases", () => {
     expect(result).toEqual({ status: "duplicate" });
   });
 
+  it("releases and reports lost ownership when completion fails", async () => {
+    const store = {
+      claim: vi.fn(async () => true),
+      complete: vi.fn(async () => false),
+      release: vi.fn(async () => true),
+    };
+
+    await expect(
+      runClockifyIdempotentWebhook(
+        store,
+        { key: "key", owner: "owner", leaseMs: 1000 },
+        async () => ({ status: 204 }),
+      ),
+    ).rejects.toThrow(/ownership was lost/i);
+    expect(store.release).toHaveBeenCalledExactlyOnceWith("key", "owner");
+  });
+
+  it("preserves the work error when releasing the lease also fails", async () => {
+    const workError = new Error("work failed");
+    const store = {
+      claim: vi.fn(async () => true),
+      complete: vi.fn(async () => true),
+      release: vi.fn(async () => {
+        throw new Error("release failed");
+      }),
+    };
+
+    await expect(
+      runClockifyIdempotentWebhook(
+        store,
+        { key: "key", owner: "owner", leaseMs: 1000 },
+        async () => {
+          throw workError;
+        },
+      ),
+    ).rejects.toBe(workError);
+    expect(store.release).toHaveBeenCalledExactlyOnceWith("key", "owner");
+  });
+
+  it("does not retry a release that rejects after a server-error response", async () => {
+    const releaseError = new Error("release failed");
+    const store = {
+      claim: vi.fn(async () => true),
+      complete: vi.fn(async () => true),
+      release: vi.fn(async () => {
+        throw releaseError;
+      }),
+    };
+
+    await expect(
+      runClockifyIdempotentWebhook(
+        store,
+        { key: "key", owner: "owner", leaseMs: 1000 },
+        async () => ({ status: 503 }),
+      ),
+    ).rejects.toBe(releaseError);
+    expect(store.release).toHaveBeenCalledExactlyOnceWith("key", "owner");
+  });
+
   it("evicts the oldest completed entry once maxCompletedEntries is exceeded", async () => {
     const store = new InMemoryClockifyIdempotencyLeaseStore(Date.now, { maxCompletedEntries: 2 });
     for (const key of ["a", "b", "c"]) {
@@ -82,6 +141,84 @@ describe("webhook idempotency leases", () => {
 
     now = 11;
     await expect(store.claim("key", "other-owner", 1000)).resolves.toBe(true);
+  });
+
+  it("removes every expired lease before reporting its size", async () => {
+    let now = 0;
+    const store = new InMemoryClockifyIdempotencyLeaseStore(() => now, { completedTtlMs: 10 });
+    await store.claim("completed", "owner", 10);
+    await store.complete("completed", "owner");
+    await store.claim("active", "owner", 10);
+
+    now = 11;
+
+    expect(store.size()).toBe(0);
+  });
+
+  it("removes an expired active lease when completion or release arrives late", async () => {
+    let now = 0;
+    const store = new InMemoryClockifyIdempotencyLeaseStore(() => now);
+    await store.claim("complete", "owner", 10);
+    await store.claim("release", "owner", 10);
+
+    now = 11;
+
+    await expect(store.complete("complete", "owner")).resolves.toBe(false);
+    await expect(store.release("release", "owner")).resolves.toBe(false);
+    expect(store.size()).toBe(0);
+  });
+
+  it("does not let an old FIFO position evict a newly completed lease for the same key", async () => {
+    let now = 0;
+    const store = new InMemoryClockifyIdempotencyLeaseStore(() => now, {
+      completedTtlMs: 10,
+      maxCompletedEntries: 2,
+    });
+    await store.claim("a", "owner", 10);
+    await store.complete("a", "owner");
+    now = 11;
+    await store.claim("a", "new-owner", 10);
+    await store.complete("a", "new-owner");
+    await store.claim("b", "owner", 10);
+    await store.complete("b", "owner");
+
+    await expect(store.claim("a", "third-owner", 10)).resolves.toBe(false);
+    await expect(store.claim("b", "other-owner", 10)).resolves.toBe(false);
+  });
+
+  it.each([-1, 1.5, Number.NaN, Number.POSITIVE_INFINITY, Number.MAX_SAFE_INTEGER + 1])(
+    "rejects invalid maxCompletedEntries %s",
+    (maxCompletedEntries) => {
+      expect(
+        () => new InMemoryClockifyIdempotencyLeaseStore(Date.now, { maxCompletedEntries }),
+      ).toThrow(/maxCompletedEntries/);
+    },
+  );
+
+  it.each([0, -1, Number.NaN, Number.POSITIVE_INFINITY])(
+    "rejects invalid completedTtlMs %s",
+    (completedTtlMs) => {
+      expect(() => new InMemoryClockifyIdempotencyLeaseStore(Date.now, { completedTtlMs })).toThrow(
+        /completedTtlMs/,
+      );
+    },
+  );
+
+  it("allows a zero completed-entry cap", async () => {
+    const store = new InMemoryClockifyIdempotencyLeaseStore(Date.now, { maxCompletedEntries: 0 });
+    await store.claim("key", "owner", 1000);
+    await expect(store.complete("key", "owner")).resolves.toBe(true);
+    expect(store.size()).toBe(0);
+  });
+
+  it("keeps a validated copy of its retention options", async () => {
+    const options = { maxCompletedEntries: 1 };
+    const store = new InMemoryClockifyIdempotencyLeaseStore(Date.now, options);
+    options.maxCompletedEntries = 0;
+    await store.claim("key", "owner", 1000);
+    await store.complete("key", "owner");
+
+    expect(store.size()).toBe(1);
   });
 
   it("reports the tracked key count via size()", async () => {

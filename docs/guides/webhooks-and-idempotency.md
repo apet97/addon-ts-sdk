@@ -37,9 +37,16 @@ The Node and Fetch adapters bound and buffer the request body before route verif
 default maximum is 1 MiB, and an oversized body returns `413` before the webhook handler. Express
 body parsing and limits belong to the host application.
 
+`normalizeClockifyWebhookPath()` reduces an absolute HTTP(S) URL to its path, collapses repeated
+slashes, adds a missing leading slash, and removes a trailing slash. Use the helper when you store
+paths from `INSTALLED` and when you look them up. This keeps a live value such as
+`//webhooks/time-entry` equal to the registered `/webhooks/time-entry` path.
+
 `runClockifyIdempotentWebhook()` claims an owner-specific lease, returns `duplicate` without running
 work when the claim fails, completes work whose result is not a response-like 5xx, and calls
 `release` after a throw or a returned response-like value whose numeric status is 500 or greater.
+If both `work` and cleanup fail, the helper preserves the `work` error. A release error after a
+returned 5xx propagates without a second release attempt.
 
 ## What your application must do
 
@@ -56,10 +63,12 @@ must be atomic and conditional on the current owner; an unguarded read-then-writ
 not sufficient. Keep the business write idempotent or transactional as well—the lease coordinates
 attempts but is not a substitute for a business-data transaction.
 
-`InMemoryClockifyIdempotencyLeaseStore` never expires a completed entry, so a long-lived process
-grows its lease map without bound. It is for tests and short-lived single-process deployments only.
-A production store must put a time-to-live on completed entries — long enough to cover Clockify's
-retry window for a delivery, then evict.
+By default, `InMemoryClockifyIdempotencyLeaseStore` retains every completed entry. A long-lived
+process can therefore grow its lease map without bound. Set `completedTtlMs`,
+`maxCompletedEntries`, or both to bound completed-entry retention. The store removes expired
+entries during `size()` calls. When `completedTtlMs` is set, it also removes expired entries during
+normal operations. Use a durable store in production. Its completed-entry TTL must cover
+Clockify's retry window.
 
 ## Smallest correct path
 
@@ -75,7 +84,7 @@ addon.registerWebhook(
       getExpectedWebhookAuthToken(input) {
         return store.findWebhookAuthToken({
           ...input,
-          path: "/webhooks/expense-created",
+          path: normalizeClockifyWebhookPath("/webhooks/expense-created"),
         });
       },
     },

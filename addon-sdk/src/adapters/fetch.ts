@@ -136,7 +136,6 @@ export async function handleFetchRequest(
   } catch (e) {
     reportAddonError(options.onError, e, {
       source: "fetch-adapter",
-      nativeRequest: request,
     });
     return new Response("Internal Server Error", { status: 500 });
   }

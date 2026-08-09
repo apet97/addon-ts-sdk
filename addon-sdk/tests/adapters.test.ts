@@ -741,8 +741,9 @@ describe("Adapters", () => {
 
     expect(onError).toHaveBeenCalledExactlyOnceWith(
       failingError,
-      expect.objectContaining({ source: "router", nativeRequest: mockReq }),
+      expect.objectContaining({ source: "express-adapter" }),
     );
+    expect(onError.mock.calls[0]![1].nativeRequest).toBeUndefined();
     expect(next).toHaveBeenCalledExactlyOnceWith(failingError);
   });
 

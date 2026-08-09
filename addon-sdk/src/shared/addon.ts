@@ -14,11 +14,12 @@ function trimTrailingSlash(path: string): string {
   return path;
 }
 
-export type AddonErrorSource = "router" | "fetch-adapter" | "node-http-adapter";
+export type AddonErrorSource = "router" | "express-adapter" | "fetch-adapter" | "node-http-adapter";
 
 export interface AddonErrorContext {
   readonly source: AddonErrorSource;
   readonly request?: AddonRequest;
+  /** @deprecated Adapters omit native requests because they can contain credentials. */
   readonly nativeRequest?: unknown;
 }
 
@@ -52,7 +53,15 @@ function redactQuery(query: AddonRequest["query"]): AddonRequest["query"] {
 }
 
 function redactBody(body: unknown): unknown {
+  if (typeof body === "string" || body instanceof ArrayBuffer || ArrayBuffer.isView(body)) {
+    return REDACTED;
+  }
   if (body === null || typeof body !== "object") return body;
+  if (Array.isArray(body)) {
+    return body.map((item) =>
+      item !== null && typeof item === "object" ? redactBody(item) : item,
+    );
+  }
   const redacted: Record<string, unknown> = { ...(body as Record<string, unknown>) };
   if ("authToken" in redacted) redacted.authToken = REDACTED;
   if (Array.isArray(redacted.webhooks)) {
@@ -63,14 +72,16 @@ function redactBody(body: unknown): unknown {
   return redacted;
 }
 
-/** Strips Clockify credentials from a request before an error reporter sees it. */
+/** Returns a reporter-safe request projection with known Clockify credentials removed. */
 export function redactAddonRequest(request: AddonRequest): AddonRequest {
-  return {
+  const redacted = {
     ...request,
     headers: redactHeaders(request.headers),
     query: redactQuery(request.query),
     body: redactBody(request.body),
   };
+  delete redacted.rawBody;
+  return redacted;
 }
 
 export function reportAddonError(
@@ -79,9 +90,9 @@ export function reportAddonError(
   context: AddonErrorContext,
 ): void {
   try {
-    const redacted = context.request
-      ? { ...context, request: redactAddonRequest(context.request) }
-      : context;
+    const redacted: AddonErrorContext = context.request
+      ? { source: context.source, request: redactAddonRequest(context.request) }
+      : { source: context.source };
     reporter?.(error, redacted);
   } catch {
     // Error reporters must not change the response path.

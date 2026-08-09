@@ -98,7 +98,7 @@ export function createExpressAddonHandler(
       // chain through its own onError (set on the ClockifyAddon/Addon instance).
       // This covers what that path can't see: an error thrown before dispatch
       // or while writing the response.
-      reportAddonError(options.onError, e, { source: "router", nativeRequest: req });
+      reportAddonError(options.onError, e, { source: "express-adapter" });
       if (next) {
         next(e);
       } else {

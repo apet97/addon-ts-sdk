@@ -21,6 +21,7 @@ function commonSource(features) {
     "createClockifyHtmlResponse",
     "createClockifySignatureParser",
     "createValidatedClockifyAddon",
+    ...(all ? ["normalizeClockifyWebhookPath"] : []),
     "resolveClockifyPublicOrigin",
     ...(all
       ? [
@@ -81,7 +82,7 @@ function commonSource(features) {
           if (environment.ALLOW_EPHEMERAL_STORAGE !== "true") return undefined;
           const installation = await installations.load(workspaceId, addonId);
           return installation?.webhooks?.find((entry) =>
-            entry.path.endsWith("/webhooks/time-entry"),
+            normalizeClockifyWebhookPath(entry.path) === webhook.path,
           )?.authToken;
         },
       },
@@ -311,7 +312,7 @@ export async function scaffoldClockifyAddon(options) {
     if (error?.code !== "ENOENT") throw error;
   }
   await mkdir(resolve(directory, "src"), { recursive: true });
-  const sdkSpec = options.sdkSpec ?? "^1.2.0";
+  const sdkSpec = options.sdkSpec ?? "^1.3.0";
   const manifest = {
     name: packageName(directory),
     version: "0.1.0",
@@ -355,7 +356,12 @@ export async function scaffoldClockifyAddon(options) {
       projectReadme(options.runtime, options.features),
     ),
     ...(options.runtime === "worker"
-      ? [writeFile(resolve(directory, "wrangler.toml"), wranglerToml(packageName(directory)))]
+      ? [
+          writeFile(
+            resolve(directory, "wrangler.toml"),
+            wranglerToml(packageName(directory)),
+          ),
+        ]
       : []),
   ]);
   return directory;

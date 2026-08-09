@@ -10,9 +10,9 @@ export interface ClockifySettingUpdate {
 export interface ClockifyAddonClientRetryInfo {
   /** The attempt that just finished (1-indexed); the retry will be `attempt + 1`. */
   readonly attempt: number;
-  /** The response status that triggered the retry, absent for a network-error retry. */
+  /** The response status that triggered the retry, absent for a transport or timeout retry. */
   readonly status?: number;
-  /** The response error that triggered the retry, absent for a status-based retry. */
+  /** The transport or timeout error that triggered the retry, absent for a status-based retry. */
   readonly error?: unknown;
   /** Delay before the retry, in milliseconds. */
   readonly delayMs: number;
@@ -23,12 +23,19 @@ export interface ClockifyAddonClientOptions {
   readonly token: string;
   readonly backendUrl: string;
   readonly fetch?: typeof globalThis.fetch;
+  /** Stops every request from this client. A per-request signal can stop one generic request. */
   readonly signal?: AbortSignal;
   readonly timeoutMs?: number;
   readonly maxAttempts?: number;
   readonly sleep?: (milliseconds: number) => Promise<void>;
   /** Observe retries for metrics/logging. Never affects retry behavior, even if it throws. */
   readonly onRetry?: (info: ClockifyAddonClientRetryInfo) => void;
+}
+
+/** Options for one generic authenticated add-on request. */
+export interface ClockifyAddonRequestOptions extends RequestInit {
+  /** Encoded onto the request URL and not forwarded as a nonstandard Fetch option. */
+  readonly query?: URLSearchParams;
 }
 
 /**
@@ -111,7 +118,7 @@ function requestUrl(base: URL, segments: readonly string[]): URL {
   return url;
 }
 
-/** RFC 7231's Retry-After: either delay-seconds or an HTTP-date, capped at 30s either way. */
+/** Resolves Retry-After or X-RateLimit-Reset to a delay capped at 30 seconds. */
 function retryDelay(response: Response, attempt: number): number {
   const header = response.headers.get("retry-after");
   if (header !== null && header.trim() !== "") {
@@ -123,10 +130,16 @@ function retryDelay(response: Response, attempt: number): number {
       if (diffMs > 0) return Math.min(diffMs, 30_000);
     }
   }
+  const resetHeader = response.headers.get("x-ratelimit-reset");
+  if (resetHeader !== null) {
+    const resetMs = Number(resetHeader) * 1000;
+    const diffMs = resetMs - Date.now();
+    if (Number.isFinite(resetMs) && diffMs > 0) return Math.min(diffMs, 30_000);
+  }
   return Math.min(100 * 2 ** (attempt - 1), 2_000);
 }
 
-/** True for a body shape `send()` can safely re-issue on a 429 retry without it having been consumed. */
+/** True for a body shape `send()` can safely re-issue without it having been consumed. */
 function isReplayableRequestBody(body: BodyInit | null | undefined): boolean {
   return (
     body === null ||
@@ -138,24 +151,65 @@ function isReplayableRequestBody(body: BodyInit | null | undefined): boolean {
   );
 }
 
+const RETRYABLE_READ_STATUS_CODES = new Set([408, 500, 502, 503, 504]);
+
+/** Starts best-effort response cleanup without delaying the caller or a retry. */
+function cancelResponseBody(response: Response): void {
+  try {
+    void response.body?.cancel().catch(() => undefined);
+  } catch {
+    // Response cleanup must not replace or delay the intended result.
+  }
+}
+
 /** Races `sleep(ms)` against `signal` aborting, so an abort during backoff does not wait out the delay. */
 function sleepOrAbort(
   ms: number,
-  signal: AbortSignal | undefined,
+  signals: readonly AbortSignal[],
   sleep: (milliseconds: number) => Promise<void>,
 ): Promise<void> {
-  if (!signal) return sleep(ms);
-  if (signal.aborted) return Promise.reject(signal.reason);
+  const aborted = signals.find((signal) => signal.aborted);
+  if (aborted) return Promise.reject(aborted.reason);
+  if (signals.length === 0) return sleep(ms);
   return new Promise((resolve, reject) => {
-    const onAbort = () => reject(signal.reason);
-    signal.addEventListener("abort", onAbort, { once: true });
-    sleep(ms).then(
+    const listeners: Array<{
+      readonly signal: AbortSignal;
+      readonly listener: () => void;
+    }> = [];
+    const cleanup = () => {
+      for (const { signal, listener } of listeners) {
+        signal.removeEventListener("abort", listener);
+      }
+    };
+    for (const signal of signals) {
+      const listener = () => {
+        cleanup();
+        reject(signal.reason);
+      };
+      listeners.push({ signal, listener });
+      signal.addEventListener("abort", listener, { once: true });
+    }
+    const abortedAfterRegistration = signals.find((signal) => signal.aborted);
+    if (abortedAfterRegistration) {
+      cleanup();
+      reject(abortedAfterRegistration.reason);
+      return;
+    }
+    let delay: Promise<void>;
+    try {
+      delay = sleep(ms);
+    } catch (error) {
+      cleanup();
+      reject(error);
+      return;
+    }
+    delay.then(
       () => {
-        signal.removeEventListener("abort", onAbort);
+        cleanup();
         resolve();
       },
       (error) => {
-        signal.removeEventListener("abort", onAbort);
+        cleanup();
         reject(error);
       },
     );
@@ -168,8 +222,9 @@ function sleepOrAbort(
  * A request can reject with:
  * - {@link ClockifyAddonHttpError} on a non-`ok` HTTP status.
  * - `Error("Clockify add-on request timed out.")` — a generic `Error`, matched by `/timed out/i` —
- *   when one attempt exceeds `timeoutMs`.
+ *   when a non-retryable or final attempt exceeds `timeoutMs`.
  * - `signal.reason` (identity preserved, may be a `DOMException`) when the caller's `signal` aborts.
+ * - `Error` when a request attempts to follow a redirect or receives an HTTP 3xx response.
  * - `Error` with `cause` set to the original parse error when `getSettings`/`updateSettings` receive
  *   a `200` response whose body is not valid JSON.
  *
@@ -215,69 +270,102 @@ export class ClockifyAddonClient {
     }
   }
 
-  private async send(segments: readonly string[], init: RequestInit): Promise<Response> {
+  private async send(
+    segments: readonly string[],
+    options: ClockifyAddonRequestOptions,
+  ): Promise<Response> {
+    const { query, ...init } = options;
     const url = requestUrl(this.backendUrl, segments);
+    if (query !== undefined) url.search = query.toString();
+    if (init.redirect === "follow") {
+      throw new Error("Clockify add-on requests must not follow redirects.");
+    }
     const method = (init.method ?? "GET").toUpperCase();
-    const safeRead = method === "GET" || method === "HEAD";
+    const safeRequest = method === "GET" || method === "HEAD" || method === "OPTIONS";
     const replayableBody = isReplayableRequestBody(init.body);
+    const callerSignals = [this.signal, init.signal].filter(
+      (signal): signal is AbortSignal => signal !== undefined && signal !== null,
+    );
+    const initiallyAborted = callerSignals.find((signal) => signal.aborted);
+    if (initiallyAborted) throw initiallyAborted.reason;
+    const requestHeaders = new Headers(init.headers);
+    requestHeaders.delete("authorization");
+    requestHeaders.set("x-addon-token", this.token);
     for (let attempt = 1; attempt <= this.maxAttempts; attempt += 1) {
-      if (this.signal?.aborted) throw this.signal.reason;
+      const alreadyAborted = callerSignals.find((signal) => signal.aborted);
+      if (alreadyAborted) throw alreadyAborted.reason;
       const controller = new AbortController();
-      const timeout = setTimeout(
-        () => controller.abort(new Error("Clockify add-on request timed out.")),
-        this.timeoutMs,
-      );
-      const abort = () => controller.abort(this.signal?.reason);
-      this.signal?.addEventListener("abort", abort, { once: true });
+      const timeoutError = new Error("Clockify add-on request timed out.");
+      const timeout = setTimeout(() => controller.abort(timeoutError), this.timeoutMs);
+      const abortListeners = callerSignals.map((signal) => {
+        const listener = () => controller.abort(signal.reason);
+        signal.addEventListener("abort", listener, { once: true });
+        return { signal, listener };
+      });
       // The abort listener above closes most of the race, but signal could
       // still have become aborted between the pre-check at the top of this
       // iteration and the addEventListener call just above (both synchronous,
       // but not atomic) — in that gap the "abort" event already fired and
       // this listener, registered after, never runs. Re-check and abort the
       // controller directly instead of waiting out the full request timeout.
-      if (this.signal?.aborted) controller.abort(this.signal.reason);
+      const abortedAfterRegistration = callerSignals.find((signal) => signal.aborted);
+      if (abortedAfterRegistration) controller.abort(abortedAfterRegistration.reason);
+      let outcome: { readonly response: Response } | { readonly error: unknown };
       try {
-        const headers = new Headers(init.headers);
-        headers.delete("authorization");
-        headers.set("x-addon-token", this.token);
-        const response = await this.fetch(url, {
-          ...init,
-          headers,
-          signal: controller.signal,
-        });
-        const retryable =
-          replayableBody && (response.status === 429 || (safeRead && response.status >= 500));
-        if (retryable && attempt < this.maxAttempts) {
-          try {
-            // cancel() releases the connection back to the pool on Node 22's
-            // fetch and on workerd. The Fetch spec defines cancel() as
-            // best-effort, so a runtime that needs a full drain instead of a
-            // cancel is a known gap; whatever happens here must never block
-            // or replace the intended retry below.
-            await response.body?.cancel();
-          } catch {
-            // Discarded-response cleanup must not replace the intended retry.
-          }
-          const delayMs = retryDelay(response, attempt);
-          this.notifyRetry({ attempt, status: response.status, delayMs });
-          await sleepOrAbort(delayMs, this.signal, this.sleep);
-          continue;
-        }
-        return response;
+        outcome = {
+          response: await this.fetch(url, {
+            ...init,
+            redirect: "manual",
+            headers: new Headers(requestHeaders),
+            signal: controller.signal,
+          }),
+        };
       } catch (error) {
-        if (!safeRead || attempt >= this.maxAttempts || this.signal?.aborted) throw error;
-        const delayMs = Math.min(100 * 2 ** (attempt - 1), 2_000);
-        this.notifyRetry({ attempt, error, delayMs });
-        await sleepOrAbort(delayMs, this.signal, this.sleep);
+        outcome = { error };
       } finally {
         clearTimeout(timeout);
-        this.signal?.removeEventListener("abort", abort);
+        for (const { signal, listener } of abortListeners) {
+          signal.removeEventListener("abort", listener);
+        }
       }
+
+      if ("error" in outcome) {
+        const timeoutWon = controller.signal.reason === timeoutError;
+        if (controller.signal.aborted && !timeoutWon) throw controller.signal.reason;
+        if (timeoutWon && callerSignals.some((signal) => signal.aborted)) throw timeoutError;
+        const retryError = timeoutWon ? timeoutError : outcome.error;
+        if (!safeRequest || !replayableBody || attempt >= this.maxAttempts) throw retryError;
+        const delayMs = Math.min(100 * 2 ** (attempt - 1), 2_000);
+        this.notifyRetry({ attempt, error: retryError, delayMs });
+        await sleepOrAbort(delayMs, callerSignals, this.sleep);
+        continue;
+      }
+
+      const { response } = outcome;
+      if (response.status >= 300 && response.status < 400) {
+        cancelResponseBody(response);
+        throw new Error(`Clockify add-on request rejected HTTP ${response.status} redirect.`);
+      }
+      const retryable =
+        replayableBody &&
+        (response.status === 429 ||
+          (safeRequest && RETRYABLE_READ_STATUS_CODES.has(response.status)));
+      if (retryable && attempt < this.maxAttempts) {
+        cancelResponseBody(response);
+        const delayMs = retryDelay(response, attempt);
+        this.notifyRetry({ attempt, status: response.status, delayMs });
+        await sleepOrAbort(delayMs, callerSignals, this.sleep);
+        continue;
+      }
+      return response;
     }
     throw new Error("Clockify add-on request exhausted retry attempts.");
   }
 
-  private async expectOk(segments: readonly string[], init: RequestInit): Promise<Response> {
+  private async expectOk(
+    segments: readonly string[],
+    init: ClockifyAddonRequestOptions,
+  ): Promise<Response> {
     const response = await this.send(segments, init);
     if (!response.ok) throw new ClockifyAddonHttpError(response.status, await response.text());
     return response;
@@ -323,8 +411,15 @@ export class ClockifyAddonClient {
     return this.parseJson<T>(response);
   }
 
-  /** Performs an authenticated request using encoded, caller-supplied path segments. */
-  request(pathSegments: readonly string[], init: RequestInit = {}): Promise<Response> {
-    return this.expectOk(pathSegments, init);
+  /**
+   * Performs an authenticated request using encoded path segments and optional query parameters.
+   * A signal in `options` stops this request. The client rejects `redirect: "follow"` and never
+   * forwards the token to a redirect.
+   */
+  request(
+    pathSegments: readonly string[],
+    options: ClockifyAddonRequestOptions = {},
+  ): Promise<Response> {
+    return this.expectOk(pathSegments, options);
   }
 }

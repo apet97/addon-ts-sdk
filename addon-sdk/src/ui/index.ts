@@ -1,4 +1,10 @@
 import { isHttpsOrLoopbackHttp } from "../shared/loopback";
+import { isClockifyAdminRole as checkClockifyAdminRole } from "../clockify/clockify-request-wire";
+
+/** True for Clockify owner and admin role values. */
+export function isClockifyAdminRole(role: unknown): boolean {
+  return checkClockifyAdminRole(role);
+}
 
 /** The supported message envelope sent by Clockify to an iframe component. */
 export interface ClockifyWindowMessage {
@@ -147,9 +153,25 @@ export function createClockifyBridge(options: CreateClockifyBridgeOptions): Cloc
 
 /** Minimal document-root contract used by theme and language helpers. */
 export interface ClockifyDocumentRoot {
-  readonly dataset: Record<string, string>;
+  readonly dataset: Record<string, string | undefined>;
   lang: string;
 }
+
+const CLOCKIFY_EXPLICIT_DATE_TIME_KEYS = [
+  "dateStyle",
+  "timeStyle",
+  "weekday",
+  "era",
+  "year",
+  "month",
+  "day",
+  "dayPeriod",
+  "hour",
+  "minute",
+  "second",
+  "fractionalSecondDigits",
+  "timeZoneName",
+] as const satisfies readonly (keyof Intl.DateTimeFormatOptions)[];
 
 /** Applies the verified Clockify user theme as a normalized data attribute. */
 export function applyClockifyTheme(
@@ -168,19 +190,24 @@ export function applyClockifyLanguage(
 }
 
 /**
- * Formats a date using the user's locale while permitting explicit timezone policy. Falls back to
- * `"en"` if `locale` is not a well-formed BCP 47 tag `Intl.DateTimeFormat` accepts.
+ * Formats a date with the user's locale and explicit options. Uses medium `dateStyle` only when the
+ * options contain no date or time fields or styles. Falls back to `"en"` for an invalid locale tag.
  */
 export function formatClockifyDate(
   value: Date | number,
   locale: string,
   options: Intl.DateTimeFormatOptions = {},
 ): string {
+  const formatterOptions = CLOCKIFY_EXPLICIT_DATE_TIME_KEYS.some(
+    (key) => options[key] !== undefined,
+  )
+    ? options
+    : { dateStyle: "medium" as const, ...options };
   let formatter: Intl.DateTimeFormat;
   try {
-    formatter = new Intl.DateTimeFormat(locale, { dateStyle: "medium", ...options });
+    formatter = new Intl.DateTimeFormat(locale, formatterOptions);
   } catch {
-    formatter = new Intl.DateTimeFormat("en", { dateStyle: "medium", ...options });
+    formatter = new Intl.DateTimeFormat("en", formatterOptions);
   }
   return formatter.format(value);
 }

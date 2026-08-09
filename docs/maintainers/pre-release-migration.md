@@ -14,6 +14,6 @@ import { createExpressAddonHandler } from "@apet97/clockify-addon-sdk/adapters/e
 import { handleFetchRequest } from "@apet97/clockify-addon-sdk/adapters/fetch";
 ```
 
-The existing manifest, router, builder, verification, lifecycle and settings symbols retain their
+The existing manifest, router, builder, verification, lifecycle, and settings symbols retain their
 names. New applications should use granular adapter imports even though `/adapters` remains as a
-temporary source-compatibility entrypoint.
+legacy source-compatibility entrypoint.

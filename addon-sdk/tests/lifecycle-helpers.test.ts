@@ -7,6 +7,7 @@ import {
   isClockifyInstalledLifecyclePayload,
   isClockifySettingsUpdatedLifecyclePayload,
   isClockifyStatusChangedLifecyclePayload,
+  normalizeClockifyWebhookPath,
 } from "../src";
 
 describe("Clockify lifecycle payload helpers", () => {
@@ -112,5 +113,19 @@ describe("Clockify lifecycle payload helpers", () => {
     expect(clockifyLifecyclePayloadMatchesClaims(payload, { ...claims, addonId: undefined })).toBe(
       false,
     );
+  });
+
+  it.each([
+    ["/webhooks/time-entry", "/webhooks/time-entry"],
+    ["//webhooks/time-entry", "/webhooks/time-entry"],
+    ["https://example.invalid//webhooks/time-entry", "/webhooks/time-entry"],
+    ["webhooks/time-entry", "/webhooks/time-entry"],
+    ["/webhooks/time-entry/", "/webhooks/time-entry"],
+    ["/", "/"],
+    ["webhooks:time-entry", "/webhooks:time-entry"],
+  ])("normalizes a lifecycle webhook path %j", (input, expected) => {
+    const normalized = normalizeClockifyWebhookPath(input);
+    expect(normalized).toBe(expected);
+    expect(normalizeClockifyWebhookPath(normalized)).toBe(normalized);
   });
 });

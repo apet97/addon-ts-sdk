@@ -108,12 +108,13 @@ await scaffoldClockifyAddon({
 
 Importing `create-clockify-addon` does not run the CLI or touch the file system. Files are created
 only when `scaffoldClockifyAddon()` is called. The optional `sdkSpec` field lets repository tooling
-substitute a packed SDK; normal generated projects use `^1.2.0`.
+substitute a packed SDK; normal generated projects use `^1.3.0`.
 
 ## Before production
 
 The all-features template deliberately uses an in-memory installation store behind an explicit
-local-development switch. Before installing a real add-on:
+local-development switch. It normalizes lifecycle-reported webhook paths before it selects the
+stored verification token. Before installing a real add-on:
 
 - replace it with a persistent encrypted installation store;
 - add durable idempotency storage before processing webhooks;

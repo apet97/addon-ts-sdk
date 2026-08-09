@@ -169,7 +169,14 @@ const handleComponent = withClockifyHandler(
   deletion. Clockify's documented `DELETED` payload does not itself provide that generation.
 - `ClockifyIdempotencyLeaseStore` and `runClockifyIdempotentWebhook()` define owner-specific webhook
   processing.
-- `ClockifyAddonClient` uses `X-Addon-Token`, encoded path segments, abort/timeout handling,
-  safe-read retries, and mutation replay only after confirmed HTTP 429. Its public operations are
-  `exchangeUserToken()`, `getSettings()`, `updateSettings()`, and generic `request()`.
-- `/ui` exports `createClockifyBridge()`, preference application, and locale-aware date formatting.
+- `normalizeClockifyWebhookPath()` converts lifecycle-reported webhook paths and absolute HTTP(S)
+  URLs to one stable lookup key.
+- `ClockifyAddonRequestOptions` extends `RequestInit` with a `URLSearchParams` query value. The
+  client encodes the query and does not forward the custom `query` field to `fetch`.
+- `ClockifyAddonClient` uses `X-Addon-Token`, encoded path segments and query parameters, caller
+  aborts, timeouts, manual redirect handling, transient safe-request retries, and mutation replay
+  only after confirmed HTTP 429. It does not retry a body that it cannot replay. Its public
+  operations are `exchangeUserToken()`, `getSettings()`, `updateSettings()`, and generic
+  `request()`.
+- `/ui` exports `createClockifyBridge()`, `isClockifyAdminRole()`, preference application, and
+  locale-aware date formatting.

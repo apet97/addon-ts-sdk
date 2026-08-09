@@ -45,24 +45,24 @@ Clockify request
   -> your add-on application persists credentials and runs business logic
 ```
 
-| Capability             | SDK support                                                                                    |
-| ---------------------- | ---------------------------------------------------------------------------------------------- |
-| Typed manifests        | Schema 1.2–1.6 builders and runtime validation                                                 |
-| Verified requests      | RS256 component, lifecycle, and stored-token webhook verification with context checks          |
-| Runtime adapters       | Node.js `http`, optional Express integration, and the standard Fetch API                       |
-| Add-on services        | Claim-driven token exchange, structured settings transport, and generic authenticated requests |
-| Installation workflows | Store contracts, encryption wrappers, lifecycle guards, and webhook idempotency leases         |
-| Browser integration    | Hardened HTML/JSON responses and an exact-origin iframe bridge                                 |
+| Capability             | SDK support                                                                                 |
+| ---------------------- | ------------------------------------------------------------------------------------------- |
+| Typed manifests        | Schema 1.2–1.6 builders and runtime validation                                              |
+| Verified requests      | RS256 component, lifecycle, and stored-token webhook verification with context checks       |
+| Runtime adapters       | Node.js `http`, optional Express integration, and the standard Fetch API                    |
+| Add-on services        | Claim-driven token exchange, settings, and encoded path/query requests with bounded retries |
+| Installation workflows | Store contracts, encryption wrappers, lifecycle guards, and webhook idempotency leases      |
+| Browser integration    | Hardened HTML/JSON responses and an exact-origin iframe bridge                              |
 
 Entity-specific Clockify REST APIs remain outside this package. See
 [Product Surface](docs/maintainers/product-surface.md) for the exact boundary.
 
 ## Packages and runtimes
 
-| Package                                                                                  | Purpose                                                                                          | Distribution             |
-| ---------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ | ------------------------ |
-| [`@apet97/clockify-addon-sdk`](https://www.npmjs.com/package/@apet97/clockify-addon-sdk) | Manifests, routing, verification, adapters, storage contracts, client helpers, and UI primitives | ESM + CommonJS, Node 22+ |
-| [`create-clockify-addon`](https://www.npmjs.com/package/create-clockify-addon)           | CLI and typed programmatic scaffolding for Node or Worker projects                               | ESM, Node 22+            |
+| Package                                                                                  | Purpose                                                                                          | Distribution                  |
+| ---------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ | ----------------------------- |
+| [`@apet97/clockify-addon-sdk`](https://www.npmjs.com/package/@apet97/clockify-addon-sdk) | Manifests, routing, verification, adapters, storage contracts, client helpers, and UI primitives | ESM + CommonJS, Node 22.13.0+ |
+| [`create-clockify-addon`](https://www.npmjs.com/package/create-clockify-addon)           | CLI and typed programmatic scaffolding for Node or Worker projects                               | ESM, Node 22.13.0+            |
 
 The SDK root stays runtime-neutral. Host integrations are explicit:
 

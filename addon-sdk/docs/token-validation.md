@@ -205,12 +205,13 @@ locations, or screenshots hosts. Read those URLs from the verified token claims,
 
 `apiUrl` comes from the verified `INSTALLED` payload and is stored in
 `ClockifyInstallationContext`; `backendUrl` is a signed JWT claim. Use
-`resolveClockifyApiBaseUrl({ apiUrl, backendUrl })` to produce the versioned `/v1` entity REST base:
-a nonblank `apiUrl` wins over `backendUrl`, trailing path slashes are trimmed, and `/v1` is appended
-only when missing. The resolvers accept absolute HTTPS URLs, plus HTTP only for
+`resolveClockifyApiBaseUrl({ apiUrl, backendUrl })` to produce the versioned `/v1` entity REST base.
+The first valid `apiUrl` wins. If `apiUrl` is missing or invalid, the resolver tries `backendUrl`.
+Trailing path slashes are trimmed, and `/v1` is appended only when missing. The resolvers accept
+absolute HTTPS URLs, plus HTTP only for
 URL-parser-canonical `localhost`, `127.0.0.1`, and `[::1]` loopback hosts. They return `undefined`
 for malformed or relative values, credentials, query strings, fragments, unsupported schemes, and
-non-loopback HTTP; an invalid preferred `apiUrl` does not fall back to `backendUrl`. Use
+non-loopback HTTP when no valid candidate remains. Use
 `resolveClockifyReportsBaseUrl({ reportsUrl })` for the reports claim; do not derive reports hosts
 from the API host.
 

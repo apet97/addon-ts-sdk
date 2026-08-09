@@ -2,9 +2,8 @@
 
 ## Prerequisites and setup
 
-Use Node 22.13.0 or newer for source development; the published packages retain a Node 22 runtime
-floor. Make changes on a topic branch or isolated worktree, then install the locked workspace
-exactly:
+Use Node 22.13.0 or newer for source development and published-package use. Make changes on a topic
+branch or isolated worktree, then install the locked workspace exactly:
 
 ```bash
 npm ci

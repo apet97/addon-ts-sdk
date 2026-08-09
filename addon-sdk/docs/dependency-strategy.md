@@ -33,8 +33,8 @@ The public SDK does not expose `jose`'s removed `KeyLike` type. Use the SDK-owne
 inputs accepted by `jose@6`.
 
 `npm run verify:package-consumer` installs the packed SDK into runtime and TypeScript ESM/CJS
-consumers and exercises the signing and verification path. Source development starts at Node
-22.13.0; the published package runtime contract remains Node 22 or newer.
+consumers and exercises the signing and verification path. Source development and the published
+package runtime contract both start at Node 22.13.0.
 
 Do not reintroduce static `jose` runtime imports in CJS-built SDK files unless the package drops its
 CommonJS build or raises its runtime floor with explicit owner approval.
@@ -50,9 +50,8 @@ contract:
 - Vitest 4 runs the test suite. `npm run test:coverage` uses the V8 coverage provider with text and
   JSON summary reporters.
 - Vite 8 powers Vitest and requires Node 22.12+ within the supported Node 22 line. ESLint 10 sets the
-  effective source-development floor at Node 22.13.0, which is pinned in root metadata and CI. The
-  published package runtime support remains `>=22`; do not raise it just because source-build tools
-  have a narrower patch-level requirement.
+  effective floor at Node 22.13.0. Both package manifests, root metadata, and CI use that same
+  minimum. Do not raise it without an explicit support-policy review.
 - TypeScript stays on major 6 and `@types/node` stays on major 22 until their compatibility lanes are
   reviewed deliberately. Dependabot groups routine tooling updates as minor/patch changes and
   ignores those two unsupported majors.

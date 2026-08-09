@@ -7,7 +7,7 @@
 //      occurs at index 0, so a leading capital is PRESERVED (PascalCase). JS's String.split drops
 //      that index-0 empty match, silently camelCasing the word.
 //   2. Java splits words on `\p{Upper}` (any Unicode uppercase letter), not ASCII `[A-Z]`.
-// Neither case is exercised by schemas 1.2-1.5 (every property/enum value stays identical), but the
+// Neither case is exercised by schemas 1.2-1.6 (every property/enum value stays identical), but the
 // port must still match the law for any value Clockify might add later.
 
 export function capitalize(value: string): string {

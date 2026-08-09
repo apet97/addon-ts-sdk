@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { ClockifyAddon, ClockifyManifest } from "../src";
+import { ClockifyAddon, ClockifyManifest, redactAddonRequest } from "../src";
 import { ValidationException, IllegalArgumentException } from "../src/shared/errors";
 
 describe("Router", () => {
@@ -195,6 +195,12 @@ describe("Router", () => {
       },
       query,
       body: { authToken: "body-secret", webhooks: [{ path: "/x", authToken: "hook-secret" }] },
+      rawBody: new TextEncoder().encode(
+        JSON.stringify({
+          authToken: "raw-body-secret",
+          webhooks: [{ path: "/x", authToken: "raw-hook-secret" }],
+        }),
+      ),
     };
 
     await addon.handle(request);
@@ -209,9 +215,37 @@ describe("Router", () => {
       authToken: "__redacted__",
       webhooks: [{ path: "/x", authToken: "__redacted__" }],
     });
+    expect(context.request.rawBody).toBeUndefined();
+    expect("rawBody" in context.request).toBe(false);
     // The original request object passed to handle() must not be mutated.
     expect(request.headers["clockify-signature"]).toBe("jwt.jwt.jwt");
     expect(query.get("auth_token")).toBe("secret-token");
+    expect(new TextDecoder().decode(request.rawBody)).toContain("raw-body-secret");
+  });
+
+  it("preserves JSON array bodies and hides unstructured bodies while redacting a request", () => {
+    const body = [{ id: "one", authToken: "secret" }, { id: "two" }];
+
+    expect(redactAddonRequest({ method: "POST", path: "/items", headers: {}, body }).body).toEqual([
+      { id: "one", authToken: "__redacted__" },
+      { id: "two" },
+    ]);
+    expect(
+      redactAddonRequest({
+        method: "POST",
+        path: "/items",
+        headers: {},
+        body: "malformed authToken=secret",
+      }).body,
+    ).toBe("__redacted__");
+    expect(
+      redactAddonRequest({
+        method: "POST",
+        path: "/items",
+        headers: {},
+        body: new TextEncoder().encode("secret"),
+      }).body,
+    ).toBe("__redacted__");
   });
 
   it("should execute middleware chain in order", async () => {

@@ -119,6 +119,83 @@ describe("ClockifyAddonClient", () => {
     );
     expect(new Headers(init?.headers).get("x-addon-token")).toBe("user-token");
     expect(new Headers(init?.headers).has("authorization")).toBe(false);
+    expect(init?.redirect).toBe("manual");
+  });
+
+  it("rejects redirects without retrying or forwarding the add-on token", async () => {
+    const fetch = vi.fn<typeof globalThis.fetch>().mockResolvedValue(
+      new Response(null, {
+        status: 302,
+        headers: { location: "https://attacker.example/collect" },
+      }),
+    );
+    const onRetry = vi.fn();
+    const client = new ClockifyAddonClient({
+      token: "installation-secret",
+      backendUrl: "https://api.example/api",
+      fetch,
+      onRetry,
+    });
+
+    await expect(client.request(["v1"])).rejects.toThrow(/redirect/i);
+    expect(fetch).toHaveBeenCalledOnce();
+    expect(fetch.mock.calls[0]![1]?.redirect).toBe("manual");
+    expect(onRetry).not.toHaveBeenCalled();
+  });
+
+  it("rejects a redirect even when response-body cancellation never settles", async () => {
+    const cancel = vi.fn(() => new Promise<void>(() => undefined));
+    const fetch = vi.fn<typeof globalThis.fetch>().mockResolvedValue(
+      new Response(new ReadableStream({ cancel }), {
+        status: 302,
+        headers: { location: "https://attacker.example/collect" },
+      }),
+    );
+    const client = new ClockifyAddonClient({
+      token: "installation-secret",
+      backendUrl: "https://api.example/api",
+      fetch,
+      maxAttempts: 1,
+      timeoutMs: 1,
+    });
+
+    const outcome = await Promise.race([
+      client.request(["v1"]).then(
+        () => "resolved",
+        () => "rejected",
+      ),
+      new Promise<string>((resolve) => setTimeout(() => resolve("still pending"), 20)),
+    ]);
+
+    expect(outcome).toBe("rejected");
+    expect(cancel).toHaveBeenCalledOnce();
+  });
+
+  it("rejects redirect follow mode before dispatch", async () => {
+    const fetch = vi.fn<typeof globalThis.fetch>();
+    const client = new ClockifyAddonClient({
+      token: "installation-secret",
+      backendUrl: "https://api.example/api",
+      fetch,
+    });
+
+    await expect(client.request(["v1"], { redirect: "follow" })).rejects.toThrow(/redirect/i);
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it("handles explicit redirect error mode without fetch-specific redirect behavior", async () => {
+    const fetch = vi
+      .fn<typeof globalThis.fetch>()
+      .mockResolvedValue(new Response(null, { status: 307 }));
+    const client = new ClockifyAddonClient({
+      token: "installation-secret",
+      backendUrl: "https://api.example/api",
+      fetch,
+    });
+
+    await expect(client.request(["v1"], { redirect: "error" })).rejects.toThrow(/redirect/i);
+    expect(fetch).toHaveBeenCalledOnce();
+    expect(fetch.mock.calls[0]![1]?.redirect).toBe("manual");
   });
 
   it.each(["", ".", ".."])(
@@ -263,6 +340,53 @@ describe("ClockifyAddonClient", () => {
     expect(mutationFetch).toHaveBeenCalledTimes(1);
   });
 
+  it("retries transient read statuses but not permanent server errors", async () => {
+    const timedOutFetch = vi
+      .fn<typeof globalThis.fetch>()
+      .mockResolvedValueOnce(new Response("timed out", { status: 408 }))
+      .mockResolvedValueOnce(new Response("{}", { status: 200 }));
+    const timedOutClient = new ClockifyAddonClient({
+      token: "token",
+      backendUrl: "https://api.example/api",
+      fetch: timedOutFetch,
+      sleep: async () => undefined,
+    });
+
+    await expect(timedOutClient.getSettings("w1")).resolves.toEqual({});
+    expect(timedOutFetch).toHaveBeenCalledTimes(2);
+
+    const notImplementedFetch = vi
+      .fn<typeof globalThis.fetch>()
+      .mockResolvedValue(new Response("not implemented", { status: 501 }));
+    const notImplementedClient = new ClockifyAddonClient({
+      token: "token",
+      backendUrl: "https://api.example/api",
+      fetch: notImplementedFetch,
+      sleep: async () => undefined,
+    });
+
+    await expect(notImplementedClient.getSettings("w1")).rejects.toMatchObject({ status: 501 });
+    expect(notImplementedFetch).toHaveBeenCalledOnce();
+  });
+
+  it("retries a transient OPTIONS failure as a safe request", async () => {
+    const fetch = vi
+      .fn<typeof globalThis.fetch>()
+      .mockResolvedValueOnce(new Response("unavailable", { status: 503 }))
+      .mockResolvedValueOnce(new Response(null, { status: 204 }));
+    const client = new ClockifyAddonClient({
+      token: "token",
+      backendUrl: "https://api.example/api",
+      fetch,
+      sleep: async () => undefined,
+    });
+
+    await expect(client.request(["v1"], { method: "OPTIONS" })).resolves.toMatchObject({
+      status: 204,
+    });
+    expect(fetch).toHaveBeenCalledTimes(2);
+  });
+
   it("notifies onRetry for both a status-based retry and a network-error retry", async () => {
     const onRetry = vi.fn();
     const statusFetch = vi
@@ -322,7 +446,7 @@ describe("ClockifyAddonClient", () => {
     expect(fetch).toHaveBeenCalledTimes(2);
   });
 
-  it("propagates a rejecting injected sleep during a retry delay when a signal is configured", async () => {
+  it("propagates a rejecting retry delay exactly once", async () => {
     // sleepOrAbort races sleep(ms) against the signal aborting; this covers
     // the branch where sleep() itself rejects (not the signal), which must
     // still surface as the retry's rejection and still remove its abort
@@ -331,15 +455,52 @@ describe("ClockifyAddonClient", () => {
       .fn<typeof globalThis.fetch>()
       .mockResolvedValueOnce(new Response("busy", { status: 429 }));
     const sleepError = new Error("injected sleep failed");
+    const sleep = vi.fn(() => Promise.reject(sleepError));
+    const onRetry = vi.fn();
     const client = new ClockifyAddonClient({
       token: "token",
       backendUrl: "https://api.example/api",
       fetch,
       signal: new AbortController().signal,
-      sleep: () => Promise.reject(sleepError),
+      sleep,
+      onRetry,
     });
 
     await expect(client.request(["v1"])).rejects.toBe(sleepError);
+    expect(sleep).toHaveBeenCalledOnce();
+    expect(onRetry).toHaveBeenCalledExactlyOnceWith({
+      attempt: 1,
+      status: 429,
+      delayMs: expect.any(Number),
+    });
+  });
+
+  it("removes its abort listener when an injected retry delay throws", async () => {
+    const addEventListener = vi.fn();
+    const removeEventListener = vi.fn();
+    const signal = {
+      aborted: false,
+      reason: undefined,
+      addEventListener,
+      removeEventListener,
+    } as unknown as AbortSignal;
+    const fetch = vi
+      .fn<typeof globalThis.fetch>()
+      .mockResolvedValueOnce(new Response("busy", { status: 429 }));
+    const sleepError = new Error("injected sleep threw");
+    const client = new ClockifyAddonClient({
+      token: "token",
+      backendUrl: "https://api.example/api",
+      fetch,
+      signal,
+      sleep: () => {
+        throw sleepError;
+      },
+    });
+
+    await expect(client.request(["v1"])).rejects.toBe(sleepError);
+    expect(addEventListener).toHaveBeenCalledTimes(2);
+    expect(removeEventListener).toHaveBeenCalledTimes(2);
   });
 
   it("cancels a discarded retry response before sleeping and ignores cancellation failures", async () => {
@@ -411,6 +572,29 @@ describe("ClockifyAddonClient", () => {
     expect(String(fetch.mock.calls[0][0])).toBe("https://api.example/api/workspaces");
   });
 
+  it("adds encoded repeated query parameters without forwarding a nonstandard fetch option", async () => {
+    const fetch = vi
+      .fn<typeof globalThis.fetch>()
+      .mockResolvedValue(new Response("ok", { status: 200 }));
+    const client = new ClockifyAddonClient({
+      token: "token",
+      backendUrl: "https://api.example/api",
+      fetch,
+    });
+    const query = new URLSearchParams([
+      ["page", "2"],
+      ["tag", "one/two"],
+      ["tag", "three"],
+    ]);
+
+    await client.request(["workspaces", "w1", "items"], { query });
+
+    expect(String(fetch.mock.calls[0][0])).toBe(
+      "https://api.example/api/workspaces/w1/items?page=2&tag=one%2Ftwo&tag=three",
+    );
+    expect(fetch.mock.calls[0][1]).not.toHaveProperty("query");
+  });
+
   it("treats caller aborts as terminal", async () => {
     const controller = new AbortController();
     controller.abort(new Error("caller stopped"));
@@ -455,6 +639,64 @@ describe("ClockifyAddonClient", () => {
       timeoutMs: 1,
     });
     await expect(timed.getSettings("w1")).rejects.toThrow(/timed out/i);
+  });
+
+  it("retries an attempt timeout for a replayable safe request", async () => {
+    const fetch = vi
+      .fn<typeof globalThis.fetch>()
+      .mockImplementationOnce(
+        (_input, init) =>
+          new Promise((_resolve, reject) => {
+            const rejectWithReason = () => reject(init?.signal?.reason);
+            if (init?.signal?.aborted) rejectWithReason();
+            else init?.signal?.addEventListener("abort", rejectWithReason, { once: true });
+          }),
+      )
+      .mockResolvedValueOnce(new Response("{}", { status: 200 }));
+    const sleep = vi.fn(async () => undefined);
+    const onRetry = vi.fn();
+    const client = new ClockifyAddonClient({
+      token: "token",
+      backendUrl: "https://api.example/api",
+      fetch,
+      maxAttempts: 2,
+      onRetry,
+      sleep,
+      timeoutMs: 1,
+    });
+
+    await expect(client.getSettings("w1")).resolves.toEqual({});
+    expect(fetch).toHaveBeenCalledTimes(2);
+    expect(sleep).toHaveBeenCalledExactlyOnceWith(100);
+    expect(onRetry).toHaveBeenCalledWith({
+      attempt: 1,
+      delayMs: 100,
+      error: expect.objectContaining({ message: "Clockify add-on request timed out." }),
+    });
+  });
+
+  it("does not retry an attempt timeout for a mutation", async () => {
+    const fetch = vi.fn<typeof globalThis.fetch>(
+      (_input, init) =>
+        new Promise((_resolve, reject) => {
+          const rejectWithReason = () => reject(init?.signal?.reason);
+          if (init?.signal?.aborted) rejectWithReason();
+          else init?.signal?.addEventListener("abort", rejectWithReason, { once: true });
+        }),
+    );
+    const sleep = vi.fn(async () => undefined);
+    const client = new ClockifyAddonClient({
+      token: "token",
+      backendUrl: "https://api.example/api",
+      fetch,
+      maxAttempts: 2,
+      sleep,
+      timeoutMs: 1,
+    });
+
+    await expect(client.updateSettings("w1", [])).rejects.toThrow(/timed out/i);
+    expect(fetch).toHaveBeenCalledOnce();
+    expect(sleep).not.toHaveBeenCalled();
   });
 
   it.each([
@@ -529,6 +771,53 @@ describe("ClockifyAddonClient", () => {
     const pending = client.getSettings("w1");
     controller.abort(new Error("caller stopped in flight"));
     await expect(pending).rejects.toThrow("caller stopped in flight");
+  });
+
+  it("honors the AbortSignal supplied to a generic request", async () => {
+    const controller = new AbortController();
+    const reason = new Error("request stopped in flight");
+    const fetch = vi.fn<typeof globalThis.fetch>(
+      (_input, init) =>
+        new Promise((_resolve, reject) => {
+          init?.signal?.addEventListener("abort", () => reject(init.signal?.reason));
+        }),
+    );
+    const client = new ClockifyAddonClient({
+      token: "token",
+      backendUrl: "https://api.example/api",
+      fetch,
+      timeoutMs: 20,
+    });
+
+    const pending = client.request(["v1"], { signal: controller.signal });
+    controller.abort(reason);
+
+    await expect(pending).rejects.toBe(reason);
+  });
+
+  it("keeps an SDK timeout when the transport triggers a later caller abort", async () => {
+    const caller = new AbortController();
+    const laterCallerReason = new Error("caller aborted after timeout");
+    const fetch = vi.fn<typeof globalThis.fetch>(
+      (_input, init) =>
+        new Promise((_resolve, reject) => {
+          init?.signal?.addEventListener("abort", () => {
+            const timeoutReason = init.signal?.reason;
+            caller.abort(laterCallerReason);
+            reject(timeoutReason);
+          });
+        }),
+    );
+    const client = new ClockifyAddonClient({
+      token: "token",
+      backendUrl: "https://api.example/api",
+      fetch,
+      signal: caller.signal,
+      maxAttempts: 1,
+      timeoutMs: 1,
+    });
+
+    await expect(client.getSettings("w1")).rejects.toThrow(/timed out/i);
   });
 
   it("rejects an empty pathSegments array before fetching", async () => {
@@ -634,6 +923,31 @@ describe("ClockifyAddonClient", () => {
     expect(delays).toEqual([30_000]);
   });
 
+  it("uses X-RateLimit-Reset when Retry-After is absent", async () => {
+    const fetch = vi
+      .fn<typeof globalThis.fetch>()
+      .mockResolvedValueOnce(
+        new Response("busy", {
+          status: 429,
+          headers: { "x-ratelimit-reset": "4102444800" },
+        }),
+      )
+      .mockResolvedValueOnce(new Response("{}", { status: 200 }));
+    const delays: number[] = [];
+    const client = new ClockifyAddonClient({
+      token: "token",
+      backendUrl: "https://api.example/api",
+      fetch,
+      sleep: async (delay) => {
+        delays.push(delay);
+      },
+    });
+
+    await client.getSettings("w1");
+
+    expect(delays).toEqual([30_000]);
+  });
+
   it("falls back to exponential backoff for a Retry-After HTTP-date already in the past", async () => {
     const fetch = vi
       .fn<typeof globalThis.fetch>()
@@ -675,6 +989,24 @@ describe("ClockifyAddonClient", () => {
       client.request(["v1"], { method: "PATCH", body: new ReadableStream() }),
     ).rejects.toBeInstanceOf(ClockifyAddonHttpError);
     expect(fetch).toHaveBeenCalledTimes(1);
+    expect(sleep).not.toHaveBeenCalled();
+  });
+
+  it("does not retry a network failure when a safe read body is not replayable", async () => {
+    const networkError = new Error("network failed after consuming the body");
+    const fetch = vi.fn<typeof globalThis.fetch>().mockRejectedValue(networkError);
+    const sleep = vi.fn(async () => undefined);
+    const client = new ClockifyAddonClient({
+      token: "token",
+      backendUrl: "https://api.example/api",
+      fetch,
+      sleep,
+    });
+
+    await expect(
+      client.request(["v1"], { method: "GET", body: new ReadableStream() }),
+    ).rejects.toBe(networkError);
+    expect(fetch).toHaveBeenCalledOnce();
     expect(sleep).not.toHaveBeenCalled();
   });
 

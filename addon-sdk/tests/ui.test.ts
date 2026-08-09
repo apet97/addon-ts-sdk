@@ -4,6 +4,7 @@ import {
   applyClockifyTheme,
   createClockifyBridge,
   formatClockifyDate,
+  isClockifyAdminRole,
 } from "../src/ui";
 
 describe("Clockify UI bridge", () => {
@@ -171,6 +172,36 @@ describe("Clockify UI bridge", () => {
         new Date("2026-01-02T00:00:00Z"),
       ),
     );
+  });
+
+  it("accepts explicit date components without adding a conflicting dateStyle", () => {
+    const value = new Date("2026-01-02T00:00:00Z");
+    const options: Intl.DateTimeFormatOptions = {
+      timeZone: "UTC",
+      weekday: "short",
+      year: "numeric",
+    };
+
+    expect(formatClockifyDate(value, "en-GB", options)).toBe(
+      new Intl.DateTimeFormat("en-GB", options).format(value),
+    );
+    expect(formatClockifyDate(value, "not a locale!", options)).toBe(
+      new Intl.DateTimeFormat("en", options).format(value),
+    );
+  });
+
+  it("does not add a date when the caller requests timeStyle only", () => {
+    const value = new Date("2026-01-02T09:30:00Z");
+    const options: Intl.DateTimeFormatOptions = { timeStyle: "short", timeZone: "UTC" };
+
+    expect(formatClockifyDate(value, "en-GB", options)).toBe(
+      new Intl.DateTimeFormat("en-GB", options).format(value),
+    );
+  });
+
+  it("exports the runtime-neutral admin-role check from the browser entrypoint", () => {
+    expect(isClockifyAdminRole(" admin ")).toBe(true);
+    expect(isClockifyAdminRole("USER")).toBe(false);
   });
 
   it("unsubscribes and disposes its listener", () => {

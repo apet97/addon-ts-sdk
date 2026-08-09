@@ -91,6 +91,9 @@ describe("create-clockify-addon", () => {
       expect(source).toContain("ALLOW_EPHEMERAL_STORAGE");
       expect(source).toContain("withClockifyInstalledLifecycleRequest");
       expect(source).toContain("getExpectedWebhookAuthToken");
+      expect(source).toContain("normalizeClockifyWebhookPath(entry.path)");
+      expect(source).toContain("normalizeClockifyWebhookPath(entry.path) === webhook.path");
+      expect(source).not.toContain('entry.path.endsWith("/webhooks/time-entry")');
       expect(source).not.toContain(".components([component])");
       expect(source).not.toContain(".lifecycle([installed, deleted])");
       expect(source).not.toContain(".webhooks([webhook])");

@@ -32,7 +32,11 @@ exact HTTPS parent origin outside canonical loopback development, checks both `e
 `event.source`, and targets that same origin for outbound messages.
 
 `applyClockifyTheme()` and `applyClockifyLanguage()` normalize verified theme and language values for
-a document root. They do not verify a token themselves.
+a document root. `formatClockifyDate()` uses the requested date or time fields, `dateStyle`, or
+`timeStyle` when you supply them. It uses the medium date style only when you supply none of these
+options. The `/ui` entrypoint also exports the runtime-neutral `isClockifyAdminRole()` helper, so
+browser code does not have to import the broader Clockify entrypoint. These helpers do not verify a
+token themselves.
 
 ## What your application must do
 

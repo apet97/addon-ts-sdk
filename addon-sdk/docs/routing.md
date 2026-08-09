@@ -96,10 +96,10 @@ app.use(express.json({ limit: "1mb" }));
 app.use(createExpressAddonHandler(addon, { onError }));
 ```
 
-`createExpressAddonHandler`'s optional `onError` observes an error from outside the handler
-chain — a malformed request target, or a failure while writing the response — the one case the
-`ClockifyAddon`-level `onError` (set on the `Addon`/`ClockifyAddon` instance) cannot see, since
-that only covers errors thrown from inside `addon.handle()`.
+`createExpressAddonHandler`'s optional `onError` observes an error from outside the handler chain,
+such as a failure while writing the response. The `ClockifyAddon`-level `onError` cannot see that
+failure because it observes only errors from inside `addon.handle()`. A malformed request target is
+a client error. The Express adapter returns `400` for it and does not call `onError`.
 
 Prefer the granular `/adapters/node`, `/adapters/express`, and `/adapters/fetch` imports for host
 code. The legacy `/adapters` aggregate remains Node-oriented, while the package root stays
@@ -107,8 +107,8 @@ runtime-neutral.
 
 ## Handled Errors
 
-Router, Fetch adapter, and Node `http` adapter errors that become handled 500 responses are quiet by
-default. Pass `onError(error, context)` when the host application wants to log, count, or redact them:
+Router, Express, Fetch, and Node `http` adapter errors are quiet by default. Pass
+`onError(error, context)` when the host application must log or count them:
 
 ```typescript
 import { AddonErrorReporter, ClockifyAddon } from "@apet97/clockify-addon-sdk";
@@ -124,3 +124,10 @@ const addon = new ClockifyAddon(manifest, undefined, {
 
 const server = createNodeHttpAddonServer(addon, { onError: addonErrorReporter });
 ```
+
+`context.source` identifies `router`, `express-adapter`, `fetch-adapter`, or `node-http-adapter`.
+When the router supplies a normalized request, the SDK redacts known credential headers, the
+component query token, and lifecycle or webhook tokens in the parsed body. It replaces
+unstructured string and binary bodies, and it omits `rawBody`, because these values can contain the
+same credentials. Adapters do not expose the native request object to `onError` because it can
+contain unredacted headers, URLs, or bodies.

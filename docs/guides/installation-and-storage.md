@@ -56,7 +56,8 @@ generation atomically.
 Keep installation and webhook credentials server-side. Never copy them into component HTML,
 browser storage, logs, or error messages. The SDK redacts what it knows about (`authToken`,
 `x-addon-token`, `clockify-signature`, and similar) before its own `onError` reporter sees a
-request, but it cannot redact a request or store record your application logs directly:
+request. It also removes raw request bytes and replaces unstructured string or binary bodies. It
+cannot redact a request or store record that your application logs directly:
 
 ```typescript
 // WRONG — logs the raw authToken and every webhooks[].authToken:

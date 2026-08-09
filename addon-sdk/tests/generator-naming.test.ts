@@ -11,7 +11,7 @@ import { join } from "node:path";
 import { toMethodName, toClassName } from "../scripts/naming";
 
 describe("generator naming parity with the Java SDK", () => {
-  // Values that appear in schemas 1.2-1.5 today — the live surface must stay byte-identical.
+  // Values that appear in schemas 1.2-1.6 today — the live surface must stay byte-identical.
   const realSurface: ReadonlyArray<readonly [string, string]> = [
     ["on_NEW_TIME_ENTRY", "onNewTimeEntry"],
     ["on_TIME_OFF_REQUEST_WITHDRAWN", "onTimeOffRequestWithdrawn"],

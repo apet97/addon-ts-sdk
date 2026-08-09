@@ -5,6 +5,14 @@ Historical receipts below prove only the source SHA and environment they name.
 
 ## Published versions
 
+The current unpublished release candidate is:
+
+- `@apet97/clockify-addon-sdk@1.3.0`
+- `create-clockify-addon@1.3.0`
+
+Do not treat these candidate versions as registry evidence until this document records the exact
+published artifacts and post-publication verification.
+
 The latest registry publication is:
 
 - `@apet97/clockify-addon-sdk@1.2.0`

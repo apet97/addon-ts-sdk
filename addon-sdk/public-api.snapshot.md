@@ -32,17 +32,18 @@ export * as testing from "./testing/index.js";
 import { AddonRequest } from "./request.js";
 import { AddonResponse } from "./response.js";
 import { RequestHandler, AddonMiddleware } from "./handler.js";
-export type AddonErrorSource = "router" | "fetch-adapter" | "node-http-adapter";
+export type AddonErrorSource = "router" | "express-adapter" | "fetch-adapter" | "node-http-adapter";
 export interface AddonErrorContext {
     readonly source: AddonErrorSource;
     readonly request?: AddonRequest;
+    /** @deprecated Adapters omit native requests because they can contain credentials. */
     readonly nativeRequest?: unknown;
 }
 export type AddonErrorReporter = (error: unknown, context: AddonErrorContext) => void;
 export interface AddonOptions {
     readonly onError?: AddonErrorReporter;
 }
-/** Strips Clockify credentials from a request before an error reporter sees it. */
+/** Returns a reporter-safe request projection with known Clockify credentials removed. */
 export declare function redactAddonRequest(request: AddonRequest): AddonRequest;
 export declare function reportAddonError(reporter: AddonErrorReporter | undefined, error: unknown, context: AddonErrorContext): void;
 export declare abstract class Addon<M> {
@@ -613,6 +614,8 @@ export interface ClockifyDeletedLifecyclePayload {
     asUser: string;
 }
 export type ClockifyLifecyclePayload = ClockifyInstalledLifecyclePayload | ClockifyStatusChangedLifecyclePayload | ClockifySettingsUpdatedLifecyclePayload | ClockifyDeletedLifecyclePayload;
+/** Converts a lifecycle webhook path or absolute HTTP(S) URL to one stable path key. */
+export declare function normalizeClockifyWebhookPath(path: string): string;
 export declare function isClockifyInstalledLifecyclePayload(value: unknown): value is ClockifyInstalledLifecyclePayload;
 export declare function isClockifyStatusChangedLifecyclePayload(value: unknown): value is ClockifyStatusChangedLifecyclePayload;
 export declare function isClockifySettingsUpdatedLifecyclePayload(value: unknown): value is ClockifySettingsUpdatedLifecyclePayload;
@@ -945,17 +948,15 @@ export interface ClockifyIdempotencyLeaseStore {
 /** Bounds for {@link InMemoryClockifyIdempotencyLeaseStore}'s completed-entry retention. */
 export interface ClockifyIdempotencyLeaseStoreOptions {
     /**
-     * Caps how many completed entries are retained at once. Once exceeded, the
-     * oldest completed entry is evicted (FIFO). Unset keeps every completed
+     * Caps how many completed entries are retained at once. Must be a nonnegative safe integer.
+     * Once exceeded, the oldest completed entry is evicted (FIFO). Unset keeps every completed
      * entry (the default, unbounded).
      */
     readonly maxCompletedEntries?: number;
     /**
-     * TTL, in milliseconds, for a completed entry. Once it elapses, the key is
-     * treated as never completed and becomes claimable again — a webhook
-     * redelivered after the TTL is no longer deduplicated. Unset retains
-     * completed entries forever (the default), matching the class's original
-     * behavior.
+     * Positive TTL, in milliseconds, for a completed entry. After it elapses, the key becomes
+     * claimable again. A webhook redelivered after the TTL is no longer deduplicated. Unset retains
+     * completed entries forever (the default).
      */
     readonly completedTtlMs?: number;
 }
@@ -975,6 +976,7 @@ export declare class InMemoryClockifyIdempotencyLeaseStore implements ClockifyId
     constructor(now?: () => number, options?: ClockifyIdempotencyLeaseStoreOptions);
     /** Number of keys currently tracked (active leases plus retained completed entries). */
     size(): number;
+    private pruneExpired;
     claim(key: string, owner: string, leaseMs: number): Promise<boolean>;
     complete(key: string, owner: string): Promise<boolean>;
     release(key: string, owner: string): Promise<boolean>;
@@ -3550,9 +3552,9 @@ export interface ClockifySettingUpdate {
 export interface ClockifyAddonClientRetryInfo {
     /** The attempt that just finished (1-indexed); the retry will be `attempt + 1`. */
     readonly attempt: number;
-    /** The response status that triggered the retry, absent for a network-error retry. */
+    /** The response status that triggered the retry, absent for a transport or timeout retry. */
     readonly status?: number;
-    /** The response error that triggered the retry, absent for a status-based retry. */
+    /** The transport or timeout error that triggered the retry, absent for a status-based retry. */
     readonly error?: unknown;
     /** Delay before the retry, in milliseconds. */
     readonly delayMs: number;
@@ -3562,12 +3564,18 @@ export interface ClockifyAddonClientOptions {
     readonly token: string;
     readonly backendUrl: string;
     readonly fetch?: typeof globalThis.fetch;
+    /** Stops every request from this client. A per-request signal can stop one generic request. */
     readonly signal?: AbortSignal;
     readonly timeoutMs?: number;
     readonly maxAttempts?: number;
     readonly sleep?: (milliseconds: number) => Promise<void>;
     /** Observe retries for metrics/logging. Never affects retry behavior, even if it throws. */
     readonly onRetry?: (info: ClockifyAddonClientRetryInfo) => void;
+}
+/** Options for one generic authenticated add-on request. */
+export interface ClockifyAddonRequestOptions extends RequestInit {
+    /** Encoded onto the request URL and not forwarded as a nonstandard Fetch option. */
+    readonly query?: URLSearchParams;
 }
 /**
  * HTTP failure returned by a Clockify add-on API call.
@@ -3587,8 +3595,9 @@ export declare class ClockifyAddonHttpError extends Error {
  * A request can reject with:
  * - {@link ClockifyAddonHttpError} on a non-`ok` HTTP status.
  * - `Error("Clockify add-on request timed out.")` — a generic `Error`, matched by `/timed out/i` —
- *   when one attempt exceeds `timeoutMs`.
+ *   when a non-retryable or final attempt exceeds `timeoutMs`.
  * - `signal.reason` (identity preserved, may be a `DOMException`) when the caller's `signal` aborts.
+ * - `Error` when a request attempts to follow a redirect or receives an HTTP 3xx response.
  * - `Error` with `cause` set to the original parse error when `getSettings`/`updateSettings` receive
  *   a `200` response whose body is not valid JSON.
  *
@@ -3621,8 +3630,12 @@ export declare class ClockifyAddonClient {
     getSettings<T = unknown>(workspaceId: string): Promise<T>;
     /** Updates structured settings for one installation workspace. */
     updateSettings<T = unknown>(workspaceId: string, updates: readonly ClockifySettingUpdate[]): Promise<T>;
-    /** Performs an authenticated request using encoded, caller-supplied path segments. */
-    request(pathSegments: readonly string[], init?: RequestInit): Promise<Response>;
+    /**
+     * Performs an authenticated request using encoded path segments and optional query parameters.
+     * A signal in `options` stops this request. The client rejects `redirect: "follow"` and never
+     * forwards the token to a redirect.
+     */
+    request(pathSegments: readonly string[], options?: ClockifyAddonRequestOptions): Promise<Response>;
 }
 ```
 
@@ -4145,6 +4158,8 @@ export interface ClockifyDeletedLifecyclePayload {
     asUser: string;
 }
 export type ClockifyLifecyclePayload = ClockifyInstalledLifecyclePayload | ClockifyStatusChangedLifecyclePayload | ClockifySettingsUpdatedLifecyclePayload | ClockifyDeletedLifecyclePayload;
+/** Converts a lifecycle webhook path or absolute HTTP(S) URL to one stable path key. */
+export declare function normalizeClockifyWebhookPath(path: string): string;
 export declare function isClockifyInstalledLifecyclePayload(value: unknown): value is ClockifyInstalledLifecyclePayload;
 export declare function isClockifyStatusChangedLifecyclePayload(value: unknown): value is ClockifyStatusChangedLifecyclePayload;
 export declare function isClockifySettingsUpdatedLifecyclePayload(value: unknown): value is ClockifySettingsUpdatedLifecyclePayload;
@@ -4477,17 +4492,15 @@ export interface ClockifyIdempotencyLeaseStore {
 /** Bounds for {@link InMemoryClockifyIdempotencyLeaseStore}'s completed-entry retention. */
 export interface ClockifyIdempotencyLeaseStoreOptions {
     /**
-     * Caps how many completed entries are retained at once. Once exceeded, the
-     * oldest completed entry is evicted (FIFO). Unset keeps every completed
+     * Caps how many completed entries are retained at once. Must be a nonnegative safe integer.
+     * Once exceeded, the oldest completed entry is evicted (FIFO). Unset keeps every completed
      * entry (the default, unbounded).
      */
     readonly maxCompletedEntries?: number;
     /**
-     * TTL, in milliseconds, for a completed entry. Once it elapses, the key is
-     * treated as never completed and becomes claimable again — a webhook
-     * redelivered after the TTL is no longer deduplicated. Unset retains
-     * completed entries forever (the default), matching the class's original
-     * behavior.
+     * Positive TTL, in milliseconds, for a completed entry. After it elapses, the key becomes
+     * claimable again. A webhook redelivered after the TTL is no longer deduplicated. Unset retains
+     * completed entries forever (the default).
      */
     readonly completedTtlMs?: number;
 }
@@ -4507,6 +4520,7 @@ export declare class InMemoryClockifyIdempotencyLeaseStore implements ClockifyId
     constructor(now?: () => number, options?: ClockifyIdempotencyLeaseStoreOptions);
     /** Number of keys currently tracked (active leases plus retained completed entries). */
     size(): number;
+    private pruneExpired;
     claim(key: string, owner: string, leaseMs: number): Promise<boolean>;
     complete(key: string, owner: string): Promise<boolean>;
     release(key: string, owner: string): Promise<boolean>;
@@ -7262,9 +7276,9 @@ export interface ClockifySettingUpdate {
 export interface ClockifyAddonClientRetryInfo {
     /** The attempt that just finished (1-indexed); the retry will be `attempt + 1`. */
     readonly attempt: number;
-    /** The response status that triggered the retry, absent for a network-error retry. */
+    /** The response status that triggered the retry, absent for a transport or timeout retry. */
     readonly status?: number;
-    /** The response error that triggered the retry, absent for a status-based retry. */
+    /** The transport or timeout error that triggered the retry, absent for a status-based retry. */
     readonly error?: unknown;
     /** Delay before the retry, in milliseconds. */
     readonly delayMs: number;
@@ -7274,12 +7288,18 @@ export interface ClockifyAddonClientOptions {
     readonly token: string;
     readonly backendUrl: string;
     readonly fetch?: typeof globalThis.fetch;
+    /** Stops every request from this client. A per-request signal can stop one generic request. */
     readonly signal?: AbortSignal;
     readonly timeoutMs?: number;
     readonly maxAttempts?: number;
     readonly sleep?: (milliseconds: number) => Promise<void>;
     /** Observe retries for metrics/logging. Never affects retry behavior, even if it throws. */
     readonly onRetry?: (info: ClockifyAddonClientRetryInfo) => void;
+}
+/** Options for one generic authenticated add-on request. */
+export interface ClockifyAddonRequestOptions extends RequestInit {
+    /** Encoded onto the request URL and not forwarded as a nonstandard Fetch option. */
+    readonly query?: URLSearchParams;
 }
 /**
  * HTTP failure returned by a Clockify add-on API call.
@@ -7299,8 +7319,9 @@ export declare class ClockifyAddonHttpError extends Error {
  * A request can reject with:
  * - {@link ClockifyAddonHttpError} on a non-`ok` HTTP status.
  * - `Error("Clockify add-on request timed out.")` — a generic `Error`, matched by `/timed out/i` —
- *   when one attempt exceeds `timeoutMs`.
+ *   when a non-retryable or final attempt exceeds `timeoutMs`.
  * - `signal.reason` (identity preserved, may be a `DOMException`) when the caller's `signal` aborts.
+ * - `Error` when a request attempts to follow a redirect or receives an HTTP 3xx response.
  * - `Error` with `cause` set to the original parse error when `getSettings`/`updateSettings` receive
  *   a `200` response whose body is not valid JSON.
  *
@@ -7333,8 +7354,12 @@ export declare class ClockifyAddonClient {
     getSettings<T = unknown>(workspaceId: string): Promise<T>;
     /** Updates structured settings for one installation workspace. */
     updateSettings<T = unknown>(workspaceId: string, updates: readonly ClockifySettingUpdate[]): Promise<T>;
-    /** Performs an authenticated request using encoded, caller-supplied path segments. */
-    request(pathSegments: readonly string[], init?: RequestInit): Promise<Response>;
+    /**
+     * Performs an authenticated request using encoded path segments and optional query parameters.
+     * A signal in `options` stops this request. The client rejects `redirect: "follow"` and never
+     * forwards the token to a redirect.
+     */
+    request(pathSegments: readonly string[], options?: ClockifyAddonRequestOptions): Promise<Response>;
 }
 ```
 
@@ -7343,6 +7368,8 @@ export declare class ClockifyAddonClient {
 ### ui/index.d.ts
 
 ```ts
+/** True for Clockify owner and admin role values. */
+export declare function isClockifyAdminRole(role: unknown): boolean;
 /** The supported message envelope sent by Clockify to an iframe component. */
 export interface ClockifyWindowMessage {
     readonly title: string;
@@ -7396,7 +7423,7 @@ export interface ClockifyBridge {
 export declare function createClockifyBridge(options: CreateClockifyBridgeOptions): ClockifyBridge;
 /** Minimal document-root contract used by theme and language helpers. */
 export interface ClockifyDocumentRoot {
-    readonly dataset: Record<string, string>;
+    readonly dataset: Record<string, string | undefined>;
     lang: string;
 }
 /** Applies the verified Clockify user theme as a normalized data attribute. */
@@ -7404,8 +7431,8 @@ export declare function applyClockifyTheme(theme: string | undefined, root: Pick
 /** Applies the verified Clockify user language to a document root. */
 export declare function applyClockifyLanguage(language: string | undefined, root: Pick<ClockifyDocumentRoot, "lang">): void;
 /**
- * Formats a date using the user's locale while permitting explicit timezone policy. Falls back to
- * `"en"` if `locale` is not a well-formed BCP 47 tag `Intl.DateTimeFormat` accepts.
+ * Formats a date with the user's locale and explicit options. Uses medium `dateStyle` only when the
+ * options contain no date or time fields or styles. Falls back to `"en"` for an invalid locale tag.
  */
 export declare function formatClockifyDate(value: Date | number, locale: string, options?: Intl.DateTimeFormatOptions): string;
 ```

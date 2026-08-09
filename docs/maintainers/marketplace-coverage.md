@@ -15,7 +15,7 @@ This matrix maps the vendored `MARKETPLACE_DOCS` snapshot to SDK behavior. A row
 | UI components            | Generated component builders and hardened HTML responses                                                                                | builder, security and creator suites                |
 | Webhooks                 | Fixed-token raw verification, exactly-one-source wrappers, signed installation context, 1 MiB limits and owner leases                   | request-verification and webhook-idempotency suites |
 | Structured settings      | Typed builders plus claim-driven GET/PATCH clients with bounded timeouts, bounded retry fallback, and response cleanup                  | settings and add-on-client suites                   |
-| Developer account        | Application responsibility; authenticated installation remains outside deterministic repo gates                                         | 1.0.3 `303f9c6` workspace receipt below             |
+| Developer account        | Application responsibility; authenticated installation remains outside deterministic repo gates                                         | 1.2.0 pointer below and release-readiness receipt   |
 | Authentication           | RS256, issuer/type/subject pinning, expiry profiles and context matching                                                                | request-verification suite                          |
 | Environments and regions | Absolute HTTPS/canonical loopback URLs, exact direct-client loopback spellings, encoded nondegenerate segments, and fail-closed origins | request-wire, client and origin suites              |
 | Window events            | Source/origin-checked subscriptions and typed actions                                                                                   | UI suite                                            |
@@ -32,15 +32,23 @@ the caller supplies `installedAt`; omitting it intentionally performs unconditio
 cleanup. The generated development scaffold keeps that normal uninstall cleanup and therefore does
 not claim protection from delayed events belonging to an earlier installation.
 
+## 1.2.0 lifecycle evidence pointer
+
+After publication, a project created with the public `create-clockify-addon@1.2.0` package was
+installed in the authenticated developer workspace. The pass covered `INSTALLED`, `DELETED`, the
+signed component request, and five of seven registered time-entry webhooks. `TIME_ENTRY_SPLIT` and
+`TIME_ENTRY_RESTORED` remained unexercised because the review found no public REST endpoint that
+triggers them. This is the latest lifecycle evidence. See the "1.2.0 release evidence" section of
+`release-readiness.md` for the exact boundary and registry record.
+
 ## 1.1.0 lifecycle evidence pointer
 
 A cloudflared-tunnel developer-workspace pass against an unpublished-tarball scaffold exercised
 installation, component authentication, webhook delivery, and uninstall cleanup for the 1.1.0
-release source before publication. This is now the latest lifecycle evidence, superseding the 1.0.3
-receipt referenced below. See the "1.1.0 release evidence" section of `release-readiness.md` for the
-publish record; this repository does not hold a sanitized route/status log for that pass (unlike the
-1.0.3 and final-SHA receipts below), because the tunnel and server were already torn down before the
-publisher's confirmation was recorded.
+release source before publication. The 1.2.0 pass supersedes this historical receipt. See the
+"1.1.0 release evidence" section of `release-readiness.md` for the publish record. This repository
+does not hold a sanitized route/status log for the 1.1.0 pass because the tunnel and server were
+already removed before the publisher's confirmation was recorded.
 
 ## 1.0.5 registry-only evidence boundary
 
@@ -57,8 +65,8 @@ empty npm cache:
 
 This proves registry packaging, SDK ESM/CommonJS/TypeScript consumption, creator API/CLI execution,
 generated-project type-checking, manifest validation, route failures, and production fail-closed
-behavior for 1.0.5. No authenticated Marketplace install was run for this release, so the 1.0.3
-live receipt below remains the latest lifecycle evidence and is not inherited by 1.0.5.
+behavior for 1.0.5. No authenticated Marketplace install was run for this release. At publication,
+the 1.0.3 receipt below was the latest lifecycle evidence, and 1.0.5 did not inherit it.
 
 ## 1.0.4 registry-only evidence boundary
 
@@ -73,12 +81,12 @@ installed and executed from an isolated empty npm cache:
 
 This proves registry packaging, SDK ESM/CommonJS/TypeScript consumption, creator API/CLI execution,
 generated-project type-checking, manifest validation, route failures, and production fail-closed
-behavior for 1.0.4. No authenticated Marketplace install was run for this patch, so the 1.0.3 live
-receipt below remains the latest lifecycle evidence and is not inherited by 1.0.4.
+behavior for 1.0.4. No authenticated Marketplace install was run for this patch. At publication,
+the 1.0.3 receipt below was the latest lifecycle evidence, and 1.0.4 did not inherit it.
 
 ## 1.0.3 evidence boundary
 
-The current receipt proves release source commit `303f9c6a732707b572f418b592e75575811a7447`, the
+This historical receipt proves release source commit `303f9c6a732707b572f418b592e75575811a7447`, the
 exact packed artifacts identified below, their authenticated developer-workspace behavior, and
 their subsequent installation from the public npm registry. It does not prove a Marketplace
 submission, future source changes, or future package versions.

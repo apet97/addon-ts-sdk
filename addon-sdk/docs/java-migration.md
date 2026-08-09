@@ -1,8 +1,9 @@
 # Java to TypeScript Migration Guide
 
 This guide maps features, classes, and code patterns directly from the Clockify Java Addon SDK to
-the published `@apet97/clockify-addon-sdk` package. New TypeScript add-ons should use schema 1.5;
-the TypeScript builders retain 1.2-1.4 for compatibility with older manifests and Java parity.
+the published `@apet97/clockify-addon-sdk` package. New TypeScript add-ons should use the schema 1.5
+default. The TypeScript builders retain schemas 1.2-1.4 for compatibility and Java parity. They
+also provide schema 1.6 for its additive webhook and component values.
 
 ## API Comparison
 

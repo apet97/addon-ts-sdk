@@ -145,12 +145,14 @@ development, expose your server with a tunnel (`npx ngrok http 8080` or
 - **Verified handler wrappers** that compose the token helpers into small route handlers returning
   `401 Unauthorized` for failed component, lifecycle, installed lifecycle, and webhook checks.
 - **Lifecycle payload guards** that validate documented lifecycle bodies and narrow verified claims
-  before persisting installation or webhook-token data.
+  before persisting installation or webhook-token data, plus stable webhook-path normalization for
+  storage and lookup.
 - **Structured setting helpers** for common setting types, keeping value types paired with
   `TXT`, `NUMBER`, `CHECKBOX`, `LINK`, dropdown, and user dropdown settings.
 - **Adapters** for Node `http`, Express, and the Fetch API (Hono, Cloudflare Workers, Bun, Deno).
 - **`ClockifyAddonClient`** for add-on token exchange, structured settings, and authenticated
-  server-side requests using `X-Addon-Token`.
+  server-side requests with encoded path/query input and `X-Addon-Token`, with fail-closed redirect
+  handling.
 
 ## Node and Express runtimes
 
@@ -228,8 +230,8 @@ const claims = await new ClockifySignatureParser("my-addon-key", publicKey).pars
 - Installation-store encryption and webhook idempotency leases cover server credential workflows.
   Generation-aware deletion applies only when the caller supplies `installedAt`; the documented
   Clockify `DELETED` payload has no generation, so unqualified cleanup is unconditional.
-- `@apet97/clockify-addon-sdk/ui` provides exact-origin iframe messaging, theme, language and date
-  helpers.
+- `@apet97/clockify-addon-sdk/ui` provides exact-origin iframe messaging, admin-role checks, theme,
+  language, and date helpers.
 - `create-clockify-addon` scaffolds Node or Worker projects that fail closed until production origin,
   parent-origin, persistence and webhook processing are configured.
 
