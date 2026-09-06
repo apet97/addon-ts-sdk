@@ -32,6 +32,23 @@ the caller supplies `installedAt`; omitting it intentionally performs unconditio
 cleanup. The generated development scaffold keeps that normal uninstall cleanup and therefore does
 not claim protection from delayed events belonging to an earlier installation.
 
+## 1.3.1 registry-only evidence boundary
+
+Release source commit `7864b479cb69dc3e5d54191f9f59a28c85bf618b` passed the full local release
+gate, [SDK CI run
+`34031203378`](https://github.com/apet97/addon-ts-sdk/actions/runs/34031203378), and [Workers
+compatibility run
+`34031203392`](https://github.com/apet97/addon-ts-sdk/actions/runs/34031203392). Both exact public
+registry artifacts were then installed and executed from an isolated empty npm cache:
+
+- `@apet97/clockify-addon-sdk@1.3.1`: npm SHA-1
+  `337fe45f49d056ca2291603e1d8bdfc3b520f4c0`
+- `create-clockify-addon@1.3.1`: npm SHA-1
+  `f26e6e6e4f05bd7d9ac8d38cd3620234c656b87d`
+
+No authenticated Marketplace install was run for 1.3.1. The 1.2.0 receipt below remains the
+latest lifecycle evidence.
+
 ## 1.3.0 registry-only evidence boundary
 
 Release source commit `64e668afd7bf330be4908c58d8671bdd27951608` passed the full local release
