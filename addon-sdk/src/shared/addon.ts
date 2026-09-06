@@ -59,24 +59,33 @@ function redactQuery(query: AddonRequest["query"]): AddonRequest["query"] {
   return redacted;
 }
 
-function redactBody(body: unknown): unknown {
-  if (typeof body === "string" || body instanceof ArrayBuffer || ArrayBuffer.isView(body)) {
+function redactBody(body: unknown, ancestors = new WeakSet<object>(), topLevel = true): unknown {
+  if (
+    (topLevel && typeof body === "string") ||
+    body instanceof ArrayBuffer ||
+    ArrayBuffer.isView(body)
+  ) {
     return REDACTED;
   }
   if (body === null || typeof body !== "object") return body;
-  if (Array.isArray(body)) {
-    return body.map((item) =>
-      item !== null && typeof item === "object" ? redactBody(item) : item,
-    );
+  if (ancestors.has(body)) return REDACTED;
+  ancestors.add(body);
+  try {
+    if (Array.isArray(body)) return body.map((item) => redactBody(item, ancestors, false));
+
+    // Redact every nested authToken field, rather than only the known
+    // lifecycle/webhook shapes. Error reporters can receive application
+    // payloads with the same credential nested under another object, and a
+    // shallow copy would leak that value. Keep the returned projection plain
+    // so custom prototypes and getters are not retained in the report.
+    const redacted: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(body as Record<string, unknown>)) {
+      redacted[key] = key === "authToken" ? REDACTED : redactBody(value, ancestors, false);
+    }
+    return redacted;
+  } finally {
+    ancestors.delete(body);
   }
-  const redacted: Record<string, unknown> = { ...(body as Record<string, unknown>) };
-  if ("authToken" in redacted) redacted.authToken = REDACTED;
-  if (Array.isArray(redacted.webhooks)) {
-    redacted.webhooks = redacted.webhooks.map((webhook: unknown) =>
-      webhook && typeof webhook === "object" ? { ...webhook, authToken: REDACTED } : webhook,
-    );
-  }
-  return redacted;
 }
 
 /** Returns a reporter-safe request projection with known Clockify credentials removed. */

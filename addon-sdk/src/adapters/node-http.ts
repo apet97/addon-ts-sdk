@@ -60,8 +60,8 @@ export async function fromNodeRequest(
   req: IncomingMessage,
   options: BodyLimitOptions = {},
 ): Promise<AddonRequest> {
-  const url = parseHttpRequestTarget(req.url);
   const maxBodyBytes = resolveMaxBodyBytes(options);
+  const url = parseHttpRequestTarget(req.url);
   if (hasDuplicateContentLengthHeader(req.rawHeaders)) {
     throw new InvalidContentLengthError(String(req.headers["content-length"]));
   }

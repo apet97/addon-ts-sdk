@@ -39,6 +39,28 @@ describe("installation stores", () => {
     ).resolves.toBeUndefined();
   });
 
+  it.each([
+    "https://user:password@api.clockify.me/api",
+    "https://api.clockify.me/api?tenant=one",
+    "https://api.clockify.me/api#fragment",
+  ])("rejects an apiUrl with URL metadata: %s", async (apiUrl) => {
+    const store = new InMemoryClockifyInstallationStore();
+    await expect(store.save({ ...context(100), apiUrl })).rejects.toThrow(/apiUrl/);
+  });
+
+  it("rejects malformed nested webhook credentials and descriptors", async () => {
+    const store = new InMemoryClockifyInstallationStore();
+    await expect(
+      store.save({ ...context(100), webhooks: [{ ...context(100).webhooks![0], path: " " }] }),
+    ).rejects.toThrow(/webhook path/);
+    await expect(
+      store.save({
+        ...context(100),
+        webhooks: [{ ...context(100).webhooks![0], webhookType: "OTHER" as "ADDON" }],
+      }),
+    ).rejects.toThrow(/webhook type/);
+  });
+
   it("does not let a stale uninstall delete a newer installation generation", async () => {
     const store = new InMemoryClockifyInstallationStore();
     await store.save(context(100));

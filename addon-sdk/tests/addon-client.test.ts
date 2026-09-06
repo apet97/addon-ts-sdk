@@ -641,6 +641,20 @@ describe("ClockifyAddonClient", () => {
     await expect(timed.getSettings("w1")).rejects.toThrow(/timed out/i);
   });
 
+  it("enforces request timeouts when an injected fetch ignores AbortSignal", async () => {
+    const fetch = vi.fn<typeof globalThis.fetch>(() => new Promise(() => undefined));
+    const client = new ClockifyAddonClient({
+      token: "token",
+      backendUrl: "https://api.example/api",
+      fetch,
+      maxAttempts: 1,
+      timeoutMs: 1,
+    });
+
+    await expect(client.getSettings("w1")).rejects.toThrow(/timed out/i);
+    expect(fetch).toHaveBeenCalledOnce();
+  });
+
   it("retries an attempt timeout for a replayable safe request", async () => {
     const fetch = vi
       .fn<typeof globalThis.fetch>()

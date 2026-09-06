@@ -23,7 +23,14 @@ async function readFetchBody(request: Request, maxBodyBytes: number): Promise<Ui
     if (!value) continue;
     total += value.byteLength;
     if (total > maxBodyBytes) {
-      reader.cancel().catch(() => undefined);
+      // A host-provided stream may throw synchronously from cancel(). The
+      // size violation must remain the reported error regardless of whether
+      // cleanup succeeds.
+      try {
+        void Promise.resolve(reader.cancel()).catch(() => undefined);
+      } catch {
+        // Best-effort stream cleanup must not replace PayloadTooLargeError.
+      }
       throw new PayloadTooLargeError(maxBodyBytes);
     }
     chunks.push(value);

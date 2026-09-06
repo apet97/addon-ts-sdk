@@ -272,4 +272,20 @@ descendant.once("message", () => {
       parseWorkerManifest(body, { name: "worker-all", features: "all" }, "shape trace"),
     ).toThrow(/worker-all[\s\S]*Body:.*components[\s\S]*Wrangler output:[\s\S]*shape trace/u);
   });
+
+  it("rejects manifest fields that only imitate array lengths", async () => {
+    if (!helpersExist) return;
+    const { parseWorkerManifest } = await loadHelpers();
+    expect(() =>
+      parseWorkerManifest(
+        JSON.stringify({
+          components: { length: 1 },
+          lifecycle: { length: 0 },
+          webhooks: { length: 0 },
+        }),
+        { name: "worker-minimal", features: "minimal" },
+        "array-shape trace",
+      ),
+    ).toThrow(/worker-minimal[\s\S]*unexpected workerd manifest shape/u);
+  });
 });

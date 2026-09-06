@@ -311,18 +311,34 @@ export class ClockifyAddonClient {
       const abortedAfterRegistration = callerSignals.find((signal) => signal.aborted);
       if (abortedAfterRegistration) controller.abort(abortedAfterRegistration.reason);
       let outcome: { readonly response: Response } | { readonly error: unknown };
+      let abortListener: (() => void) | undefined;
       try {
-        outcome = {
-          response: await this.fetch(url, {
+        // AbortController is the normal cancellation path for Fetch, but a
+        // caller-supplied implementation can ignore its signal. Race the
+        // request with the controller so timeout and caller aborts still have
+        // a bounded result in that case. Promise.race attaches rejection
+        // handlers to both inputs, so a late settlement from an ignored fetch
+        // cannot become an unhandled rejection.
+        const fetchPromise = Promise.resolve(
+          this.fetch(url, {
             ...init,
             redirect: "manual",
             headers: new Headers(requestHeaders),
             signal: controller.signal,
           }),
+        );
+        const abortPromise = new Promise<never>((_resolve, reject) => {
+          abortListener = () => reject(controller.signal.reason);
+          if (controller.signal.aborted) abortListener();
+          else controller.signal.addEventListener("abort", abortListener, { once: true });
+        });
+        outcome = {
+          response: await Promise.race([fetchPromise, abortPromise]),
         };
       } catch (error) {
         outcome = { error };
       } finally {
+        if (abortListener) controller.signal.removeEventListener("abort", abortListener);
         clearTimeout(timeout);
         for (const { signal, listener } of abortListeners) {
           signal.removeEventListener("abort", listener);

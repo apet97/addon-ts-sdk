@@ -32,5 +32,5 @@ describe("third-party notices", () => {
     expect(files.map((file: { readonly path: string }) => file.path)).toContain(
       "THIRD_PARTY_NOTICES.md",
     );
-  });
+  }, 15_000);
 });

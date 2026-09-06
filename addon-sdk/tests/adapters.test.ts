@@ -68,6 +68,14 @@ describe("Adapters", () => {
     await expect(fromNodeRequest(mockReq)).rejects.toBeInstanceOf(InvalidRequestTargetError);
   });
 
+  it("validates the Node body-limit configuration before parsing a request target", async () => {
+    const mockReq = new IncomingMessage(new Socket());
+    mockReq.url = "not-origin-form";
+    mockReq.method = "GET";
+
+    await expect(fromNodeRequest(mockReq, { maxBodyBytes: 0 })).rejects.toThrow(/positive integer/);
+  });
+
   it("rejects a //-prefixed Node request-target (authority-form, not origin-form)", async () => {
     for (const url of ["//evil.example/manifest", "///", "//"]) {
       const mockReq = new IncomingMessage(new Socket());
@@ -291,6 +299,27 @@ describe("Adapters", () => {
     expect(response.status).toBe(413);
     expect(await response.text()).toBe("Payload Too Large");
     expect(dispatched).toBe(false);
+  });
+
+  it("keeps the 413 result when an oversized Fetch stream rejects cancellation", async () => {
+    const addon = new ClockifyAddon(mockManifest);
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(new Uint8Array([1, 2, 3, 4, 5]));
+      },
+      cancel() {
+        throw new Error("cancel failed");
+      },
+    });
+
+    const response = await handleFetchRequest(
+      addon,
+      new Request("https://example.com/webhook", { method: "POST", body: stream, duplex: "half" }),
+      { maxBodyBytes: 4 },
+    );
+
+    expect(response.status).toBe(413);
+    expect(await response.text()).toBe("Payload Too Large");
   });
 
   it.each(["GET", "HEAD"])(

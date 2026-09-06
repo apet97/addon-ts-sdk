@@ -133,6 +133,48 @@ describe("create-clockify-addon", () => {
     }
   });
 
+  it("validates programmatic options before touching the target", async () => {
+    const parent = await mkdtemp(join(tmpdir(), "clockify-addon-creator-options-"));
+    const directory = join(parent, "generated-addon");
+    try {
+      await expect(
+        scaffoldClockifyAddon({ directory, runtime: "node", features: "minimal", sdkSpec: "" }),
+      ).rejects.toThrow(/sdkSpec.*non-empty/i);
+      await expect(readFile(join(directory, "package.json"), "utf8")).rejects.toMatchObject({
+        code: "ENOENT",
+      });
+    } finally {
+      await rm(parent, { recursive: true, force: true });
+    }
+  });
+
+  it("keeps generated project names valid for package and Worker metadata", async () => {
+    const parent = await mkdtemp(join(tmpdir(), "clockify-addon-creator-name-"));
+    const directory = join(parent, `${"A".repeat(80)}.demo project`);
+    try {
+      await scaffoldClockifyAddon({ directory, runtime: "worker", features: "minimal" });
+      const packageJson = JSON.parse(await readFile(join(directory, "package.json"), "utf8"));
+      const wrangler = await readFile(join(directory, "wrangler.toml"), "utf8");
+      expect(packageJson.name).toMatch(/^[a-z0-9][a-z0-9_-]{0,62}$/);
+      expect(packageJson.name).not.toContain(".");
+      expect(wrangler).toContain(`name = "${packageJson.name}"`);
+    } finally {
+      await rm(parent, { recursive: true, force: true });
+    }
+  });
+
+  it("generates explicit Node port validation", async () => {
+    const parent = await mkdtemp(join(tmpdir(), "clockify-addon-creator-port-"));
+    const directory = join(parent, "node-addon");
+    try {
+      await scaffoldClockifyAddon({ directory, runtime: "node", features: "minimal" });
+      const bootstrap = await readFile(join(directory, "src", "index.ts"), "utf8");
+      expect(bootstrap).toContain("PORT must be an integer between 0 and 65535.");
+    } finally {
+      await rm(parent, { recursive: true, force: true });
+    }
+  });
+
   it("keeps the minimal scaffold free of lifecycle and webhook routes", async () => {
     const parent = await mkdtemp(join(tmpdir(), "clockify-addon-creator-"));
     const directory = join(parent, "minimal-addon");

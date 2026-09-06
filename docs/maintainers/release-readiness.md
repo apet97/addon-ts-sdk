@@ -5,10 +5,12 @@ Historical receipts below prove only the source SHA and environment they name.
 
 ## Published versions
 
-The latest registry publication is:
+The current release candidate is:
 
-- `@apet97/clockify-addon-sdk@1.3.0`
-- `create-clockify-addon@1.3.0`
+- `@apet97/clockify-addon-sdk@1.3.1`
+- `create-clockify-addon@1.3.1`
+
+The latest registry publication remains 1.3.0 until the 1.3.1 publish receipt is recorded below.
 
 Install the SDK with `npm install @apet97/clockify-addon-sdk` or create a project with
 `npm create clockify-addon@latest`. npm versions are immutable: every future release requires a

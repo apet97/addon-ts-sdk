@@ -84,6 +84,7 @@ Use `https://developer.clockify.me` as the parent origin for a developer workspa
 After installing dependencies and configuring `.env`:
 
 - Node projects run `npm start`, which executes `tsx src/index.ts` and listens on `PORT` or `8080`.
+  `PORT` must be a decimal integer from `0` through `65535`; `0` asks the OS for an available port.
 - Worker projects run `npm start`, which executes `wrangler dev src/index.ts`.
 
 Request `GET /manifest` at the local URL printed by the runtime before configuring Clockify.
@@ -108,7 +109,7 @@ await scaffoldClockifyAddon({
 
 Importing `create-clockify-addon` does not run the CLI or touch the file system. Files are created
 only when `scaffoldClockifyAddon()` is called. The optional `sdkSpec` field lets repository tooling
-substitute a packed SDK; normal generated projects use `^1.3.0`.
+substitute a packed SDK; normal generated projects use `^1.3.1`.
 
 ## Before production
 

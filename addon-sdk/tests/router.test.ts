@@ -274,6 +274,14 @@ describe("Router", () => {
     ).toBe("__redacted__");
   });
 
+  it("redacts nested authToken fields in arbitrary JSON objects", () => {
+    const body = { payload: { installation: { authToken: "nested-secret" } } };
+
+    expect(redactAddonRequest({ method: "POST", path: "/items", headers: {}, body }).body).toEqual({
+      payload: { installation: { authToken: "__redacted__" } },
+    });
+  });
+
   it("should execute middleware chain in order", async () => {
     const addon = new ClockifyAddon(mockManifest);
     const order: number[] = [];

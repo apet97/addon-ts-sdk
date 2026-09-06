@@ -2,7 +2,7 @@
 
 All notable changes to this SDK are recorded here.
 
-## Unreleased
+## 1.3.1 - 2026-09-06
 
 - Node request-target parsing now accepts only origin-form paths (`/path`), rejecting empty,
   relative, query-only, wildcard, and non-HTTP targets before URL normalization.
@@ -15,6 +15,15 @@ All notable changes to this SDK are recorded here.
   paths that cannot be represented consistently by HTTP pathname adapters.
 - Refreshed `jose` and SDK tooling dependencies, plus transitive overrides for `fast-uri`, `nanoid`,
   and `qs`; the full dependency audit is clean.
+- Enforced client timeouts even when an injected fetch implementation ignores `AbortSignal`, and
+  kept caller abort reasons intact.
+- Recursively redacted nested `authToken` values, preserved oversized-fetch errors when stream
+  cleanup fails, and validated Node body-limit options before request-target parsing.
+- Rejected persisted installation URLs with credentials, queries, or fragments, and rejected
+  malformed stored webhook descriptors before exposing them to application code.
+- Hardened the creator against invalid options, unsafe package/Worker names, and invalid Node
+  ports; generated Worker verification now requires actual manifest arrays and `PORT=0` logs the
+  port selected by the operating system.
 
 ## 1.3.0 - 2026-08-09
 

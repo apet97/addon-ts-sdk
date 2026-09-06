@@ -190,11 +190,24 @@ function assertInstallationContext(context: ClockifyInstallationContext): void {
   } catch {
     throw new Error("Clockify apiUrl must be a valid URL.");
   }
+  if (
+    apiUrl.username !== "" ||
+    apiUrl.password !== "" ||
+    apiUrl.search !== "" ||
+    apiUrl.hash !== ""
+  ) {
+    throw new Error("Clockify apiUrl must not include credentials, a query, or a fragment.");
+  }
   if (!isHttpsOrLoopbackHttp(apiUrl)) {
     throw new Error("Clockify apiUrl must use HTTPS outside canonical loopback hosts.");
   }
-  for (const webhook of context.webhooks ?? [])
+  for (const webhook of context.webhooks ?? []) {
+    assertNonEmpty(webhook.path, "webhook path");
+    if (webhook.webhookType !== "ADDON") {
+      throw new Error("Clockify webhook type must be ADDON.");
+    }
     assertNonEmpty(webhook.authToken, "webhook auth token");
+  }
 }
 
 /**

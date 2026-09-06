@@ -175,9 +175,12 @@ export function parseWorkerManifest(body, variant, wranglerOutput) {
   if (
     !manifest ||
     typeof manifest !== "object" ||
-    (manifest.components?.length ?? 0) !== 1 ||
-    (manifest.lifecycle?.length ?? 0) !== expectedLifecycle ||
-    (manifest.webhooks?.length ?? 0) !== expectedWebhooks
+    !Array.isArray(manifest.components) ||
+    !Array.isArray(manifest.lifecycle) ||
+    !Array.isArray(manifest.webhooks) ||
+    manifest.components.length !== 1 ||
+    manifest.lifecycle.length !== expectedLifecycle ||
+    manifest.webhooks.length !== expectedWebhooks
   ) {
     throw new Error(
       workerDiagnostics(

@@ -3,12 +3,29 @@ import { basename, resolve } from "node:path";
 import { WRANGLER_COMPATIBILITY_DATE } from "./wrangler-date.mjs";
 
 function packageName(directory) {
-  return (
-    basename(directory)
-      .toLowerCase()
-      .replace(/[^a-z0-9._-]+/g, "-")
-      .replace(/^-+|-+$/g, "") || "clockify-addon"
-  );
+  const cleaned = basename(directory)
+    .toLowerCase()
+    .replace(/[^a-z0-9_-]+/g, "-")
+    .replace(/^[-_]+|[-_]+$/g, "");
+  return cleaned.slice(0, 63).replace(/[-_]+$/g, "") || "clockify-addon";
+}
+
+function assertScaffoldOptions(options) {
+  if (!options || typeof options !== "object") {
+    throw new TypeError("options must be an object.");
+  }
+  if (
+    typeof options.directory !== "string" ||
+    options.directory.trim() === ""
+  ) {
+    throw new TypeError("directory must be a non-empty string.");
+  }
+  if (
+    options.sdkSpec !== undefined &&
+    (typeof options.sdkSpec !== "string" || options.sdkSpec.trim() === "")
+  ) {
+    throw new TypeError("sdkSpec must be a non-empty string when provided.");
+  }
 }
 
 function commonSource(features) {
@@ -177,11 +194,25 @@ export interface NodeAddonEnvironment extends AddonEnvironment {
   readonly PORT?: string;
 }
 
+function parsePort(value: string | undefined): number {
+  if (value !== undefined && !/^\\d+$/.test(value)) {
+    throw new Error("PORT must be an integer between 0 and 65535.");
+  }
+  const port = Number(value ?? 8080);
+  if (!Number.isSafeInteger(port) || port < 0 || port > 65_535) {
+    throw new Error("PORT must be an integer between 0 and 65535.");
+  }
+  return port;
+}
+
 export function startNodeAddon(environment: NodeAddonEnvironment = process.env) {
-  const port = Number(environment.PORT ?? 8080);
+  const port = parsePort(environment.PORT);
   const server = createNodeHttpAddonServer(createAddon(environment));
   return server.listen(port, () => {
-    console.log(\`Clockify add-on listening on http://localhost:\${port}\`);
+    const address = server.address();
+    const listeningPort =
+      address && typeof address === "object" ? address.port : port;
+    console.log(\`Clockify add-on listening on http://localhost:\${listeningPort}\`);
   });
 }
 
@@ -300,6 +331,7 @@ compatibility_date = "${WRANGLER_COMPATIBILITY_DATE}"
 }
 
 export async function scaffoldClockifyAddon(options) {
+  assertScaffoldOptions(options);
   if (options.runtime !== "node" && options.runtime !== "worker")
     throw new Error("runtime must be node or worker");
   if (options.features !== "all" && options.features !== "minimal")
@@ -312,7 +344,7 @@ export async function scaffoldClockifyAddon(options) {
     if (error?.code !== "ENOENT") throw error;
   }
   await mkdir(resolve(directory, "src"), { recursive: true });
-  const sdkSpec = options.sdkSpec ?? "^1.3.0";
+  const sdkSpec = options.sdkSpec ?? "^1.3.1";
   const manifest = {
     name: packageName(directory),
     version: "0.1.0",
