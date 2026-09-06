@@ -61,7 +61,7 @@ The exact public artifacts are:
   `sha512-8f4/JT1vjASicAGAFZS7eg5f6rX3xfScQi1GhRXNC8ENPfZ1S7kEoal7Qy6IQy2Nm3fny0B1td2ZTof2HXB03A==`
 - `create-clockify-addon@1.3.1`: SHA-1
   `f26e6e6e4f05bd7d9ac8d38cd3620234c656b87d`; SHA-512
-  `sha512-VVpUQ6xLX/z4zrGsPjwQ7IRt5GrAmyVSX0CZIZGTtvGPAyJaVz03rup+/TPS5my5nDgz/Q25giQNy8zp7NUfg==`
+  `sha512-VVpUQ6xLX/z+4zrGsPjwQ7IRt5GrAmyVSX0CZIZGTtvGPAyJaVz03rup+/TPS5my5nDgz/Q25giQNy8zp7NUfg==`
 
 Post-publication `npm run verify:registry` passed from an isolated empty npm cache. It installed
 and executed both exact public versions, including a real `npm create` project that type-checked
