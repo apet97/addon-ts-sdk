@@ -151,24 +151,48 @@ describe("installation stores", () => {
     await expect(encrypted.load("workspace-1", "addon-1")).resolves.toBeNull();
   });
 
-  it("reports corrupt-decode events via onDecodeError without changing the null result", async () => {
-    const raw = new InMemoryClockifyInstallationStore();
+  it("fails closed when a durable store returns a decoded row with invalid context", async () => {
     const key = await crypto.subtle.generateKey({ name: "AES-GCM", length: 256 }, false, [
       "encrypt",
       "decrypt",
     ]);
+    const codec = createClockifyAesGcmTokenCodec(key);
+    const encoded = await codec.encode("installation-secret");
     const onDecodeError = vi.fn();
-    const encrypted = wrapClockifyInstallationStoreWithEncryption(
-      raw,
-      createClockifyAesGcmTokenCodec(key),
-      onDecodeError,
-    );
+    const raw = {
+      load: vi.fn(async () => ({ ...context(100, encoded), apiUrl: "http://attacker.invalid" })),
+      save: vi.fn(async () => undefined),
+      delete: vi.fn(async () => "deleted" as const),
+    };
+    const encrypted = wrapClockifyInstallationStoreWithEncryption(raw, codec, onDecodeError);
 
-    await raw.save(context(100, "enc:v1:not-valid"));
     await expect(encrypted.load("workspace-1", "addon-1")).resolves.toBeNull();
-    expect(onDecodeError).toHaveBeenCalledTimes(1);
-    expect(onDecodeError).toHaveBeenCalledWith(expect.anything(), "workspace-1", "addon-1");
+    expect(onDecodeError).toHaveBeenCalledWith(expect.any(Error), "workspace-1", "addon-1");
   });
+
+  it.each([false, true])(
+    "keeps corrupt-decode loads null when the observer throws: %s",
+    async (throws) => {
+      const raw = new InMemoryClockifyInstallationStore();
+      const key = await crypto.subtle.generateKey({ name: "AES-GCM", length: 256 }, false, [
+        "encrypt",
+        "decrypt",
+      ]);
+      const onDecodeError = vi.fn(() => {
+        if (throws) throw new Error("observer failed");
+      });
+      const encrypted = wrapClockifyInstallationStoreWithEncryption(
+        raw,
+        createClockifyAesGcmTokenCodec(key),
+        onDecodeError,
+      );
+
+      await raw.save(context(100, "enc:v1:not-valid"));
+      await expect(encrypted.load("workspace-1", "addon-1")).resolves.toBeNull();
+      expect(onDecodeError).toHaveBeenCalledTimes(1);
+      expect(onDecodeError).toHaveBeenCalledWith(expect.anything(), "workspace-1", "addon-1");
+    },
+  );
 
   it("rotates encryption keys by decoding old-key rows and encoding new ones with the new key", async () => {
     const oldKey = await crypto.subtle.generateKey({ name: "AES-GCM", length: 256 }, false, [
@@ -206,28 +230,21 @@ describe("installation stores", () => {
     });
   });
 
-  it("chains both codec errors when a rotating codec's decode fails under both keys", async () => {
-    const oldKey = await crypto.subtle.generateKey({ name: "AES-GCM", length: 256 }, false, [
-      "encrypt",
-      "decrypt",
-    ]);
-    const newKey = await crypto.subtle.generateKey({ name: "AES-GCM", length: 256 }, false, [
-      "encrypt",
-      "decrypt",
-    ]);
+  it("retains both rotating-codec errors without mutating a frozen original error", async () => {
+    const newError = new Error("new codec failed");
+    const originalCause = new Error("original cause");
+    const oldError = Object.freeze(new Error("old codec failed", { cause: originalCause }));
     const rotating = createRotatingClockifyTokenCodec(
-      createClockifyAesGcmTokenCodec(newKey),
-      createClockifyAesGcmTokenCodec(oldKey),
+      { encode: vi.fn(), decode: vi.fn().mockRejectedValue(newError) },
+      { encode: vi.fn(), decode: vi.fn().mockRejectedValue(oldError) },
     );
 
-    // The thrown error's cause is the codec actually caught last (oldCodec's
-    // failure); newCodec's failure is chained one level deeper via
-    // cause.cause, so both are reachable without inventing a wrapper shape.
     await expect(rotating.decode("enc:v1:not-valid-at-all")).rejects.toMatchObject({
+      name: "AggregateError",
       message: expect.stringContaining("Both Clockify token codecs failed"),
-      cause: expect.objectContaining({
-        cause: expect.anything(),
-      }),
+      errors: [newError, oldError],
+      cause: oldError,
     });
+    expect(oldError.cause).toBe(originalCause);
   });
 });

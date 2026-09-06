@@ -7188,9 +7188,8 @@ export declare function isPayloadTooLargeError(error: unknown): error is Payload
 
 ```ts
 /**
- * Raised when a Node request-target is not origin-form (`/path`). An origin
- * server only ever receives origin-form; absolute-form and authority-form
- * are proxy-only per RFC 7230 and have no business reaching this adapter.
+ * Raised when a Node request-target is not origin-form (`/path`). This adapter
+ * dispatches registered paths and supports only origin-form request targets.
  */
 export declare class InvalidRequestTargetError extends Error {
     readonly requestTarget: string;

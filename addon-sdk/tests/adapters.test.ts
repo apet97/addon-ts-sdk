@@ -79,6 +79,17 @@ describe("Adapters", () => {
     }
   });
 
+  it.each([undefined, "", "manifest", "?mode=compact", "*", "mailto:manifest", "/path\\child"])(
+    "rejects a Node request-target outside origin-form: %s",
+    async (url) => {
+      const mockReq = new IncomingMessage(new Socket());
+      mockReq.url = url;
+      mockReq.method = "GET";
+
+      await expect(fromNodeRequest(mockReq)).rejects.toBeInstanceOf(InvalidRequestTargetError);
+    },
+  );
+
   it("rejects Node HTTP requests with oversized content-length before body parsing", async () => {
     const mockReq = new IncomingMessage(new Socket());
     mockReq.headers = { host: "localhost", "content-length": "8" };
@@ -577,6 +588,7 @@ describe("Adapters", () => {
 
   it("should handle Node HTTP request read error", async () => {
     const mockReq = new IncomingMessage(new Socket());
+    mockReq.url = "/webhook";
     const promise = fromNodeRequest(mockReq);
     mockReq.emit("error", new Error("Read error"));
 

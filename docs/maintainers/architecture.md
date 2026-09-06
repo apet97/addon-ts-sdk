@@ -43,18 +43,16 @@ The root entrypoint must continue to bundle for browser/Worker targets without `
 Persistent implementations may adapt the store and lease interfaces, but distributed claims must be
 atomic; an unguarded read-then-write is not a valid distributed adapter.
 
-## Known bundle-size debt
+## Validator bundle contract
 
 `clockify-manifest-validation.ts` statically imports all five generated per-schema-version
-validators (`manifest-validators.ts`, ~600 KB unminified in `dist/esm`) so `validateClockifyManifest`
-and `assertClockifyManifest` stay fully synchronous — every consumer pays for validating versions
-1.2–1.4 and 1.6 even when they only ever build a 1.5 manifest. `generated/manifest-schemas.ts` (~48 KB) is
-also always reachable through the root barrel (`generated` namespace), though nothing in the
-runtime validation path reads it.
+validators so `validateClockifyManifest` and `assertClockifyManifest` stay fully synchronous — every
+consumer pays the validator bundle cost for versions 1.2–1.6 even when they only ever build a 1.5
+manifest. `generated/manifest-schemas.ts` is also always reachable through the root barrel
+(`generated` namespace), though nothing in the runtime validation path reads it.
 
-A real fix needs one of: an async validation API (a breaking change, so a major version), or
-splitting the generator's per-version output into separate subpath exports a consumer can import
-selectively. Both are real design work, not a one-line trim, and were deliberately deferred rather
-than rushed into a minor release. Do not "fix" this by hand-editing `generated/manifest-schemas.ts`
-or `generated/index.ts` — change `scripts/generate-clockify-manifest.ts`, the schema, or the
-validation API surface, then run `npm run generate` and the generated-drift verification.
+This is an intentional synchronous API contract. Keep the generated files and their root-barrel
+exports aligned with the generator; do not hand-edit `generated/manifest-schemas.ts` or
+`generated/index.ts`. Any future API or export-boundary change must start from
+`scripts/generate-clockify-manifest.ts` or the validation API, then run `npm run generate` and
+generated-drift verification together.

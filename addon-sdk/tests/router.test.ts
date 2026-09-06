@@ -71,6 +71,32 @@ describe("Router", () => {
     }).toThrow(ValidationException);
   });
 
+  it.each([
+    "//endpoint",
+    "/endpoint?mode=compact",
+    "/endpoint#section",
+    "/endpoint\\child",
+    "/endpoint\r\n",
+  ])("should reject a route path that cannot be represented by an HTTP pathname: %s", (path) => {
+    const addon = new ClockifyAddon(mockManifest);
+    expect(() => addon.registerHandler(path, "GET", () => ({ status: 200 }))).toThrow(
+      ValidationException,
+    );
+  });
+
+  it("reports malformed JavaScript inputs as validation errors", () => {
+    const addon = new ClockifyAddon(mockManifest);
+    expect(() =>
+      addon.registerHandler(42 as unknown as string, "GET", () => ({ status: 200 })),
+    ).toThrow(ValidationException);
+    expect(() => addon.registerHandler("/endpoint", "", () => ({ status: 200 }))).toThrow(
+      ValidationException,
+    );
+    expect(() =>
+      addon.registerHandler("/endpoint", null as unknown as string, () => ({ status: 200 })),
+    ).toThrow(ValidationException);
+  });
+
   it("should reject duplicate path registration", () => {
     const addon = new ClockifyAddon(mockManifest);
     addon.registerHandler("/test", "GET", () => ({ status: 200 }));

@@ -4,6 +4,18 @@ All notable changes to this SDK are recorded here.
 
 ## Unreleased
 
+- Node request-target parsing now accepts only origin-form paths (`/path`), rejecting empty,
+  relative, query-only, wildcard, and non-HTTP targets before URL normalization.
+- Encrypted installation-store decode observers can no longer change the fail-closed `null` result
+  when an observer throws. Rotating token codecs retain both decode failures in an `AggregateError`
+  without mutating either original error.
+- Lifecycle payload guards reject blank identifiers and credentials, and encrypted loads validate
+  decoded installation context before returning it.
+- Route registration rejects authority-like, query, fragment, backslash, and control-character
+  paths that cannot be represented consistently by HTTP pathname adapters.
+- Refreshed `jose` and SDK tooling dependencies, plus transitive overrides for `fast-uri`, `nanoid`,
+  and `qs`; the full dependency audit is clean.
+
 ## 1.3.0 - 2026-08-09
 
 - Omitted raw request bytes and native host request objects from `onError` context, and identified

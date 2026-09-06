@@ -44,3 +44,20 @@ updates:
       time: "08:30"
       timezone: "Europe/Belgrade"
     open-pull-requests-limit: 3
+
+  # The Workers compatibility project has its own lockfile and is not part of
+  # the root npm workspace, so it needs a separate update stream.
+  - package-ecosystem: "npm"
+    directory: "/workers-compat"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "08:15"
+      timezone: "Europe/Belgrade"
+    open-pull-requests-limit: 3
+    groups:
+      workers-tooling:
+        patterns:
+          - "@cloudflare/vitest-pool-workers"
+          - "vitest"
+          - "wrangler"

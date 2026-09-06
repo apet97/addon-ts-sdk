@@ -161,15 +161,11 @@ export function createRotatingClockifyTokenCodec(
         try {
           return await oldCodec.decode(encoded);
         } catch (oldError) {
-          // Corrupted data (not a wrong-key rotation case) fails both codecs;
-          // surfacing only oldError would hide newError's more likely cause.
-          // Chain newError onto oldError.cause first so the thrown error's
-          // own cause is still the codec actually caught here, and a reader
-          // can walk error.cause.cause to see both failures.
-          if (oldError instanceof Error) oldError.cause = newError;
-          throw new Error("Both Clockify token codecs failed to decode the stored value.", {
-            cause: oldError,
-          });
+          throw new AggregateError(
+            [newError, oldError],
+            "Both Clockify token codecs failed to decode the stored value.",
+            { cause: oldError },
+          );
         }
       }
     },
@@ -223,7 +219,7 @@ export function wrapClockifyInstallationStoreWithEncryption(
       const stored = await store.load(workspaceId, addonId);
       if (!stored) return null;
       try {
-        return {
+        const decoded = {
           ...stored,
           authToken: await codec.decode(stored.authToken),
           ...(stored.webhooks
@@ -237,8 +233,18 @@ export function wrapClockifyInstallationStoreWithEncryption(
               }
             : {}),
         };
+        // Treat the persistence boundary as untrusted. A durable store may
+        // contain rows written by an older version, a migration, or a caller
+        // that bypassed the TypeScript contract. Validate the fully decoded
+        // context before exposing credentials or URLs to application code.
+        assertInstallationContext(decoded);
+        return decoded;
       } catch (error) {
-        onDecodeError?.(error, workspaceId, addonId);
+        try {
+          onDecodeError?.(error, workspaceId, addonId);
+        } catch {
+          // An observer must not change the fail-closed load result.
+        }
         return null;
       }
     },

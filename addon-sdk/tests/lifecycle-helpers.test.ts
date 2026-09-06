@@ -88,6 +88,48 @@ describe("Clockify lifecycle payload helpers", () => {
         workspaceId: "workspace-1",
       }),
     ).toBe(false);
+    expect(
+      isClockifyInstalledLifecyclePayload({
+        addonId: " ",
+        authToken: "installation-token",
+        workspaceId: "workspace-1",
+        asUser: "user-1",
+        apiUrl: "https://api.clockify.example/api",
+        addonUserId: "addon-user-1",
+      }),
+    ).toBe(false);
+    expect(
+      isClockifyStatusChangedLifecyclePayload({
+        addonId: "addon-1",
+        workspaceId: "\t",
+        status: "ACTIVE",
+      }),
+    ).toBe(false);
+    expect(
+      isClockifySettingsUpdatedLifecyclePayload({
+        addonId: "addon-1",
+        workspaceId: "workspace-1",
+        settings: [{ id: " ", name: "Name", value: true }],
+      }),
+    ).toBe(false);
+    expect(
+      isClockifyDeletedLifecyclePayload({
+        addonId: "addon-1",
+        workspaceId: "workspace-1",
+        asUser: "",
+      }),
+    ).toBe(false);
+    expect(
+      isClockifyInstalledLifecyclePayload({
+        addonId: "addon-1",
+        authToken: "installation-token",
+        workspaceId: "workspace-1",
+        asUser: "user-1",
+        apiUrl: "https://api.clockify.example/api",
+        addonUserId: "addon-user-1",
+        webhooks: [{ path: "/webhook", webhookType: "ADDON", authToken: " " }],
+      }),
+    ).toBe(false);
   });
 
   it("matches lifecycle payloads to verified workspace and add-on claims", () => {
@@ -110,6 +152,9 @@ describe("Clockify lifecycle payload helpers", () => {
       clockifyLifecyclePayloadMatchesClaims({ ...payload, workspaceId: "workspace-2" }, claims),
     ).toBe(false);
     expect(clockifyLifecyclePayloadMatchesClaims(null, claims)).toBe(false);
+    expect(clockifyLifecyclePayloadMatchesClaims({ ...payload, workspaceId: "  " }, claims)).toBe(
+      false,
+    );
     expect(clockifyLifecyclePayloadMatchesClaims(payload, { ...claims, addonId: undefined })).toBe(
       false,
     );

@@ -79,13 +79,13 @@ describe("tooling configuration", () => {
     expect(sdkPackageJson.devDependencies).toMatchObject({
       "@arethetypeswrong/cli": "^0.18.5",
       "@types/node": "^22.20.1",
-      "@vitest/coverage-v8": "^4.1.10",
-      eslint: "^10.7.0",
-      prettier: "^3.9.5",
-      tsx: "^4.23.1",
+      "@vitest/coverage-v8": "^4.1.11",
+      eslint: "^10.8.1",
+      prettier: "^3.9.6",
+      tsx: "^4.23.12",
       typescript: "^6.0.3",
-      "typescript-eslint": "^8.64.0",
-      vite: "^8.1.4",
+      "typescript-eslint": "^8.67.0",
+      vite: "^8.2.2",
       vitest: "^4.1.10",
     });
     expect(workflow).toContain("          - 22.13.0");

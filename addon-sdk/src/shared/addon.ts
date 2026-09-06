@@ -3,8 +3,15 @@ import { AddonResponse } from "./response";
 import { RequestHandler, AddonMiddleware } from "./handler";
 import { ValidationException, IllegalArgumentException } from "./errors";
 
-function isValidManifestPath(path: string): boolean {
-  return !!path && path.length > 0 && path.startsWith("/") && !path.endsWith("/");
+function isValidManifestPath(path: unknown): path is string {
+  return (
+    typeof path === "string" &&
+    path.length > 0 &&
+    path.startsWith("/") &&
+    !path.startsWith("//") &&
+    !path.endsWith("/") &&
+    !/[\\?#\r\n]/.test(path)
+  );
 }
 
 function trimTrailingSlash(path: string): string {
@@ -139,6 +146,9 @@ export abstract class Addon<M> {
       throw new ValidationException(
         `Url should be an absolute path and not end with a slash. Got ${JSON.stringify(path)}.`,
       );
+    }
+    if (typeof method !== "string" || method.trim() === "") {
+      throw new ValidationException("HTTP method must be a non-empty string.");
     }
 
     const key = `${method.toUpperCase()}:${path}`;

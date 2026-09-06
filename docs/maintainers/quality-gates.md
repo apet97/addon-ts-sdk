@@ -106,9 +106,10 @@ post-publish and live receipts described in `docs/maintainers/release-readiness.
 
 Dependency freshness:
 
-- `.github/dependabot.yml` checks npm and GitHub Actions weekly. npm updates are grouped into
-  SDK-tooling and SDK-runtime PRs so dependency review stays deliberate instead of noisy. Tooling
-  groups accept only minor and patch updates.
+- `.github/dependabot.yml` checks npm and GitHub Actions weekly. Root npm updates are grouped into
+  SDK-tooling and SDK-runtime PRs, while the independent `workers-compat` lockfile has its own
+  Workers-tooling group. Dependency review stays deliberate instead of noisy; root tooling groups
+  accept only minor and patch updates.
 - Keep `@types/node` aligned to the Node 22 runtime floor (`^22`) unless the package support policy
   changes. Keep TypeScript on major 6 until its next major is reviewed separately; Dependabot ignores
   both unsupported majors.

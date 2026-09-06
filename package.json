@@ -41,5 +41,10 @@
   },
   "devDependencies": {
     "acorn": "^8.17.0"
+  },
+  "overrides": {
+    "fast-uri": "^3.1.7",
+    "nanoid": "^3.3.18",
+    "qs": "^6.16.0"
   }
 }

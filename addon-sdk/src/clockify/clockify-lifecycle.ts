@@ -74,16 +74,16 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
 
-function hasString(value: Record<string, unknown>, key: string): boolean {
-  return typeof value[key] === "string";
+function hasNonEmptyString(value: Record<string, unknown>, key: string): boolean {
+  return typeof value[key] === "string" && (value[key] as string).trim() !== "";
 }
 
 function isClockifyLifecycleWebhookToken(value: unknown): value is ClockifyLifecycleWebhookToken {
   return (
     isRecord(value) &&
-    hasString(value, "path") &&
+    hasNonEmptyString(value, "path") &&
     value.webhookType === "ADDON" &&
-    hasString(value, "authToken")
+    hasNonEmptyString(value, "authToken")
   );
 }
 
@@ -92,12 +92,12 @@ export function isClockifyInstalledLifecyclePayload(
 ): value is ClockifyInstalledLifecyclePayload {
   if (
     !isRecord(value) ||
-    !hasString(value, "addonId") ||
-    !hasString(value, "authToken") ||
-    !hasString(value, "workspaceId") ||
-    !hasString(value, "asUser") ||
-    !hasString(value, "apiUrl") ||
-    !hasString(value, "addonUserId")
+    !hasNonEmptyString(value, "addonId") ||
+    !hasNonEmptyString(value, "authToken") ||
+    !hasNonEmptyString(value, "workspaceId") ||
+    !hasNonEmptyString(value, "asUser") ||
+    !hasNonEmptyString(value, "apiUrl") ||
+    !hasNonEmptyString(value, "addonUserId")
   ) {
     return false;
   }
@@ -113,14 +113,19 @@ export function isClockifyStatusChangedLifecyclePayload(
 ): value is ClockifyStatusChangedLifecyclePayload {
   return (
     isRecord(value) &&
-    hasString(value, "addonId") &&
-    hasString(value, "workspaceId") &&
+    hasNonEmptyString(value, "addonId") &&
+    hasNonEmptyString(value, "workspaceId") &&
     (value.status === "ACTIVE" || value.status === "INACTIVE")
   );
 }
 
 function isClockifySettingsUpdatedSetting(value: unknown): value is ClockifySettingsUpdatedSetting {
-  return isRecord(value) && hasString(value, "id") && hasString(value, "name") && "value" in value;
+  return (
+    isRecord(value) &&
+    hasNonEmptyString(value, "id") &&
+    hasNonEmptyString(value, "name") &&
+    "value" in value
+  );
 }
 
 export function isClockifySettingsUpdatedLifecyclePayload(
@@ -128,8 +133,8 @@ export function isClockifySettingsUpdatedLifecyclePayload(
 ): value is ClockifySettingsUpdatedLifecyclePayload {
   return (
     isRecord(value) &&
-    hasString(value, "addonId") &&
-    hasString(value, "workspaceId") &&
+    hasNonEmptyString(value, "addonId") &&
+    hasNonEmptyString(value, "workspaceId") &&
     Array.isArray(value.settings) &&
     value.settings.every(isClockifySettingsUpdatedSetting)
   );
@@ -140,9 +145,9 @@ export function isClockifyDeletedLifecyclePayload(
 ): value is ClockifyDeletedLifecyclePayload {
   return (
     isRecord(value) &&
-    hasString(value, "addonId") &&
-    hasString(value, "workspaceId") &&
-    hasString(value, "asUser")
+    hasNonEmptyString(value, "addonId") &&
+    hasNonEmptyString(value, "workspaceId") &&
+    hasNonEmptyString(value, "asUser")
   );
 }
 
@@ -153,9 +158,9 @@ export function clockifyLifecyclePayloadMatchesClaims(
   return (
     isRecord(payload) &&
     typeof payload.workspaceId === "string" &&
-    payload.workspaceId !== "" &&
+    payload.workspaceId.trim() !== "" &&
     typeof payload.addonId === "string" &&
-    payload.addonId !== "" &&
+    payload.addonId.trim() !== "" &&
     payload.workspaceId === claims.workspaceId &&
     payload.addonId === claims.addonId
   );
