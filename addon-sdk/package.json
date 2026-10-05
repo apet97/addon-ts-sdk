@@ -173,7 +173,7 @@
     "eslint-config-prettier": "^10.1.8",
     "express": "^5.2.1",
     "prettier": "^3.9.6",
-    "publint": "^0.3.24",
+    "publint": "^0.3.25",
     "tsx": "^4.23.12",
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.67.0",
